@@ -104,6 +104,8 @@ jobs:
             if (-not (Test-Path "$dist\$dll")) { throw "$dll is missing from the package" }
           }
           if (-not (Test-Path "$dist\raw*.dll")) { throw "LibRaw is missing from the package" }
+          # Turkish strings for Qt's own buttons (OK, Close, Cancel...).
+          if (-not (Test-Path "$dist\translations\qt_tr.qm")) { throw "translations\qt_tr.qm is missing from the package" }
           Copy-Item README.md, docs\ozellikler.md $dist
           Copy-Item "$env:FFMPEG_ROOT\LICENSE.txt" "$dist\FFmpeg-LICENSE.txt" -ErrorAction SilentlyContinue
 
