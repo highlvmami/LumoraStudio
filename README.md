@@ -1,0 +1,155 @@
+# LumoraStudio
+
+Ücretsiz, tamamen yerel çalışan bir video ve fotoğraf düzenleyici. İlk kuralı şu: **siz istemedikçe kalite asla düşmez.**
+
+- Sadece kesip birleştirdiyseniz video yeniden kodlanmaz; paketler bit bit kopyalanır.
+- Yeniden kodlamak gerekiyorsa "kaynakla aynı" seçeneği kodek, çözünürlük, kare hızı, bit derinliği, renk ve bit hızını kaynaktan alır.
+- Fotoğraflarda orijinal dosyaya asla yazılmaz; ayarlar projede saklanır, dışa aktarırken 32 bit kayan noktada hesaplanıp kayıpsız kaydedilir.
+
+![Kurgu çalışma alanı](docs/screenshots/kurgu.png)
+
+| Dışa aktarma | Fotoğraf |
+|---|---|
+| ![Dışa aktarma penceresi](docs/screenshots/disa-aktar.png) | ![Fotoğraf çalışma alanı](docs/screenshots/fotograf.png) |
+
+Tam yol haritası: [docs/ozellikler.md](docs/ozellikler.md). Mimari: [docs/mimari.md](docs/mimari.md).
+
+## Sürüm 0.1'de neler var
+
+**Video**
+- MP4, MOV, MKV, WebM, AVI, MXF, TS dosyalarını açma; küçük resim, ses dalga formu ve anahtar kare taraması arka planda.
+- Kaynak ve zaman çizelgesi önizlemesi, sesli oynatma, kare kare ilerleme, giriş/çıkış (I/O) noktaları.
+- Mıknatıslı zaman çizelgesi (V1 + bağlantılı A1): ekleme, bölme, silme (boşluk kapanır), kırpma, taşıma, aynı dosyanın ardışık parçalarını yeniden birleştirme, yakınlaştırma ve yapışma.
+- Klip özelliklerinde "kayıpsız kesim" göstergesi: klip bir anahtar karede mi başlıyor?
+
+**Dışa aktarma**
+- **Kayıpsız kesim (önerilen):** video ve ses yeniden kodlanmadan kopyalanır. Kesimler anahtar karelere oturur; B-kareli videolarda hiçbir bozuk kare yazılmaz. "Kesimleri anahtar karelere hizala" ile zaman çizelgesi tam olarak çıkacak sonucu gösterir.
+- **Kaynakla aynı:** kare hassasiyetinde kesim; kaynağın kodeği, çözünürlüğü, kare hızı, piksel biçimi, renk bilgileri ve bit hızıyla yeniden kodlar. Ses uyumluysa kopyalanır.
+- **Kayıpsız ara format:** FFV1 (MKV), kare hassasiyetinde ve matematiksel olarak kayıpsız.
+- Dışa aktarmadan önce "Ne olacak" listesi neyin kopyalanıp neyin kodlanacağını açıkça söyler; kalite hiçbir zaman sessizce düşürülmez.
+
+**Fotoğraf**
+- JPEG, PNG, TIFF, WebP (8 ve 16 bit) açma.
+- Kırpma (serbest ve hazır oranlar), pozlama, kontrast, beyaz dengesi (sıcaklık ve ton), önce/sonra karşılaştırması.
+- Doğrusal ışıkta 32 bit kayan nokta işleme, 16 bit saklama; ICC renk profili korunur.
+- Kayıpsız kaydetme: PNG veya TIFF. Ayar yapılmadıysa pikseller birebir yazılır. JPEG/WebP isteğe bağlıdır ve kayıplı olduğu açıkça yazar.
+
+**Genel**
+- Sınırsız geri al / yinele (video ve fotoğraf için ayrı geçmiş).
+- `.lumora` proje dosyası (okunabilir JSON; göreli ve mutlak yollar, eksik medya listesi).
+- Türkçe ve İngilizce arayüz (Görünüm → Dil), koyu ve açık tema, taşınabilir paneller.
+
+Bilinçli olarak sonraki sürümlere bırakılanlar: EXIF meta verisinin fotoğrafa geri yazılması, donanım kodlayıcıları (NVENC/AMF/QSV, 0.2), çok izli zaman çizelgesi (0.2), Renk ve Ses çalışma alanları (0.3 / 0.4).
+
+## Klavye kısayolları
+
+| Tuş | İşlem |
+|---|---|
+| Boşluk | Oynat / duraklat |
+| ← / → | Önceki / sonraki kare |
+| Home / End | Başa / sona git |
+| I / O | Giriş / çıkış noktası |
+| E | Kaynak aralığını zaman çizelgesine ekle |
+| S veya Ctrl+B | Oynatma kafasından böl |
+| Del | Klibi sil (boşluğu kapat) |
+| Ctrl+J | Sonraki kliple birleştir |
+| N | Yapışmayı aç/kapat |
+| + / − | Yakınlaştır / uzaklaştır |
+| Ctrl+I / Ctrl+E | Medya içe aktar / videoyu dışa aktar |
+| Ctrl+Z / Ctrl+Shift+Z | Geri al / yinele |
+| C / \\ | Fotoğrafta kırpma / önce-sonra |
+
+## Derleme
+
+Gerekenler:
+
+- CMake 3.21+, C++20 derleyici (Windows'ta Visual Studio 2022, Linux'ta GCC 11+ ya da Clang 14+)
+- Qt 6.4+ : Core, Gui, Widgets, Concurrent, Multimedia, LinguistTools (testler için Test). WebP/TIFF için Qt Image Formats eklentisi önerilir.
+- FFmpeg 6.1 – 8.x kütüphaneleri: avformat, avcodec, avutil, swscale, swresample
+
+### Windows
+
+1. **Visual Studio 2022**'yi "Desktop development with C++" iş yüküyle kurun (CMake ve Ninja onunla gelir).
+2. **Qt 6**'yı kurun. [Qt Online Installer](https://www.qt.io/download-qt-installer-oss) ile *Qt 6.8 → MSVC 2022 64-bit* ve *Additional Libraries → Qt Multimedia, Qt Image Formats* seçin. Ya da komut satırından:
+   ```powershell
+   pip install aqtinstall
+   aqt install-qt windows desktop 6.8.3 win64_msvc2022_64 -m qtmultimedia qtimageformats -O C:\Qt
+   ```
+3. **FFmpeg**'i indirin: [BtbN FFmpeg-Builds](https://github.com/BtbN/FFmpeg-Builds/releases/tag/latest) sayfasından `ffmpeg-n8.1-latest-win64-gpl-shared-8.1.zip` dosyasını alıp örneğin `C:\deps\ffmpeg` klasörüne açın (`include`, `lib`, `bin` klasörleri orada olmalı).
+4. "x64 Native Tools Command Prompt for VS 2022" penceresinde:
+   ```bat
+   git clone https://github.com/highlvmami/LumoraStudio.git
+   cd LumoraStudio
+   cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release ^
+         -DCMAKE_PREFIX_PATH=C:\Qt\6.8.3\msvc2022_64 -DFFMPEG_ROOT=C:\deps\ffmpeg
+   cmake --build build
+   ```
+   Derleme sonunda FFmpeg DLL'leri otomatik olarak `build\src\app` içine kopyalanır.
+5. Çalıştırmak ya da başka bir bilgisayara taşımak için Qt DLL'lerini yanına koyun:
+   ```bat
+   C:\Qt\6.8.3\msvc2022_64\bin\windeployqt.exe --release build\src\app\LumoraStudio.exe
+   build\src\app\LumoraStudio.exe
+   ```
+
+Hazır derlenmiş paket: her PR ve `main` için GitHub Actions'ta **Build** iş akışı çalışır; `LumoraStudio-windows-x64` çıktısını indirip açtığınızda `LumoraStudio.exe` doğrudan çalışır.
+
+### Linux (Ubuntu 24.04)
+
+```bash
+sudo apt install build-essential cmake ninja-build pkg-config \
+  qt6-base-dev qt6-multimedia-dev qt6-tools-dev qt6-tools-dev-tools qt6-l10n-tools \
+  qt6-image-formats-plugins libgl-dev \
+  libavformat-dev libavcodec-dev libavutil-dev libswscale-dev libswresample-dev
+cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+cmake --build build
+./build/src/app/LumoraStudio
+```
+
+Başka bir FFmpeg kullanmak için `-DFFMPEG_ROOT=/yol/ffmpeg` verin; verilmezse pkg-config kullanılır.
+
+### macOS
+
+Kod taşınabilir yazıldı ama 0.1'de macOS derlemesi denenmedi. `brew install qt ffmpeg cmake ninja` sonrasında Linux'taki komutlar çalışmalıdır.
+
+## Çalıştırma
+
+```bash
+LumoraStudio                     # boş proje
+LumoraStudio proje.lumora        # proje aç
+LumoraStudio video.mp4 foto.jpg  # dosyaları içe aktararak başla
+```
+
+Dil, Görünüm → Dil menüsünden seçilir (yeniden başlatınca geçerli olur); seçilmezse sistem dili kullanılır.
+
+## Testler
+
+```bash
+cmake --build build
+QT_QPA_PLATFORM=offscreen ctest --test-dir build --output-on-failure
+```
+
+Testler kendi deneme videolarını üretir (her kare kendi numarasını taşır) ve şunları doğrular: kayıpsız kesimde paketlerin bit bit aynı olması, "kaynakla aynı"da kare hassasiyeti, FFV1'de piksel piksel eşitlik, B-kareli H.264 kesimlerinde hiç çözme hatası olmaması, zaman çizelgesi işlemleri, fotoğraf işleme ve proje dosyasının gidiş-dönüşü.
+
+## Proje yapısı
+
+```
+src/core/        Arayüzden bağımsız çekirdek (lumora_core kütüphanesi)
+  TimeBase.*       Tamsayı zaman tabanı (1/705 600 000 sn), kare hızı yardımcıları
+  ffmpeg/          FFmpeg için RAII sarmalayıcılar
+  media/           Medya bilgisi, anahtar kare taraması, video/ses çözücüler, medya havuzu
+  timeline/        Zaman çizelgesi modeli (izler, klipler, bağlantılar, değişmezler)
+  undo/            Geri al / yinele komutları
+  export/          Dışa aktarma planlayıcı (ne kopyalanır, ne kodlanır) ve dışa aktarıcı
+  image/           Fotoğraf ayarları, işleme hattı, fotoğraf kütüphanesi
+  project/         .lumora proje dosyası
+src/app/         Qt Widgets arayüzü: ana pencere, paneller, oynatma motoru, pencereler
+src/i18n/        Çeviriler (lumora_tr.ts)
+tests/           Qt Test birim testleri
+docs/            Özellik listesi, mimari, ekran görüntüleri
+```
+
+Çeviriyi güncellemek için: `cmake --build build --target update_translations`, sonra `src/i18n/lumora_tr.ts` dosyasını Qt Linguist ile düzenleyin.
+
+## Lisans notu
+
+Henüz bir lisans dosyası eklenmedi; projenin lisansına siz karar vermelisiniz. Windows paketi BtbN'in GPL FFmpeg derlemesini kullanır (x264 vb. içerir), bu yüzden dağıtılan paket GPL koşullarına tabidir. LGPL istenirse `lgpl-shared` derlemesi kullanılabilir; o durumda H.264 kodlama için başka bir kodlayıcı gerekir.

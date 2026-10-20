@@ -1,0 +1,102 @@
+#include <QApplication>
+#include <QCommandLineParser>
+#include <QDir>
+#include <QLibraryInfo>
+#include <QLocale>
+#include <QScreen>
+#include <QSettings>
+#include <QTimer>
+#include <QTranslator>
+#include <QWindow>
+
+#include "MainWindow.h"
+#include "Theme.h"
+#include "media/MediaPool.h"
+
+extern "C" {
+#include <libavutil/log.h>
+}
+
+using namespace lumora;
+
+int main(int argc, char* argv[]) {
+    QApplication app(argc, argv);
+    QApplication::setOrganizationName(QStringLiteral("LumoraStudio"));
+    QApplication::setApplicationName(QStringLiteral("LumoraStudio"));
+    QApplication::setApplicationVersion(QStringLiteral(LUMORA_VERSION));
+    av_log_set_level(AV_LOG_ERROR);
+    qRegisterMetaType<lumora::Ticks>("lumora::Ticks");
+    qRegisterMetaType<lumora::MediaItemPtr>();
+
+    QSettings settings;
+    applyTheme(themeFromString(settings.value(QStringLiteral("ui/theme"), QStringLiteral("dark")).toString()));
+
+    // Interface language: setting, else the system language (Turkish or English).
+    QString lang = settings.value(QStringLiteral("ui/language")).toString();
+    if (lang.isEmpty())
+        lang = QLocale().language() == QLocale::Turkish ? QStringLiteral("tr") : QStringLiteral("en");
+    QTranslator appTranslator, qtTranslator;
+    if (lang != QLatin1String("en")) {
+        if (appTranslator.load(QStringLiteral(":/i18n/lumora_%1.qm").arg(lang)))
+            QApplication::installTranslator(&appTranslator);
+        if (qtTranslator.load(QStringLiteral("qtbase_%1").arg(lang), QLibraryInfo::path(QLibraryInfo::TranslationsPath)) ||
+            qtTranslator.load(QStringLiteral("qtbase_%1").arg(lang), QCoreApplication::applicationDirPath() + QStringLiteral("/translations")))
+            QApplication::installTranslator(&qtTranslator);
+        QLocale::setDefault(QLocale(lang));
+    }
+
+    QCommandLineParser parser;
+    parser.setApplicationDescription(QStringLiteral("LumoraStudio video and photo editor"));
+    parser.addHelpOption();
+    parser.addVersionOption();
+    parser.addPositionalArgument(QStringLiteral("files"), QStringLiteral("Project (.lumora) or media files to open"));
+    // Used to produce the screenshots in docs/screenshots.
+    QCommandLineOption shotOpt(QStringLiteral("screenshot"), QStringLiteral("Save a screenshot and quit"), QStringLiteral("png"));
+    QCommandLineOption workspaceOpt(QStringLiteral("workspace"), QStringLiteral("edit or photo"), QStringLiteral("name"));
+    QCommandLineOption selectOpt(QStringLiteral("select-first-clip"), QStringLiteral("Select the first clip"));
+    QCommandLineOption exportOpt(QStringLiteral("export-dialog"), QStringLiteral("Open the export dialog"));
+    QCommandLineOption seekOpt(QStringLiteral("seek"), QStringLiteral("Move the playhead (seconds)"), QStringLiteral("s"));
+    QCommandLineOption sizeOpt(QStringLiteral("size"), QStringLiteral("Window size WxH"), QStringLiteral("size"));
+    for (auto* o : {&shotOpt, &workspaceOpt, &selectOpt, &exportOpt, &seekOpt, &sizeOpt}) {
+        o->setFlags(QCommandLineOption::HiddenFromHelp);
+        parser.addOption(*o);
+    }
+    parser.process(app);
+
+    MainWindow w;
+    if (parser.isSet(sizeOpt)) {
+        const QStringList wh = parser.value(sizeOpt).split(QLatin1Char('x'));
+        if (wh.size() == 2)
+            w.resize(wh[0].toInt(), wh[1].toInt());
+    }
+    w.show();
+    w.openPaths(parser.positionalArguments());
+    if (parser.value(workspaceOpt) == QLatin1String("photo"))
+        w.setWorkspace(MainWindow::Workspace::Photo);
+    if (parser.isSet(selectOpt))
+        w.selectFirstClip();
+    if (parser.isSet(seekOpt))
+        QTimer::singleShot(800, &w, [&w, s = parser.value(seekOpt).toDouble()] { w.seekSeconds(s); });
+
+    if (parser.isSet(shotOpt)) {
+        const QString out = parser.value(shotOpt);
+        const bool exportDlg = parser.isSet(exportOpt);
+        QTimer::singleShot(2500, &w, [&w, out, exportDlg] {
+            if (exportDlg) {
+                w.openExportDialog(false);
+                QTimer::singleShot(1200, &w, [out] {
+                    for (QWidget* top : QApplication::topLevelWidgets())
+                        if (top->isVisible() && top->inherits("lumora::ExportDialog")) {
+                            top->grab().save(out);
+                            break;
+                        }
+                    QCoreApplication::exit(0);
+                });
+                return;
+            }
+            w.grab().save(out);
+            QCoreApplication::exit(0);
+        });
+    }
+    return app.exec();
+}
