@@ -135,6 +135,9 @@ ExportResult RenderSession::run() {
     } else {
         ok = encodePass(0);
     }
+    // The encoder keeps its statistics files open until it is freed, and
+    // Windows does not delete open files.
+    m_venc.reset();
     if (twoRuns)
         for (const char* suffix : {"", ".mbtree", ".cutree", ".temp", ".mbtree.temp", ".cutree.temp"})
             QFile::remove(statsBase + QLatin1String(suffix));
