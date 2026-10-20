@@ -17,6 +17,22 @@ enum class MaskShape {
     Rectangle, // `rect`, with a soft edge of `feather`
     Ellipse,   // the ellipse inscribed in `rect`
     Linear,    // a gradient across the line through the centre of `rect` at `angle`
+    Brush,     // painted with brush strokes
+};
+
+// One brush stroke of a painted mask. Points are normalised photo
+// coordinates; the radius is a fraction of the photo height, so a stroke
+// covers the same part of the picture at any resolution.
+struct BrushStroke {
+    std::vector<QPointF> points;
+    double radius = 0.04;
+    double hardness = 0.5; // 0 = soft edge from the centre, 1 = hard edge
+    double flow = 1.0;     // 0 .. 1 strength of the stroke
+    bool erase = false;    // takes away from the mask instead of adding
+
+    bool operator==(const BrushStroke&) const = default;
+    QJsonObject toJson() const;
+    static BrushStroke fromJson(const QJsonObject& o);
 };
 
 struct LayerMask {
@@ -25,13 +41,16 @@ struct LayerMask {
     double feather = 0.15; // Rectangle / Ellipse: fraction of the shape's half size; Linear: of the diagonal
     double angle = 0.0;    // Linear: degrees; 0 = opaque at the top, fading downwards
     bool invert = false;
+    std::vector<BrushStroke> strokes; // Brush
 
     bool operator==(const LayerMask&) const = default;
     QJsonObject toJson() const;
     static LayerMask fromJson(const QJsonObject& o);
 
-    // Mask value 0..1 at a normalised point.
+    // Mask value 0..1 at a normalised point (not for Brush masks).
     double valueAt(double u, double v, double aspect) const;
+    // The whole mask at a pixel size, row by row (any shape).
+    std::vector<float> render(int width, int height) const;
 };
 
 enum class BlendMode { Normal, Multiply, Screen, Overlay, SoftLight, Darken, Lighten, Add, Difference };

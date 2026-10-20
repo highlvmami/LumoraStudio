@@ -73,17 +73,70 @@ Ticks TimelineState::transitionDuration(int index, const std::function<Ticks(con
 }
 
 bool TimelineState::hasEffects() const {
+    if (!audioMaster.isIdentity())
+        return true;
     for (int ti = 0; ti < static_cast<int>(tracks.size()); ++ti) {
         const Track& t = tracks[ti];
+        if (t.isSubtitle())
+            continue;
         if (ti >= 2 && !t.clips.empty())
             return true;
         for (const auto& c : t.clips) {
             if (c.kind != ClipKind::Media || !c.transform.isIdentity() || !c.color.isIdentity() || !c.transitionIn.isNone() || c.fadeIn > 0 ||
-                c.fadeOut > 0 || c.gainDb != 0.0)
+                c.fadeOut > 0 || c.gainDb != 0.0 || !c.audio.isIdentity())
                 return true;
         }
     }
     return false;
+}
+
+bool TimelineState::hasVideoEffects() const {
+    for (int ti = 0; ti < static_cast<int>(tracks.size()); ++ti) {
+        const Track& t = tracks[ti];
+        if (!t.isVideo())
+            continue;
+        if (ti != 0 && !t.clips.empty())
+            return true;
+        for (const auto& c : t.clips)
+            if (c.kind != ClipKind::Media || !c.transform.isIdentity() || !c.color.isIdentity() ||
+                !c.transitionIn.isNone() || c.fadeIn > 0 || c.fadeOut > 0)
+                return true;
+    }
+    return false;
+}
+
+bool TimelineState::hasAudioChanges() const {
+    if (!audioMaster.isIdentity())
+        return true;
+    for (int ti = 0; ti < static_cast<int>(tracks.size()); ++ti) {
+        const Track& t = tracks[ti];
+        if (!t.isAudio())
+            continue;
+        for (const auto& c : t.clips)
+            if (ti != 1 || c.linkId.isNull() || c.fadeIn > 0 || c.fadeOut > 0 || c.gainDb != 0.0 || !c.audio.isIdentity())
+                return true;
+    }
+    return false;
+}
+
+bool TimelineState::hasSubtitles() const {
+    for (const auto& t : tracks)
+        if (t.isSubtitle() && !t.clips.empty())
+            return true;
+    return false;
+}
+
+std::vector<SubtitleCue> TimelineState::subtitleCues(int track, Ticks from, Ticks to) const {
+    std::vector<SubtitleCue> out;
+    if (track < 0 || track >= static_cast<int>(tracks.size()) || !tracks[track].isSubtitle())
+        return out;
+    for (const auto& c : tracks[track].clips) {
+        const Ticks s = std::max(c.timelineStart, from), e = std::min(c.timelineEnd(), to);
+        if (e <= s || c.text.trimmed().isEmpty())
+            continue;
+        out.push_back({s - from, e - from, c.text});
+    }
+    return out;
 }
 
 // ---------------------------------------------------------------------------
@@ -115,7 +168,8 @@ void Timeline::ensureDefaultTracks() {
 void Timeline::renameTracks() {
     for (int i = 0; i < static_cast<int>(m_state.tracks.size()); ++i) {
         Track& t = m_state.tracks[i];
-        t.name = (t.isVideo() ? QStringLiteral("V%1") : QStringLiteral("A%1")).arg(m_state.trackNumber(i));
+        const QString pattern = t.isVideo() ? QStringLiteral("V%1") : t.isAudio() ? QStringLiteral("A%1") : QStringLiteral("S%1");
+        t.name = pattern.arg(m_state.trackNumber(i));
     }
 }
 
@@ -410,7 +464,7 @@ void Timeline::clearRange(int trackIndex, Ticks from, Ticks to, const std::vecto
 QUuid Timeline::placeMedia(const QUuid& mediaId, Ticks sourceIn, Ticks sourceOut, bool hasVideo, bool hasAudio,
                            int trackIndex, Ticks at) {
     Track* t = track(trackIndex);
-    if (!t || sourceOut <= sourceIn || (!hasVideo && !hasAudio))
+    if (!t || t->isSubtitle() || sourceOut <= sourceIn || (!hasVideo && !hasAudio))
         return {};
     if (t->magnetic)
         return insertMedia(mediaId, sourceIn, sourceOut, hasVideo, hasAudio, at);
@@ -677,6 +731,99 @@ bool Timeline::setGain(const QUuid& clipId, double gainDb) {
     return true;
 }
 
+bool Timeline::setAudioEffects(const QUuid& clipId, const AudioEffects& fx) {
+    Clip* c = mutableClip(clipId);
+    if (!c || c->kind != ClipKind::Media || c->audio == fx)
+        return false;
+    c->audio = fx;
+    emit changed();
+    return true;
+}
+
+bool Timeline::setAudioMaster(const AudioMaster& master) {
+    if (m_state.audioMaster == master)
+        return false;
+    m_state.audioMaster = master;
+    emit changed();
+    return true;
+}
+
+QUuid Timeline::addSubtitle(int trackIndex, Ticks at, Ticks duration, const QString& text) {
+    Track* t = track(trackIndex);
+    if (!t || !t->isSubtitle() || t->locked || duration <= 0)
+        return {};
+    Clip c;
+    c.id = QUuid::createUuid();
+    c.kind = ClipKind::Subtitle;
+    c.sourceIn = 0;
+    c.sourceOut = duration;
+    c.timelineStart = std::max<Ticks>(0, at == kInvalidTicks ? 0 : at);
+    c.text = text;
+    clearRange(trackIndex, c.timelineStart, c.timelineEnd());
+    anchor(c);
+    m_state.tracks[trackIndex].clips.push_back(c);
+    normalize();
+    emit changed();
+    return c.id;
+}
+
+bool Timeline::setSubtitleText(const QUuid& clipId, const QString& text) {
+    Clip* c = mutableClip(clipId);
+    if (!c || c->kind != ClipKind::Subtitle || c->text == text)
+        return false;
+    c->text = text;
+    emit changed();
+    return true;
+}
+
+bool Timeline::setSubtitleStyle(int index, const SubtitleStyle& style) {
+    Track* t = track(index);
+    if (!t || !t->isSubtitle() || t->subtitleStyle == style)
+        return false;
+    t->subtitleStyle = style;
+    emit changed();
+    return true;
+}
+
+bool Timeline::setTrackLanguage(int index, const QString& language) {
+    Track* t = track(index);
+    if (!t || t->language == language)
+        return false;
+    t->language = language;
+    emit changed();
+    return true;
+}
+
+int Timeline::addSubtitleTrack(const std::vector<SubtitleCue>& cues, const QString& language) {
+    Track t;
+    t.id = QUuid::createUuid();
+    t.type = TrackType::Subtitle;
+    t.language = language;
+    for (const auto& cue : cues) {
+        if (cue.end <= cue.start)
+            continue;
+        Clip c;
+        c.id = QUuid::createUuid();
+        c.kind = ClipKind::Subtitle;
+        c.sourceOut = cue.end - cue.start;
+        c.timelineStart = std::max<Ticks>(0, cue.start);
+        c.text = cue.text;
+        // Overlapping cues: the later one starts where the earlier ends.
+        if (!t.clips.empty() && c.timelineStart < t.clips.back().timelineEnd()) {
+            Clip& prev = t.clips.back();
+            prev.sourceOut = std::max<Ticks>(prev.sourceIn + 1, c.timelineStart - prev.timelineStart);
+        }
+        t.clips.push_back(c);
+    }
+    m_state.tracks.push_back(t);
+    renameTracks();
+    for (auto& c : m_state.tracks.back().clips)
+        anchor(c);
+    normalize();
+    emit changed();
+    return static_cast<int>(m_state.tracks.size()) - 1;
+}
+
 bool Timeline::setTitle(const QUuid& clipId, const TitleData& title) {
     Clip* c = mutableClip(clipId);
     if (!c || c->kind != ClipKind::Title || c->title == title)
@@ -692,7 +839,7 @@ bool Timeline::setDuration(const QUuid& clipId, Ticks duration) {
         return false;
     Track& t = m_state.tracks[loc->track];
     Clip& c = t.clips[loc->index];
-    if (c.kind != ClipKind::Title || t.locked)
+    if (c.kind == ClipKind::Media || t.locked)
         return false;
     duration = std::max(duration, frameDuration());
     if (duration == c.duration())
@@ -820,7 +967,7 @@ bool Timeline::trimIn(const QUuid& clipId, Ticks newSourceIn) {
     if (!c)
         return false;
     const Ticks minDur = frameDuration();
-    const Ticks lower = c->kind == ClipKind::Title ? INT64_MIN / 4 : 0;
+    const Ticks lower = c->kind != ClipKind::Media ? INT64_MIN / 4 : 0;
     newSourceIn = std::clamp<Ticks>(newSourceIn, lower, c->sourceOut - minDur);
     const Ticks delta = newSourceIn - c->sourceIn;
     if (delta == 0)
@@ -849,7 +996,7 @@ bool Timeline::trimOut(const QUuid& clipId, Ticks newSourceOut, Ticks mediaDurat
     const Clip* c = clip(clipId);
     if (!c)
         return false;
-    if (c->kind == ClipKind::Title)
+    if (c->kind != ClipKind::Media)
         mediaDuration = 0;
     const Ticks minDur = frameDuration();
     newSourceOut = std::clamp<Ticks>(newSourceOut, c->sourceIn + minDur, mediaDuration > 0 ? mediaDuration : INT64_MAX);

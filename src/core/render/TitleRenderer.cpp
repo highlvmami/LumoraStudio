@@ -143,4 +143,58 @@ void drawTitle(QPainter& p, QSize frame, const TitleData& t, Ticks local, Ticks 
     p.restore();
 }
 
+void drawSubtitle(QPainter& p, QSize frame, const SubtitleStyle& style, const QString& text) {
+    const QString t = text.trimmed();
+    if (t.isEmpty() || frame.isEmpty())
+        return;
+    const double px = std::max(4.0, style.size * frame.height());
+    QFont font(style.fontFamily.isEmpty() ? QStringLiteral("Sans Serif") : style.fontFamily);
+    if (style.fontFamily.isEmpty())
+        font.setStyleHint(QFont::SansSerif);
+    font.setPixelSize(static_cast<int>(std::lround(px)));
+    font.setBold(style.bold);
+    const QFontMetricsF fm(font);
+    // Wrap each line to the available width.
+    const double maxWidth = frame.width() * 0.9;
+    QStringList lines;
+    for (const QString& para : t.split(QLatin1Char('\n'))) {
+        QString line;
+        for (const QString& word : para.split(QLatin1Char(' '), Qt::SkipEmptyParts)) {
+            const QString candidate = line.isEmpty() ? word : line + QLatin1Char(' ') + word;
+            if (!line.isEmpty() && fm.horizontalAdvance(candidate) > maxWidth) {
+                lines << line;
+                line = word;
+            } else {
+                line = candidate;
+            }
+        }
+        if (!line.isEmpty())
+            lines << line;
+    }
+    const double lineHeight = fm.lineSpacing();
+    const double bottom = style.y * frame.height();
+    double y = bottom - lineHeight * lines.size() + fm.ascent();
+    p.save();
+    p.setRenderHint(QPainter::Antialiasing);
+    for (const QString& line : lines) {
+        const double w = fm.horizontalAdvance(line);
+        const double x = (frame.width() - w) / 2;
+        if (style.backgroundOpacity > 0.0) {
+            QColor box(0, 0, 0);
+            box.setAlphaF(std::clamp(style.backgroundOpacity, 0.0, 1.0));
+            const double pad = px * 0.25;
+            p.fillRect(QRectF(x - pad, y - fm.ascent() - pad * 0.3, w + 2 * pad, lineHeight + pad * 0.6), box);
+        }
+        QPainterPath path;
+        path.addText(QPointF(x, y), font, line);
+        if (style.outlineWidth > 0.0) {
+            QPen pen(style.outlineColor, style.outlineWidth * px, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin);
+            p.strokePath(path, pen);
+        }
+        p.fillPath(path, style.color);
+        y += lineHeight;
+    }
+    p.restore();
+}
+
 } // namespace lumora

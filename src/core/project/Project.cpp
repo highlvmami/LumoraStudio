@@ -1,5 +1,7 @@
 #include "Project.h"
 
+#include <algorithm>
+
 #include <QDir>
 #include <QFile>
 #include <QFileInfo>
@@ -50,7 +52,9 @@ QByteArray Project::toJson() const {
 
     QJsonObject root;
     root["format"] = "LumoraStudio project";
-    root["version"] = kFormatVersion;
+    const auto& stracks = m_timeline->state().tracks;
+    const bool subtitles = std::any_of(stracks.begin(), stracks.end(), [](const Track& t) { return t.isSubtitle(); });
+    root["version"] = subtitles ? kFormatVersion : 2;
     root["application"] = QCoreApplication::applicationVersion();
 
     QJsonArray media;
@@ -67,11 +71,17 @@ QByteArray Project::toJson() const {
     QJsonObject tl;
     tl["frameRate"] = QJsonArray{st.frameRate.num, st.frameRate.den};
     tl["resolution"] = QJsonArray{st.resolution.width(), st.resolution.height()};
+    if (!st.audioMaster.isIdentity())
+        tl["audioMaster"] = st.audioMaster.toJson();
     QJsonArray tracks;
     for (const auto& t : st.tracks) {
         QJsonObject to;
         to["id"] = t.id.toString(QUuid::WithoutBraces);
-        to["type"] = t.type == TrackType::Video ? "video" : "audio";
+        to["type"] = t.isVideo() ? "video" : t.isAudio() ? "audio" : "subtitle";
+        if (!t.language.isEmpty())
+            to["language"] = t.language;
+        if (t.isSubtitle())
+            to["subtitleStyle"] = t.subtitleStyle.toJson();
         to["name"] = t.name;
         to["locked"] = t.locked;
         to["muted"] = t.muted;
@@ -84,6 +94,9 @@ QByteArray Project::toJson() const {
             if (c.kind == ClipKind::Title) {
                 co["kind"] = "title";
                 co["title"] = c.title.toJson();
+            } else if (c.kind == ClipKind::Subtitle) {
+                co["kind"] = "subtitle";
+                co["text"] = c.text;
             } else {
                 co["media"] = c.mediaId.toString(QUuid::WithoutBraces);
             }
@@ -108,6 +121,8 @@ QByteArray Project::toJson() const {
                 co["fadeOut"] = ticksToJson(c.fadeOut);
             if (c.gainDb != 0.0)
                 co["gainDb"] = c.gainDb;
+            if (!c.audio.isIdentity())
+                co["audio"] = c.audio.toJson();
             clips.append(co);
         }
         to["clips"] = clips;
@@ -210,11 +225,15 @@ bool Project::fromJson(const QByteArray& json, const QString& baseDir, QString* 
     const QJsonArray res = tl.value("resolution").toArray();
     if (res.size() == 2)
         st.resolution = QSize(res[0].toInt(), res[1].toInt());
+    st.audioMaster = AudioMaster::fromJson(tl.value("audioMaster").toObject());
     for (const auto& tv : tl.value("tracks").toArray()) {
         const QJsonObject to = tv.toObject();
         Track t;
         t.id = QUuid::fromString(to.value("id").toString());
-        t.type = to.value("type").toString() == "audio" ? TrackType::Audio : TrackType::Video;
+        const QString type = to.value("type").toString();
+        t.type = type == "audio" ? TrackType::Audio : type == "subtitle" ? TrackType::Subtitle : TrackType::Video;
+        t.language = to.value("language").toString();
+        t.subtitleStyle = SubtitleStyle::fromJson(to.value("subtitleStyle").toObject());
         t.name = to.value("name").toString();
         t.locked = to.value("locked").toBool();
         t.muted = to.value("muted").toBool();
@@ -227,6 +246,9 @@ bool Project::fromJson(const QByteArray& json, const QString& baseDir, QString* 
             if (co.value("kind").toString() == "title") {
                 c.kind = ClipKind::Title;
                 c.title = TitleData::fromJson(co.value("title").toObject());
+            } else if (co.value("kind").toString() == "subtitle") {
+                c.kind = ClipKind::Subtitle;
+                c.text = co.value("text").toString();
             }
             c.mediaId = QUuid::fromString(co.value("media").toString());
             c.sourceIn = ticksFromJson(co.value("in"));
@@ -244,6 +266,7 @@ bool Project::fromJson(const QByteArray& json, const QString& baseDir, QString* 
             c.fadeIn = ticksFromJson(co.value("fadeIn"));
             c.fadeOut = ticksFromJson(co.value("fadeOut"));
             c.gainDb = co.value("gainDb").toDouble(0.0);
+            c.audio = AudioEffects::fromJson(co.value("audio").toObject());
             t.clips.push_back(c);
         }
         st.tracks.push_back(t);

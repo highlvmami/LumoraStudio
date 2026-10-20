@@ -72,6 +72,14 @@ struct AudioEncodeOptions {
     int sampleRate = 0;          // 0 = same as source
 };
 
+// What happens to the subtitle tracks.
+enum class SubtitleMode {
+    Off,
+    Embed,   // a selectable subtitle stream per track (mov_text in MP4/MOV, SubRip in MKV, WebVTT in WebM)
+    BurnIn,  // drawn into the picture (needs re-encoding)
+    Sidecar, // a .srt file next to the video
+};
+
 enum class VideoStrategy {
     Copy,   // packets copied (lossless cut)
     Encode, // each storyline clip decoded and re-encoded on its own
@@ -86,9 +94,17 @@ struct ExportSettings {
     // Timeline range to export; kInvalidTicks = whole timeline.
     Ticks rangeStart = kInvalidTicks;
     Ticks rangeEnd = kInvalidTicks;
+    SubtitleMode subtitles = SubtitleMode::Embed;
     // Custom mode only.
     VideoEncodeOptions video;
     AudioEncodeOptions audio;
+};
+
+// One subtitle track as it will be written; times are output times.
+struct SubtitleStreamPlan {
+    QString language; // ISO 639-2, may be empty
+    QString title;
+    std::vector<SubtitleCue> cues;
 };
 
 // One timeline clip as it will be written.
@@ -129,6 +145,19 @@ struct ExportPlan {
     int audioSampleRate = 0;
     int audioChannels = 2;
     std::int64_t audioBitrate = 0;
+    // Copy / Encode video with audio == Encode: the sound comes from the
+    // mixer (clip effects, gain, fades, extra audio tracks) instead of each
+    // clip's own audio, so audio changes never force the picture to be
+    // re-encoded. `timeline` and `pool` are set.
+    bool audioMixed = false;
+    // Gain that brings the mix to the master loudness target; worked out by
+    // measuring when the export starts.
+    double normalizationGainDb = 0.0;
+    // Subtitles.
+    bool burnSubtitles = false;                      // render path: drawn into the picture
+    int subtitleCodec = 0;                           // AVCodecID of the embedded streams
+    std::vector<SubtitleStreamPlan> subtitleStreams; // embedded
+    std::vector<SubtitleStreamPlan> sidecarSubtitles; // written as .srt next to the output
     // Copy: one demuxer per segment. Render + audio copy: segments are the
     // audio pieces, placed at outputStart.
     std::vector<SegmentPlan> segments;

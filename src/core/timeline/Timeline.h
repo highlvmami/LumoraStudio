@@ -9,19 +9,21 @@
 #include <vector>
 
 #include "TimeBase.h"
+#include "audio/AudioEffects.h"
 #include "color/ColorGrade.h"
 #include "timeline/ClipEffects.h"
+#include "timeline/Subtitles.h"
 
 namespace lumora {
 
-enum class TrackType { Video, Audio };
+enum class TrackType { Video, Audio, Subtitle };
 
-enum class ClipKind { Media, Title };
+enum class ClipKind { Media, Title, Subtitle };
 
 // A clip references a range [sourceIn, sourceOut) of a media item and is
 // placed at timelineStart. Clips never own pixels; they are pure edit
-// decisions, so the source file is never touched. Title clips have no media;
-// their "source" range is simply [0, duration).
+// decisions, so the source file is never touched. Title and subtitle clips
+// have no media; their "source" range is simply [0, duration).
 struct Clip {
     QUuid id;
     ClipKind kind = ClipKind::Media;
@@ -45,7 +47,11 @@ struct Clip {
     Ticks fadeIn = 0;            // opacity (video) / volume (audio) ramps
     Ticks fadeOut = 0;
     double gainDb = 0.0;         // audio clips
+    AudioEffects audio;          // audio clips
     TitleData title;             // ClipKind::Title
+    QString text;                // ClipKind::Subtitle
+
+    bool hasMedia() const { return kind == ClipKind::Media; }
 
     Ticks duration() const { return sourceOut - sourceIn; }
     Ticks timelineEnd() const { return timelineStart + duration(); }
@@ -67,9 +73,14 @@ struct Track {
     // gaps (ripple behaviour). Other tracks keep absolute positions.
     bool magnetic = false;
     std::vector<Clip> clips; // sorted by timelineStart
+    // Subtitle tracks: ISO 639-2 language (written into exported files) and
+    // the look of the cues when they are drawn into the picture.
+    QString language;
+    SubtitleStyle subtitleStyle;
 
     bool isVideo() const { return type == TrackType::Video; }
     bool isAudio() const { return type == TrackType::Audio; }
+    bool isSubtitle() const { return type == TrackType::Subtitle; }
     bool operator==(const Track&) const = default;
 };
 
@@ -77,14 +88,16 @@ struct Track {
 //
 // Track order: tracks[0] is V1 (the magnetic primary storyline), tracks[1] is
 // A1. Further tracks are appended; among tracks of one type the vector order
-// is their number (V1, V2, ... composited bottom to top; A1, A2, ...).
+// is their number (V1, V2, ... composited bottom to top; A1, A2, ...;
+// subtitle tracks S1, S2, ...).
 struct TimelineState {
     std::vector<Track> tracks;
+    AudioMaster audioMaster;
     AVRational frameRate{0, 1}; // {0,1} = not set yet (taken from the first clip)
     QSize resolution;
 
     bool operator==(const TimelineState& o) const {
-        return tracks == o.tracks && frameRate.num == o.frameRate.num && frameRate.den == o.frameRate.den &&
+        return tracks == o.tracks && audioMaster == o.audioMaster && frameRate.num == o.frameRate.num && frameRate.den == o.frameRate.den &&
                resolution == o.resolution;
     }
 
@@ -98,8 +111,18 @@ struct TimelineState {
     // limited by the media available beyond the cut on both sides and by
     // the clip lengths. `mediaDuration` returns the length of a media item.
     Ticks transitionDuration(int index, const std::function<Ticks(const QUuid&)>& mediaDuration) const;
-    // True when anything needs compositing (more than plain cuts on V1/A1).
+    // True when anything needs compositing or mixing (more than plain cuts
+    // on V1/A1). Subtitles do not count: they are written as their own
+    // stream unless burnt in.
     bool hasEffects() const;
+    // Like hasEffects(), but only what changes the picture.
+    bool hasVideoEffects() const;
+    // True when audio needs mixing (gain, fades, effects, master settings,
+    // loose or extra audio clips).
+    bool hasAudioChanges() const;
+    bool hasSubtitles() const;
+    // Cues of a subtitle track within [from, to), shifted so `from` is 0.
+    std::vector<SubtitleCue> subtitleCues(int track, Ticks from = 0, Ticks to = INT64_MAX) const;
 };
 
 struct ClipLocation {
@@ -168,8 +191,17 @@ public:
     bool setTransition(const QUuid& clipId, const Transition& t);
     bool setFades(const QUuid& clipId, Ticks fadeIn, Ticks fadeOut);
     bool setGain(const QUuid& clipId, double gainDb);
+    bool setAudioEffects(const QUuid& clipId, const AudioEffects& fx);
+    bool setAudioMaster(const AudioMaster& master);
+    // Subtitles. A cue is placed on a subtitle track at `at`, overwriting.
+    QUuid addSubtitle(int track, Ticks at, Ticks duration, const QString& text);
+    bool setSubtitleText(const QUuid& clipId, const QString& text);
+    bool setSubtitleStyle(int track, const SubtitleStyle& style);
+    bool setTrackLanguage(int track, const QString& language);
+    // Adds a new subtitle track holding the cues; returns its index.
+    int addSubtitleTrack(const std::vector<SubtitleCue>& cues = {}, const QString& language = {});
     bool setTitle(const QUuid& clipId, const TitleData& title);
-    // Length of a clip on a non-magnetic track or a title (any track).
+    // Length of a title or subtitle clip.
     bool setDuration(const QUuid& clipId, Ticks duration);
     // Splits every clip under `t` on unlocked tracks.
     bool splitAt(Ticks t);

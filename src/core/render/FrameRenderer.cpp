@@ -382,11 +382,28 @@ QImage FrameRenderer::render(Ticks t) {
             if (c.contains(t))
                 drawLayer(p, c, t, c.toSource(t), fadeFactor(c, t));
     }
+    for (const auto& [track, clip] : subtitlesAt(t))
+        drawSubtitle(p, canvas.size(), track->subtitleStyle, clip->text);
     return canvas;
 }
 
+std::vector<std::pair<const Track*, const Clip*>> FrameRenderer::subtitlesAt(Ticks t) const {
+    std::vector<std::pair<const Track*, const Clip*>> out;
+    if (!m_subtitles)
+        return out;
+    for (int ti : m_state.trackIndices(TrackType::Subtitle)) {
+        const Track& track = m_state.tracks[ti];
+        if (track.hidden)
+            continue;
+        for (const auto& c : track.clips)
+            if (c.contains(t) && !c.text.trimmed().isEmpty())
+                out.emplace_back(&track, &c);
+    }
+    return out;
+}
+
 const AVFrame* FrameRenderer::passthroughFrame(Ticks t) {
-    if (m_state.tracks.empty() || m_state.tracks[0].hidden)
+    if (m_state.tracks.empty() || m_state.tracks[0].hidden || !subtitlesAt(t).empty())
         return nullptr;
     for (int ti : m_state.trackIndices(TrackType::Video)) {
         if (ti == 0 || m_state.tracks[ti].hidden)

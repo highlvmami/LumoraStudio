@@ -1,8 +1,10 @@
 #include "PhotoAdjustments.h"
 
 #include <QJsonArray>
+#include <QtConcurrent/QtConcurrentMap>
 #include <algorithm>
 #include <cmath>
+#include <numeric>
 
 namespace lumora {
 
@@ -32,12 +34,13 @@ const char* maskShapeId(MaskShape s) {
     case MaskShape::Rectangle: return "rectangle";
     case MaskShape::Ellipse: return "ellipse";
     case MaskShape::Linear: return "linear";
+    case MaskShape::Brush: return "brush";
     }
     return "none";
 }
 
 MaskShape maskShapeFromId(const QString& id) {
-    for (MaskShape s : {MaskShape::Rectangle, MaskShape::Ellipse, MaskShape::Linear})
+    for (MaskShape s : {MaskShape::Rectangle, MaskShape::Ellipse, MaskShape::Linear, MaskShape::Brush})
         if (id == QLatin1String(maskShapeId(s)))
             return s;
     return MaskShape::None;
@@ -64,10 +67,140 @@ BlendMode blendModeFromId(const QString& id) {
     return BlendMode::Normal;
 }
 
+namespace {
+
+double round5(double v) { return std::round(v * 1e5) / 1e5; }
+
+} // namespace
+
+QJsonObject BrushStroke::toJson() const {
+    // Points as a flat [x, y, x, y, ...] list, which keeps long strokes small.
+    QJsonArray pts;
+    for (const auto& p : points) {
+        pts.append(round5(p.x()));
+        pts.append(round5(p.y()));
+    }
+    QJsonObject o{{"points", pts}, {"radius", radius}, {"hardness", hardness}, {"flow", flow}};
+    if (erase)
+        o["erase"] = true;
+    return o;
+}
+
+BrushStroke BrushStroke::fromJson(const QJsonObject& o) {
+    BrushStroke s;
+    const QJsonArray pts = o.value("points").toArray();
+    for (int i = 0; i + 1 < pts.size(); i += 2)
+        s.points.emplace_back(pts[i].toDouble(), pts[i + 1].toDouble());
+    s.radius = std::clamp(o.value("radius").toDouble(s.radius), 1e-4, 1.0);
+    s.hardness = std::clamp(o.value("hardness").toDouble(s.hardness), 0.0, 1.0);
+    s.flow = std::clamp(o.value("flow").toDouble(s.flow), 0.0, 1.0);
+    s.erase = o.value("erase").toBool(false);
+    return s;
+}
+
+namespace {
+
+// Paints one stroke into `coverage` (the largest dab value per pixel, so a
+// stroke crossing itself does not get stronger) and returns the touched
+// pixel rectangle.
+QRect stampStroke(const BrushStroke& s, int w, int h, std::vector<float>& coverage) {
+    if (s.points.empty() || w <= 0 || h <= 0)
+        return {};
+    const double r = std::max(0.5, s.radius * h);
+    const double hard = std::clamp(s.hardness, 0.0, 0.99);
+    const double spacing = std::max(0.75, r * 0.15);
+    QRect touched;
+    auto dab = [&](double cx, double cy) {
+        const int x0 = std::max(0, static_cast<int>(std::floor(cx - r))), x1 = std::min(w - 1, static_cast<int>(std::ceil(cx + r)));
+        const int y0 = std::max(0, static_cast<int>(std::floor(cy - r))), y1 = std::min(h - 1, static_cast<int>(std::ceil(cy + r)));
+        if (x0 > x1 || y0 > y1)
+            return;
+        touched |= QRect(QPoint(x0, y0), QPoint(x1, y1));
+        for (int y = y0; y <= y1; ++y) {
+            float* row = coverage.data() + static_cast<size_t>(y) * w;
+            const double dy = (y + 0.5 - cy) / r;
+            for (int x = x0; x <= x1; ++x) {
+                const double dx = (x + 0.5 - cx) / r;
+                const double d = std::sqrt(dx * dx + dy * dy);
+                if (d >= 1.0)
+                    continue;
+                const float v = d <= hard ? 1.0f : static_cast<float>(1.0 - smoothstep((d - hard) / (1.0 - hard)));
+                row[x] = std::max(row[x], v);
+            }
+        }
+    };
+    QPointF prev(s.points.front().x() * w, s.points.front().y() * h);
+    dab(prev.x(), prev.y());
+    double carry = 0.0; // distance travelled since the last dab
+    for (size_t i = 1; i < s.points.size(); ++i) {
+        const QPointF p(s.points[i].x() * w, s.points[i].y() * h);
+        const double len = std::hypot(p.x() - prev.x(), p.y() - prev.y());
+        double t = spacing - carry;
+        while (t <= len) {
+            const double f = t / len;
+            dab(prev.x() + (p.x() - prev.x()) * f, prev.y() + (p.y() - prev.y()) * f);
+            t += spacing;
+        }
+        carry = len - (t - spacing);
+        prev = p;
+    }
+    if (s.points.size() > 1)
+        dab(prev.x(), prev.y());
+    return touched;
+}
+
+} // namespace
+
+std::vector<float> LayerMask::render(int w, int h) const {
+    std::vector<float> out(static_cast<size_t>(std::max(0, w)) * std::max(0, h), 1.0f);
+    if (w <= 0 || h <= 0)
+        return out;
+    if (shape == MaskShape::Brush) {
+        std::fill(out.begin(), out.end(), 0.0f);
+        std::vector<float> coverage(out.size(), 0.0f);
+        for (const auto& s : strokes) {
+            const QRect r = stampStroke(s, w, h, coverage);
+            if (r.isEmpty())
+                continue;
+            const float flow = static_cast<float>(std::clamp(s.flow, 0.0, 1.0));
+            for (int y = r.top(); y <= r.bottom(); ++y) {
+                float* m = out.data() + static_cast<size_t>(y) * w;
+                float* c = coverage.data() + static_cast<size_t>(y) * w;
+                for (int x = r.left(); x <= r.right(); ++x) {
+                    const float a = c[x] * flow;
+                    m[x] = s.erase ? m[x] * (1 - a) : m[x] + (1 - m[x]) * a;
+                    c[x] = 0.0f;
+                }
+            }
+        }
+        if (invert)
+            for (float& v : out)
+                v = 1.0f - v;
+        return out;
+    }
+    if (shape == MaskShape::None && !invert)
+        return out;
+    const double aspect = double(w) / h;
+    std::vector<int> rows(h);
+    std::iota(rows.begin(), rows.end(), 0);
+    QtConcurrent::blockingMap(rows, [&](int y) {
+        float* m = out.data() + static_cast<size_t>(y) * w;
+        const double v = (y + 0.5) / h;
+        for (int x = 0; x < w; ++x)
+            m[x] = static_cast<float>(valueAt((x + 0.5) / w, v, aspect));
+    });
+    return out;
+}
+
 QJsonObject LayerMask::toJson() const {
     QJsonObject o;
     o["shape"] = QLatin1String(maskShapeId(shape));
-    if (shape != MaskShape::None) {
+    if (shape == MaskShape::Brush) {
+        QJsonArray arr;
+        for (const auto& s : strokes)
+            arr.append(s.toJson());
+        o["strokes"] = arr;
+    } else if (shape != MaskShape::None) {
         o["rect"] = rectToJson(rect);
         o["feather"] = feather;
         o["angle"] = angle;
@@ -84,6 +217,8 @@ LayerMask LayerMask::fromJson(const QJsonObject& o) {
     m.feather = o.value("feather").toDouble(m.feather);
     m.angle = o.value("angle").toDouble(m.angle);
     m.invert = o.value("invert").toBool(false);
+    for (const auto& v : o.value("strokes").toArray())
+        m.strokes.push_back(BrushStroke::fromJson(v.toObject()));
     return m;
 }
 
@@ -91,7 +226,8 @@ double LayerMask::valueAt(double u, double v, double aspect) const {
     double m = 1.0;
     const double f = std::max(feather, 1e-4);
     switch (shape) {
-    case MaskShape::None: break;
+    case MaskShape::None:
+    case MaskShape::Brush: break;
     case MaskShape::Rectangle: {
         // Distance inside the edge, relative to the half size of each axis.
         const double hx = std::max(rect.width() / 2, 1e-6), hy = std::max(rect.height() / 2, 1e-6);
@@ -124,6 +260,8 @@ double LayerMask::valueAt(double u, double v, double aspect) const {
 bool PhotoLayer::isNoOp() const {
     if (!visible || opacity <= 0.0)
         return true;
+    if (mask.shape == MaskShape::Brush && mask.strokes.empty() && !mask.invert)
+        return true; // nothing painted yet
     if (kind == LayerKind::Adjustment)
         return grade.isIdentity();
     return imagePath.isEmpty();

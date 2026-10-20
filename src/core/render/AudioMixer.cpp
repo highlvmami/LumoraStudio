@@ -4,6 +4,7 @@
 #include <cmath>
 #include <deque>
 
+#include "audio/AudioDsp.h"
 #include "media/AudioDecoder.h"
 
 namespace lumora {
@@ -81,21 +82,86 @@ struct AudioMixer::Source {
     bool primed = false;
 };
 
+// Effect state of one clip. Output samples lag the input by the chain's
+// latency, so the input is read that far ahead.
+struct AudioMixer::ClipFx {
+    AudioEffects effects;
+    std::unique_ptr<dsp::ClipChain> chain;
+    std::int64_t inPos = 0;            // next media sample to feed
+    std::int64_t outPos = INT64_MIN;   // media sample of pending[0]
+    std::deque<float> pending;         // processed, interleaved
+};
+
+struct AudioMixer::Master {
+    AudioMaster settings;
+    double gainDb = 0.0;
+    std::unique_ptr<dsp::Limiter> limiter;
+    int latency() const { return limiter ? limiter->latency() : 0; }
+};
+
 AudioMixer::AudioMixer(const MediaPool* pool, int sampleRate, int channels)
     : m_pool(pool), m_rate(sampleRate), m_channels(channels) {}
 
 AudioMixer::~AudioMixer() = default;
 
+void AudioMixer::setMasterEnabled(bool on) {
+    if (m_masterEnabled == on)
+        return;
+    m_masterEnabled = on;
+    rebuildMaster();
+}
+
+void AudioMixer::setNormalizationGainDb(double db) {
+    if (m_normGainDb == db)
+        return;
+    m_normGainDb = db;
+    rebuildMaster();
+}
+
+void AudioMixer::rebuildMaster() {
+    const AudioMaster& ms = m_state.audioMaster;
+    if (!m_masterEnabled || ms.isIdentity()) {
+        m_master.reset();
+        m_masterNext = INT64_MIN;
+        return;
+    }
+    const double gain = ms.normalize ? m_normGainDb : 0.0;
+    if (m_master && m_master->settings == ms && m_master->gainDb == gain)
+        return;
+    const bool sameLimiter = m_master && m_master->limiter && m_master->settings.ceilingDb == ms.ceilingDb;
+    if (!m_master)
+        m_master = std::make_unique<Master>();
+    m_master->settings = ms;
+    m_master->gainDb = gain;
+    if (ms.limiterActive()) {
+        if (!sameLimiter) {
+            m_master->limiter = std::make_unique<dsp::Limiter>(m_rate, m_channels, ms.ceilingDb);
+            m_masterNext = INT64_MIN;
+        }
+    } else if (m_master->limiter) {
+        m_master->limiter.reset();
+        m_masterNext = INT64_MIN;
+    }
+}
+
 void AudioMixer::setTimeline(const TimelineState& state) {
     m_state = state;
     buildVoices();
-    // Forget decoders of clips that no longer exist.
+    // Forget decoders and effect state of clips that no longer exist.
     for (auto it = m_sources.begin(); it != m_sources.end();) {
         if (!m_state.findClip(it->first))
             it = m_sources.erase(it);
         else
             ++it;
     }
+    for (auto it = m_fx.begin(); it != m_fx.end();) {
+        const Clip* c = m_state.findClip(it->first);
+        if (!c || c->audio.chainIsIdentity())
+            it = m_fx.erase(it);
+        else
+            ++it;
+    }
+    rebuildMaster();
 }
 
 void AudioMixer::buildVoices() {
@@ -183,13 +249,130 @@ AudioMixer::Source* AudioMixer::sourceFor(const Clip& clip) {
 }
 
 void AudioMixer::mix(std::int64_t start, int frames, float* out) {
+    if (frames <= 0)
+        return;
+    if (!m_master) {
+        mixRaw(start, frames, out);
+        return;
+    }
+    const int look = m_master->latency();
+    const size_t samples = static_cast<size_t>(frames) * m_channels;
+    if (start != m_masterNext) {
+        // The limiter's output lags its input by `look` samples: feed it the
+        // first `look` samples of the request, so what comes out next is
+        // exactly the requested range.
+        if (m_master->limiter)
+            m_master->limiter->reset();
+        if (look > 0) {
+            std::vector<float> prime(static_cast<size_t>(look) * m_channels);
+            mixRaw(start, look, prime.data());
+            const float g = static_cast<float>(dsp::dbToGain(m_master->gainDb));
+            for (float& v : prime)
+                v *= g;
+            m_master->limiter->process(prime.data(), look);
+        }
+    }
+    mixRaw(start + look, frames, out);
+    const float g = static_cast<float>(dsp::dbToGain(m_master->gainDb));
+    if (g != 1.0f)
+        for (size_t i = 0; i < samples; ++i)
+            out[i] *= g;
+    if (m_master->limiter)
+        m_master->limiter->process(out, frames);
+    m_masterNext = start + frames;
+}
+
+void AudioMixer::readVoice(const Clip& c, Source* src, std::int64_t from, int n, float* dst) {
+    auto readPadded = [&](std::int64_t pos, int count, float* buf) {
+        if (pos < 0) {
+            const int pad = static_cast<int>(std::min<std::int64_t>(count, -pos));
+            std::fill(buf, buf + static_cast<size_t>(pad) * m_channels, 0.0f);
+            if (count > pad)
+                src->read(0, count - pad, buf + static_cast<size_t>(pad) * m_channels);
+        } else {
+            src->read(pos, count, buf);
+        }
+    };
+    if (c.audio.chainIsIdentity()) {
+        readPadded(from, n, dst);
+        return;
+    }
+    auto& fx = m_fx[c.id];
+    if (!fx || !(fx->effects == c.audio)) {
+        fx = std::make_unique<ClipFx>();
+        fx->effects = c.audio;
+        fx->chain = std::make_unique<dsp::ClipChain>(c.audio, m_rate, m_channels);
+    }
+    if (fx->outPos != from) {
+        // Start afresh a little earlier so the filters, the compressor and
+        // the noise estimate have settled when the wanted audio comes out.
+        fx->chain->reset();
+        fx->pending.clear();
+        const std::int64_t warmup = c.audio.denoise > 0 ? m_rate : m_rate / 5;
+        fx->inPos = from - warmup;
+        fx->outPos = fx->inPos - fx->chain->latency();
+    }
+    const auto pendingFrames = [&] { return static_cast<std::int64_t>(fx->pending.size()) / m_channels; };
+    std::vector<float> chunk;
+    while (fx->outPos + pendingFrames() < from + n) {
+        const int k = static_cast<int>(std::min<std::int64_t>(4096, from + n - fx->outPos - pendingFrames() + 256));
+        chunk.resize(static_cast<size_t>(k) * m_channels);
+        readPadded(fx->inPos, k, chunk.data());
+        fx->chain->process(chunk.data(), k);
+        fx->pending.insert(fx->pending.end(), chunk.begin(), chunk.end());
+        fx->inPos += k;
+    }
+    // Drop what lies before the request, hand out n samples.
+    const std::int64_t skip = from - fx->outPos;
+    if (skip > 0) {
+        fx->pending.erase(fx->pending.begin(), fx->pending.begin() + static_cast<long>(skip * m_channels));
+        fx->outPos = from;
+    }
+    std::copy(fx->pending.begin(), fx->pending.begin() + static_cast<long>(n) * m_channels, dst);
+    fx->pending.erase(fx->pending.begin(), fx->pending.begin() + static_cast<long>(n) * m_channels);
+    fx->outPos = from + n;
+}
+
+void AudioMixer::mixRaw(std::int64_t start, int frames, float* out) {
     std::fill(out, out + static_cast<size_t>(frames) * m_channels, 0.0f);
     if (frames <= 0)
         return;
+    if (start != m_rawNext) {
+        m_keyEnv = 0.0;
+        m_duck = 0.0;
+    }
+    m_rawNext = start + frames;
+    bool anyDucked = false;
+    for (const Voice& v : m_voices)
+        anyDucked |= v.clip->audio.duckDb < 0.0;
     const Ticks t0 = av_rescale(start, kTicksPerSecond, m_rate);
     const Ticks t1 = av_rescale(start + frames, kTicksPerSecond, m_rate);
     m_scratch.resize(static_cast<size_t>(frames) * m_channels);
+    // Two passes: the clips that are not ducked, then (after following their
+    // level) the ducked ones.
+    for (int pass = 0; pass < (anyDucked ? 2 : 1); ++pass) {
+    if (pass == 1) {
+        // Key level from what has been mixed so far; ducking engages 10 ms
+        // after the key gets above -45 dBFS and lets go over half a second.
+        m_duckCurve.resize(frames);
+        const double keyAttack = std::exp(-1.0 / (0.01 * m_rate)), keyRelease = std::exp(-1.0 / (0.3 * m_rate));
+        const double duckAttack = 1.0 - std::exp(-1.0 / (0.08 * m_rate));
+        const double duckRelease = 1.0 - std::exp(-1.0 / (0.6 * m_rate));
+        constexpr double threshold = 0.0056; // -45 dBFS
+        for (int i = 0; i < frames; ++i) {
+            double peak = 0.0;
+            for (int ch = 0; ch < m_channels; ++ch)
+                peak = std::max(peak, static_cast<double>(std::abs(out[static_cast<size_t>(i) * m_channels + ch])));
+            const double kc = peak > m_keyEnv ? keyAttack : keyRelease;
+            m_keyEnv = kc * m_keyEnv + (1 - kc) * peak;
+            const double target = m_keyEnv > threshold ? 1.0 : 0.0;
+            m_duck += (target - m_duck) * (target > m_duck ? duckAttack : duckRelease);
+            m_duckCurve[i] = static_cast<float>(m_duck);
+        }
+    }
     for (const Voice& v : m_voices) {
+        if ((v.clip->audio.duckDb < 0.0) != (pass == 1))
+            continue;
         if (v.to <= t0 || v.from >= t1)
             continue;
         const Clip& c = *v.clip;
@@ -208,15 +391,8 @@ void AudioMixer::mix(std::int64_t start, int frames, float* out) {
         if (src->failed)
             continue;
         float* buf = m_scratch.data();
-        if (mediaFirst < 0) {
-            // Before the start of the media: silence for that part.
-            const int pad = static_cast<int>(std::min<std::int64_t>(n, -mediaFirst));
-            std::fill(buf, buf + static_cast<size_t>(pad) * m_channels, 0.0f);
-            if (n > pad)
-                src->read(0, n - pad, buf + static_cast<size_t>(pad) * m_channels);
-        } else {
-            src->read(mediaFirst, n, buf);
-        }
+        readVoice(c, src, mediaFirst, n, buf);
+        const float duckGain = static_cast<float>(dsp::dbToGain(c.audio.duckDb));
         // Gain changes slowly: evaluate it every 32 samples and interpolate.
         constexpr int step = 32;
         for (int i = 0; i < n; i += step) {
@@ -224,13 +400,16 @@ void AudioMixer::mix(std::int64_t start, int frames, float* out) {
             const double g0 = gainAt(v, av_rescale(first + i, kTicksPerSecond, m_rate));
             const double g1 = gainAt(v, av_rescale(first + i + m, kTicksPerSecond, m_rate));
             for (int j = 0; j < m; ++j) {
-                const float g = static_cast<float>(g0 + (g1 - g0) * j / m);
+                float g = static_cast<float>(g0 + (g1 - g0) * j / m);
+                if (pass == 1)
+                    g *= 1.0f + (duckGain - 1.0f) * m_duckCurve[static_cast<size_t>(first - start + i + j)];
                 const size_t o = static_cast<size_t>(first - start + i + j) * m_channels;
                 const size_t s = static_cast<size_t>(i + j) * m_channels;
                 for (int ch = 0; ch < m_channels; ++ch)
                     out[o + ch] += buf[s + ch] * g;
             }
         }
+    }
     }
 }
 

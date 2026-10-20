@@ -13,7 +13,11 @@ add_library(lumora_core STATIC
     color/ColorProcessor.h color/ColorProcessor.cpp
     color/Lut.h color/Lut.cpp
     color/Scopes.h color/Scopes.cpp
+    audio/AudioEffects.h audio/AudioEffects.cpp
+    audio/AudioDsp.h audio/AudioDsp.cpp
+    audio/Loudness.h audio/Loudness.cpp
     timeline/ClipEffects.h timeline/ClipEffects.cpp
+    timeline/Subtitles.h timeline/Subtitles.cpp
     timeline/Timeline.h timeline/Timeline.cpp
     undo/TimelineCommands.h undo/TimelineCommands.cpp
     render/TitleRenderer.h render/TitleRenderer.cpp
@@ -25,6 +29,7 @@ add_library(lumora_core STATIC
     export/ExportPlanner.h export/ExportPlanner.cpp
     export/TimelineExporter.h export/TimelineExporter.cpp
     export/RenderExport.h export/RenderExport.cpp
+    export/SubtitleStreams.h export/SubtitleStreams.cpp
     image/PhotoAdjustments.h image/PhotoAdjustments.cpp
     image/PhotoProcessor.h image/PhotoProcessor.cpp
     image/PhotoLibrary.h image/PhotoLibrary.cpp
@@ -42,4 +47,5 @@ set(CORE_TRANSLATABLE_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/export/ExportPlanner.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/export/TimelineExporter.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/project/Project.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/timeline/Subtitles.cpp
     PARENT_SCOPE)
