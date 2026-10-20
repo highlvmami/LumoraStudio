@@ -9,6 +9,8 @@
 
 #include "export/Encoders.h"
 #include "export/ExportCommon.h"
+#include "audio/Loudness.h"
+#include "export/SubtitleStreams.h"
 #include "ffmpeg/FFmpeg.h"
 #include "media/MediaPool.h"
 #include "render/AudioMixer.h"
@@ -106,6 +108,15 @@ private:
     Ticks m_pendingTime = 0;
     bool m_audioDone = false;
 
+    SubtitleStreams m_subs;
+    std::map<int, std::int64_t> m_lastSubDts;
+    bool writeSubtitles(Ticks until) {
+        return m_subs.writeUntil(until, [this](AVPacket* p, int idx) {
+            auto [it, _] = m_lastSubDts.try_emplace(idx, AV_NOPTS_VALUE);
+            return writePacket(p, idx, it->second);
+        });
+    }
+
     QString m_error;
     QStringList m_notes;
 };
@@ -172,6 +183,7 @@ bool RenderSession::encodePass(int pass) {
     renderer.setTimeline(m_plan.timeline);
     renderer.setOutputSize(m_plan.pictureSize);
     renderer.setPrecision(FrameRenderer::Precision::Final);
+    renderer.setDrawSubtitles(m_plan.burnSubtitles);
     const AVRational rate = m_plan.outputRate;
     renderer.setSampleOffset(frameDuration(rate) / 2);
 
@@ -198,6 +210,8 @@ bool RenderSession::encodePass(int pass) {
     }
     if (!pumpAudio(length) || !flushAudio())
         return false;
+    if (!writeSubtitles(INT64_MAX))
+        return fail(m_error);
     const int ret = av_write_trailer(m_out.get());
     if (ret < 0)
         return fail(tr("Could not finish the file: %1").arg(av::errorString(ret)));
@@ -304,6 +318,11 @@ bool RenderSession::openOutput() {
     AVDictionary* opts = nullptr;
     if (m_plan.containerName == QLatin1String("mp4") || m_plan.containerName == QLatin1String("mov"))
         av_dict_set(&opts, "movflags", "+faststart+use_metadata_tags", 0);
+    {
+        QString subErr;
+        if (!m_subs.addStreams(m_out.get(), m_plan, &subErr))
+            return fail(TimelineExporter::tr("Cannot add the subtitles: %1").arg(subErr));
+    }
     ret = avformat_write_header(m_out.get(), &opts);
     av_dict_free(&opts);
     if (ret < 0)
@@ -376,6 +395,15 @@ bool RenderSession::openAudio() {
     m_aswr.reset(swr);
     m_mixer = std::make_unique<AudioMixer>(m_plan.pool, rate, channels);
     m_mixer->setTimeline(m_plan.timeline);
+    if (m_plan.timeline.audioMaster.normalize) {
+        const auto r = loudness::measureTimeline(m_plan.timeline, m_plan.pool, m_plan.rangeStart, m_plan.rangeEnd, {}, m_cancel);
+        const double gain = loudness::normalizationGain(r.integrated, m_plan.timeline.audioMaster.targetLufs);
+        m_mixer->setNormalizationGainDb(gain);
+        m_notes << tr("Loudness %1 LUFS, brought to %2 LUFS (%3 dB).")
+                       .arg(r.integrated, 0, 'f', 1)
+                       .arg(m_plan.timeline.audioMaster.targetLufs, 0, 'f', 1)
+                       .arg(gain, 0, 'f', 1);
+    }
     m_rangeStartSample = av_rescale(m_plan.rangeStart, rate, kTicksPerSecond);
     return true;
 }
@@ -477,6 +505,15 @@ bool RenderSession::writePacket(AVPacket* pkt, int stream, std::int64_t& lastDts
     }
     if (pkt->dts != AV_NOPTS_VALUE)
         lastDts = pkt->dts;
+    if (stream == m_outVideo && pkt->dts != AV_NOPTS_VALUE && !m_subs.empty()) {
+        AVPacket* held = av_packet_clone(pkt);
+        const bool ok = writeSubtitles(ticksFromStream(pkt->dts, m_out->streams[stream]->time_base));
+        av_packet_unref(pkt);
+        av_packet_move_ref(pkt, held);
+        av_packet_free(&held);
+        if (!ok)
+            return false;
+    }
     const int ret = av_interleaved_write_frame(m_out.get(), pkt);
     if (ret < 0)
         return fail(tr("Write error: %1").arg(av::errorString(ret)));

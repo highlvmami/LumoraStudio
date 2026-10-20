@@ -35,6 +35,7 @@
 #include "Icons.h"
 #include "Theme.h"
 #include "MediaCache.h"
+#include "audio/AudioPanel.h"
 #include "color/ClipColorPanel.h"
 #include "color/ScopesWidget.h"
 #include "dialogs/ExportDialog.h"
@@ -48,6 +49,7 @@
 #include "playback/PlaybackEngine.h"
 #include "project/Project.h"
 #include "render/FrameRenderer.h"
+#include "timeline/Subtitles.h"
 #include "undo/TimelineCommands.h"
 
 namespace lumora {
@@ -75,8 +77,7 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
     m_tabs->addTab(tr("Audio"));
     m_tabs->addTab(tr("Photo"));
     m_tabs->setTabToolTip(1, tr("Colour grading: wheels, LUTs and scopes for the selected clip"));
-    m_tabs->setTabEnabled(2, false);
-    m_tabs->setTabToolTip(2, tr("Audio tools arrive in version 0.4"));
+    m_tabs->setTabToolTip(2, tr("Sound: clean up, equalise and level clips, duck music, set the loudness of the mix"));
 
     m_stack = new QStackedWidget;
     m_monitor = new MonitorPanel(m_engine);
@@ -92,6 +93,7 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
     m_properties = new PropertiesPanel(m_project, m_videoUndo);
     m_clipColor = new ClipColorPanel(m_project, m_videoUndo);
     m_scopes = new ScopesWidget;
+    m_audio = new AudioPanel(m_project, m_videoUndo);
 
     createActions();
     createDocks();
@@ -203,6 +205,7 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
         else
             m_properties->showClip(sel.front());
         m_clipColor->showClip(sel.isEmpty() ? QUuid() : sel.front());
+        m_audio->showClip(sel.isEmpty() ? QUuid() : sel.front());
         const bool has = !sel.isEmpty();
         m_actDelete->setEnabled(has);
         m_actJoin->setEnabled(has && m_project->timeline()->canJoinWithNext(sel.front()));
@@ -219,6 +222,7 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
     connect(m_timelineView, &TimelineView::filesDropped, this,
             [this](const QStringList& paths, Ticks at, int track) { importFiles(paths, at, true, track); });
     connect(m_timelineView, &TimelineView::addTitleRequested, this, [this](int track, Ticks at) { addTitle(track, at); });
+    connect(m_timelineView, &TimelineView::addSubtitleRequested, this, [this](int track, Ticks at) { addSubtitle(track, at); });
     connect(m_timelineView, &TimelineView::contextMenuForClip, this, [this](const QUuid& id, const QPoint& pos) {
         QMenu menu;
         menu.addAction(m_actSplit);
@@ -352,6 +356,14 @@ void MainWindow::createActions() {
         runTimelineEdit(m_videoUndo, m_project->timeline(), tr("Add audio track"),
                         [&] { return m_project->timeline()->addTrack(TrackType::Audio) >= 0; });
     });
+    m_actAddSubtitle = make(tr("Add &subtitle"), QKeySequence(Qt::SHIFT | Qt::Key_T), [this] { addSubtitle(); });
+    m_actAddSubtitle->setToolTip(tr("Add a subtitle at the playhead (Shift+T)"));
+    m_actAddSubtitleTrack = make(tr("Add subtitle track"), {}, [this] {
+        runTimelineEdit(m_videoUndo, m_project->timeline(), tr("Add subtitle track"),
+                        [&] { return m_project->timeline()->addTrack(TrackType::Subtitle) >= 0; });
+    });
+    m_actImportSubtitles = make(tr("Import subtitles (SRT, VTT)…"), {}, &MainWindow::importSubtitles);
+    m_actExportSubtitles = make(tr("Export subtitles…"), {}, &MainWindow::exportSubtitles);
     m_actExportFrame = make(tr("Export current &frame…"), QKeySequence(Qt::CTRL | Qt::ALT | Qt::Key_S),
                             &MainWindow::exportFrame);
 
@@ -393,6 +405,12 @@ void MainWindow::createMenus() {
     edit->addAction(m_actAddTransition);
     edit->addAction(m_actAddVideoTrack);
     edit->addAction(m_actAddAudioTrack);
+    QMenu* subs = edit->addMenu(tr("Subtitles"));
+    subs->addAction(m_actAddSubtitle);
+    subs->addAction(m_actAddSubtitleTrack);
+    subs->addSeparator();
+    subs->addAction(m_actImportSubtitles);
+    subs->addAction(m_actExportSubtitles);
     edit->addSeparator();
     edit->addAction(m_actMarkIn);
     edit->addAction(m_actMarkOut);
@@ -450,6 +468,7 @@ void MainWindow::createMenus() {
     panels->addAction(m_timelineDock->toggleViewAction());
     panels->addAction(m_colorDock->toggleViewAction());
     panels->addAction(m_scopesDock->toggleViewAction());
+    panels->addAction(m_audioDock->toggleViewAction());
     view->addAction(m_actResetLayout);
 
     QMenu* help = menuBar()->addMenu(tr("&Help"));
@@ -480,6 +499,7 @@ void MainWindow::createDocks() {
     m_timelineDock = makeDock(tr("Timeline"), QStringLiteral("timelineDock"), m_timelinePanel);
     m_colorDock = makeDock(tr("Color"), QStringLiteral("colorDock"), m_clipColor);
     m_scopesDock = makeDock(tr("Scopes"), QStringLiteral("scopesDock"), m_scopes);
+    m_audioDock = makeDock(tr("Audio"), QStringLiteral("audioDock"), m_audio);
     setCorner(Qt::BottomLeftCorner, Qt::BottomDockWidgetArea);
     setCorner(Qt::BottomRightCorner, Qt::BottomDockWidgetArea);
     addDockWidget(Qt::LeftDockWidgetArea, m_binDock);
@@ -490,25 +510,31 @@ void MainWindow::createDocks() {
     // Colour docks belong to the Color workspace.
     addDockWidget(Qt::RightDockWidgetArea, m_colorDock);
     addDockWidget(Qt::LeftDockWidgetArea, m_scopesDock);
+    addDockWidget(Qt::RightDockWidgetArea, m_audioDock);
     m_colorDock->hide();
     m_scopesDock->hide();
+    m_audioDock->hide();
 }
 
 void MainWindow::applyDefaultLayout(Workspace w) {
     const bool color = w == Workspace::Color;
-    for (QDockWidget* d : {m_binDock, m_propsDock, m_timelineDock, m_colorDock, m_scopesDock})
+    const bool audio = w == Workspace::Audio;
+    for (QDockWidget* d : {m_binDock, m_propsDock, m_timelineDock, m_colorDock, m_scopesDock, m_audioDock})
         d->setFloating(false);
     addDockWidget(Qt::LeftDockWidgetArea, color ? m_scopesDock : m_binDock);
-    addDockWidget(Qt::RightDockWidgetArea, color ? m_colorDock : m_propsDock);
+    addDockWidget(Qt::RightDockWidgetArea, color ? m_colorDock : audio ? m_audioDock : m_propsDock);
     addDockWidget(Qt::BottomDockWidgetArea, m_timelineDock);
     m_binDock->setVisible(!color);
-    m_propsDock->setVisible(!color);
+    m_propsDock->setVisible(!color && !audio);
     m_scopesDock->setVisible(color);
     m_colorDock->setVisible(color);
+    m_audioDock->setVisible(audio);
     m_timelineDock->show();
     resizeDocks({m_timelineDock}, {color ? 230 : 280}, Qt::Vertical);
     if (color)
         resizeDocks({m_scopesDock, m_colorDock}, {380, 360}, Qt::Horizontal);
+    else if (audio)
+        resizeDocks({m_binDock, m_audioDock}, {280, 340}, Qt::Horizontal);
     else
         resizeDocks({m_binDock, m_propsDock}, {300, 280}, Qt::Horizontal);
 }
@@ -521,8 +547,6 @@ void MainWindow::restoreSettings() {
 }
 
 void MainWindow::setWorkspace(Workspace w) {
-    if (w == Workspace::Audio)
-        w = Workspace::Edit;
     const bool photo = w == Workspace::Photo;
     const Workspace previous = m_workspace;
     if (w != previous) {
@@ -539,19 +563,20 @@ void MainWindow::setWorkspace(Workspace w) {
     }
     m_stack->setCurrentIndex(photo ? 1 : 0);
     if (photo) {
-        for (QDockWidget* d : {m_binDock, m_propsDock, m_timelineDock, m_colorDock, m_scopesDock})
+        for (QDockWidget* d : {m_binDock, m_propsDock, m_timelineDock, m_colorDock, m_scopesDock, m_audioDock})
             d->hide();
     } else if (w != previous) {
         const QByteArray state = m_dockStates.value(static_cast<int>(w));
         if (state.isEmpty() || !restoreState(state))
             applyDefaultLayout(w);
     }
-    if (w == Workspace::Color && m_timelineView->selection().isEmpty())
+    if ((w == Workspace::Color || w == Workspace::Audio) && m_timelineView->selection().isEmpty())
         selectClipAtPlayhead();
     m_undoGroup->setActiveStack(photo ? m_photoUndo : m_videoUndo);
     for (QAction* a : {m_actSplit, m_actDelete, m_actJoin, m_actPlay, m_actPrevFrame, m_actNextFrame, m_actHome, m_actEnd,
                        m_actMarkIn, m_actMarkOut, m_actAddSource, m_actZoomIn, m_actZoomOut, m_actExport, m_actAddTitle,
-                       m_actAddTransition, m_actAddVideoTrack, m_actAddAudioTrack, m_actExportFrame})
+                       m_actAddTransition, m_actAddVideoTrack, m_actAddAudioTrack, m_actExportFrame, m_actAddSubtitle,
+                       m_actAddSubtitleTrack, m_actImportSubtitles, m_actExportSubtitles})
         a->setVisible(!photo);
     m_actExportPhoto->setVisible(photo);
 }
@@ -840,6 +865,102 @@ void MainWindow::addTitle(int track, Ticks at) {
         m_timelineView->selectOnly(id);
         m_propsDock->show();
     }
+}
+
+void MainWindow::addSubtitle(int track, Ticks at) {
+    Timeline* tl = m_project->timeline();
+    if (at == kInvalidTicks)
+        at = snapToFrame(m_engine->position(), tl->frameRate());
+    QUuid id;
+    runTimelineEdit(m_videoUndo, tl, tr("Add subtitle"), [&] {
+        int target = track;
+        if (target < 0) {
+            for (int ti : tl->state().trackIndices(TrackType::Subtitle))
+                if (!tl->tracks()[ti].locked) {
+                    target = ti;
+                    break;
+                }
+            if (target < 0)
+                target = tl->addTrack(TrackType::Subtitle);
+        }
+        // Two seconds, or up to the next subtitle when that comes sooner.
+        Ticks length = ticksFromSeconds(2);
+        for (const auto& c : tl->tracks()[target].clips)
+            if (c.timelineStart > at)
+                length = std::min(length, c.timelineStart - at);
+        if (length < ticksFromSeconds(0.3))
+            length = ticksFromSeconds(2);
+        id = tl->addSubtitle(target, at, length, QString());
+        return !id.isNull();
+    });
+    if (!id.isNull()) {
+        m_timelineView->selectOnly(id);
+        m_propsDock->show();
+        m_properties->focusText();
+    }
+}
+
+void MainWindow::importSubtitles() {
+    QSettings s;
+    const QString path = QFileDialog::getOpenFileName(this, tr("Import subtitles"), s.value(QStringLiteral("dirs/subtitles"),
+                                                      s.value(QStringLiteral("dirs/media"))).toString(),
+                                                      tr("Subtitles (*.srt *.vtt);;All files (*)"));
+    if (path.isEmpty())
+        return;
+    s.setValue(QStringLiteral("dirs/subtitles"), QFileInfo(path).absolutePath());
+    QString err;
+    const auto cues = subtitles::readFile(path, &err);
+    if (cues.empty()) {
+        QMessageBox::warning(this, tr("Import subtitles"),
+                             err.isEmpty() ? tr("%1 has no subtitles.").arg(QDir::toNativeSeparators(path))
+                                           : tr("Cannot read %1:\n%2").arg(QDir::toNativeSeparators(path), err));
+        return;
+    }
+    // "film.tr.srt" names its language.
+    const QStringList parts = QFileInfo(path).completeBaseName().split(QLatin1Char('.'));
+    const QString language = parts.size() > 1 ? subtitles::isoLanguage(parts.back()) : QString();
+    runTimelineEdit(m_videoUndo, m_project->timeline(), tr("Import subtitles"),
+                    [&] { return m_project->timeline()->addSubtitleTrack(cues, language) >= 0; });
+    statusBar()->showMessage(tr("%n subtitle(s) imported.", nullptr, int(cues.size())), 5000);
+}
+
+void MainWindow::exportSubtitles() {
+    const Timeline* tl = m_project->timeline();
+    // The track of the selected subtitle, otherwise the first one with cues.
+    int track = -1;
+    const auto sel = m_timelineView->selection();
+    if (!sel.isEmpty())
+        if (auto loc = tl->locate(sel.front()); loc && tl->tracks()[loc->track].isSubtitle())
+            track = loc->track;
+    if (track < 0)
+        for (int ti : tl->state().trackIndices(TrackType::Subtitle))
+            if (!tl->tracks()[ti].clips.empty()) {
+                track = ti;
+                break;
+            }
+    if (track < 0) {
+        QMessageBox::information(this, tr("Export subtitles"), tr("There are no subtitles to export yet."));
+        return;
+    }
+    QSettings s;
+    const QString base = m_project->filePath().isEmpty() ? tr("Subtitles") : QFileInfo(m_project->filePath()).completeBaseName();
+    QString selected;
+    QString path = QFileDialog::getSaveFileName(
+        this, tr("Export subtitles"),
+        QDir(s.value(QStringLiteral("dirs/subtitles")).toString()).filePath(base + QStringLiteral(".srt")),
+        tr("SubRip (*.srt);;WebVTT (*.vtt)"), &selected);
+    if (path.isEmpty())
+        return;
+    s.setValue(QStringLiteral("dirs/subtitles"), QFileInfo(path).absolutePath());
+    const bool vtt = path.endsWith(QLatin1String(".vtt"), Qt::CaseInsensitive) ||
+                     (!path.endsWith(QLatin1String(".srt"), Qt::CaseInsensitive) && selected.contains(QLatin1String("vtt")));
+    if (!path.endsWith(QLatin1String(".srt"), Qt::CaseInsensitive) && !path.endsWith(QLatin1String(".vtt"), Qt::CaseInsensitive))
+        path += vtt ? QStringLiteral(".vtt") : QStringLiteral(".srt");
+    QString err;
+    if (!subtitles::writeFile(path, tl->state().subtitleCues(track), vtt ? subtitles::Format::Vtt : subtitles::Format::Srt, &err))
+        QMessageBox::warning(this, tr("Export subtitles"), tr("Cannot write %1:\n%2").arg(QDir::toNativeSeparators(path), err));
+    else
+        statusBar()->showMessage(tr("Subtitles saved to %1").arg(QDir::toNativeSeparators(path)), 5000);
 }
 
 void MainWindow::addTransition() {

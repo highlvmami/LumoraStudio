@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.21)
 
 project(LumoraStudio
-    VERSION 0.3.1
+    VERSION 0.4.0
     DESCRIPTION "Free video and photo editor that never loses quality unless asked to"
     LANGUAGES CXX)
 
@@ -26,6 +26,14 @@ set(CMAKE_AUTORCC ON)
 
 find_package(Qt6 6.4 REQUIRED COMPONENTS Core Gui Widgets Concurrent Multimedia Network LinguistTools)
 find_package(FFmpeg REQUIRED COMPONENTS avformat avcodec avutil swscale swresample)
+
+option(LUMORA_WITH_LIBRAW "Open camera RAW photos with LibRaw when it is installed" ON)
+option(LUMORA_REQUIRE_LIBRAW "Fail when LibRaw is missing (release builds)" OFF)
+if(LUMORA_REQUIRE_LIBRAW)
+    find_package(LibRaw REQUIRED)
+elseif(LUMORA_WITH_LIBRAW)
+    find_package(LibRaw)
+endif()
 
 add_subdirectory(src/core)
 add_subdirectory(src/app)

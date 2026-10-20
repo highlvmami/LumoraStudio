@@ -12,6 +12,8 @@
 #include <numeric>
 #include <vector>
 
+#include "RawDecoder.h"
+
 namespace lumora {
 
 namespace {
@@ -78,7 +80,8 @@ void compositeLayer(QImage& base, const PhotoLayer& layer) {
         const QPointF centre(w / 2.0 + layer.x * w, h / 2.0 + layer.y * h);
         p.drawImage(QRectF(centre - QPointF(size.width() / 2, size.height() / 2), size), pic);
     }
-    const double aspect = h > 0 ? double(w) / h : 1.0;
+    const bool masked = layer.mask.shape != MaskShape::None || layer.mask.invert;
+    const std::vector<float> mask = masked ? layer.mask.render(w, h) : std::vector<float>{};
     const float opacity = static_cast<float>(std::clamp(layer.opacity, 0.0, 1.0));
     std::vector<int> rows(h);
     std::iota(rows.begin(), rows.end(), 0);
@@ -86,7 +89,7 @@ void compositeLayer(QImage& base, const PhotoLayer& layer) {
         auto* b = reinterpret_cast<QRgba64*>(base.scanLine(y));
         const QRgba64* s = source.isNull() ? nullptr : reinterpret_cast<const QRgba64*>(source.constScanLine(y));
         const QRgba64* c = coverage.isNull() ? nullptr : reinterpret_cast<const QRgba64*>(coverage.constScanLine(y));
-        const double v = (y + 0.5) / h;
+        const float* m = masked ? mask.data() + static_cast<size_t>(y) * w : nullptr;
         for (int x = 0; x < w; ++x) {
             float a = opacity;
             float top[3];
@@ -104,8 +107,8 @@ void compositeLayer(QImage& base, const PhotoLayer& layer) {
                 top[1] = s[x].green() / 65535.0f;
                 top[2] = s[x].blue() / 65535.0f;
             }
-            if (layer.mask.shape != MaskShape::None || layer.mask.invert)
-                a *= static_cast<float>(layer.mask.valueAt((x + 0.5) / w, v, aspect));
+            if (m)
+                a *= m[x];
             if (a <= 0.0f)
                 continue;
             const float bottom[3] = {b[x].red() / 65535.0f, b[x].green() / 65535.0f, b[x].blue() / 65535.0f};
@@ -123,14 +126,21 @@ void compositeLayer(QImage& base, const PhotoLayer& layer) {
 } // namespace
 
 QImage PhotoProcessor::load(const QString& path, QImage* original, QString* error) {
-    QImageReader reader(path);
-    reader.setAutoTransform(true);
-    reader.setAllocationLimit(2048); // MB; large photos are welcome
-    QImage img = reader.read();
-    if (img.isNull()) {
-        if (error)
-            *error = reader.errorString();
-        return {};
+    QImage img;
+    if (raw::isRawFile(path)) {
+        img = raw::decode(path, error);
+        if (img.isNull())
+            return {};
+    } else {
+        QImageReader reader(path);
+        reader.setAutoTransform(true);
+        reader.setAllocationLimit(2048); // MB; large photos are welcome
+        img = reader.read();
+        if (img.isNull()) {
+            if (error)
+                *error = reader.errorString();
+            return {};
+        }
     }
     if (original)
         *original = img;

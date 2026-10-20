@@ -1,5 +1,6 @@
 #include "ColorPanel.h"
 
+#include <QButtonGroup>
 #include <QComboBox>
 #include <QFileDialog>
 #include <QFileInfo>
@@ -17,6 +18,7 @@
 #include "Icons.h"
 #include "color/ColorProcessor.h"
 #include "color/ColorWheelWidget.h"
+#include "color/CurvesWidget.h"
 #include "color/Lut.h"
 #include "color/SliderRow.h"
 
@@ -112,6 +114,44 @@ ColorPanel::ColorPanel(QWidget* parent) : QWidget(parent) {
     wl->addWidget(m_gain);
     rl->addWidget(wheels);
 
+    auto* curves = new QGroupBox(tr("Curves"));
+    auto* cl = new QVBoxLayout(curves);
+    m_curves = new CurvesWidget;
+    cl->addWidget(m_curves);
+    rl->addWidget(curves);
+
+    auto* hsl = new QGroupBox(tr("HSL mixer"));
+    hsl->setToolTip(tr("Change one colour range at a time: its hue, how strong it is and how bright"));
+    auto* hl = new QVBoxLayout(hsl);
+    auto* bands = new QHBoxLayout;
+    bands->setSpacing(3);
+    m_hslBands = new QButtonGroup(this);
+    const QString bandNames[kHslBands] = {tr("Red"), tr("Orange"), tr("Yellow"), tr("Green"),
+                                          tr("Aqua"), tr("Blue"), tr("Purple"), tr("Magenta")};
+    for (int i = 0; i < kHslBands; ++i) {
+        auto* b = new QToolButton;
+        b->setCheckable(true);
+        b->setToolTip(bandNames[i]);
+        b->setAccessibleName(bandNames[i]);
+        b->setFixedSize(22, 22);
+        const QColor c = QColor::fromHsvF(hslBandHue(i) / 360.0, 0.75, 0.9);
+        b->setStyleSheet(QStringLiteral("QToolButton { background: %1; border: 2px solid transparent; border-radius: 11px; }"
+                                        "QToolButton:checked { border-color: palette(text); }")
+                             .arg(c.name()));
+        m_hslBands->addButton(b, i);
+        bands->addWidget(b);
+    }
+    bands->addStretch();
+    m_hslBands->button(0)->setChecked(true);
+    hl->addLayout(bands);
+    m_hslHue = new SliderRow(tr("Hue"), -100, 100, 1, 0);
+    m_hslSat = new SliderRow(tr("Saturation"), -100, 100, 1, 0);
+    m_hslLum = new SliderRow(tr("Luminance"), -100, 100, 1, 0);
+    hl->addWidget(m_hslHue);
+    hl->addWidget(m_hslSat);
+    hl->addWidget(m_hslLum);
+    rl->addWidget(hsl);
+
     auto* lutBox = new QGroupBox(tr("LUT"));
     auto* ll = new QGridLayout(lutBox);
     m_lut = new QComboBox;
@@ -156,6 +196,22 @@ ColorPanel::ColorPanel(QWidget* parent) : QWidget(parent) {
     bindWheel(m_lift, &ColorGrade::lift, tr("Lift"), QStringLiteral("lift"));
     bindWheel(m_gamma, &ColorGrade::gamma, tr("Gamma"), QStringLiteral("gamma"));
     bindWheel(m_gain, &ColorGrade::gain, tr("Gain"), QStringLiteral("gain"));
+    connect(m_curves, &CurvesWidget::curveEdited, this, [this](int channel, const ToneCurve& c) {
+        edit(tr("Curve"), QStringLiteral("curve%1").arg(channel), [&](ColorGrade& g) {
+            ToneCurve* target[4] = {&g.curveMaster, &g.curveRed, &g.curveGreen, &g.curveBlue};
+            *target[channel] = c;
+        });
+    });
+    connect(m_hslBands, &QButtonGroup::idClicked, this, &ColorPanel::showHslBand);
+    auto bindHsl = [this](SliderRow* s, double HslBand::*field, const QString& key) {
+        connect(s, &SliderRow::valueChanged, this, [this, field, key](double v) {
+            const int band = m_hslBand;
+            edit(tr("HSL"), key + QString::number(band), [&](ColorGrade& g) { g.hsl[band].*field = v; });
+        });
+    };
+    bindHsl(m_hslHue, &HslBand::hue, QStringLiteral("hslHue"));
+    bindHsl(m_hslSat, &HslBand::saturation, QStringLiteral("hslSat"));
+    bindHsl(m_hslLum, &HslBand::luminance, QStringLiteral("hslLum"));
     connect(m_lutAmount, &SliderRow::valueChanged, this, [this](double v) {
         edit(tr("LUT amount"), QStringLiteral("lutAmount"), [&](ColorGrade& g) { g.lutAmount = v / 100.0; });
     });
@@ -218,10 +274,26 @@ void ColorPanel::setGrade(const ColorGrade& g) {
     m_lift->setValue(g.lift);
     m_gamma->setValue(g.gamma);
     m_gain->setValue(g.gain);
+    m_curves->setCurves(g.curveMaster, g.curveRed, g.curveGreen, g.curveBlue);
+    showHslBand(m_hslBand);
     m_lutAmount->setValue(g.lutAmount * 100.0);
     m_lutAmount->setEnabled(!g.lutPath.isEmpty());
     refreshLutCombo();
     m_syncing = false;
+}
+
+void ColorPanel::showHslBand(int band) {
+    const bool wasSyncing = m_syncing;
+    m_syncing = true;
+    m_hslBand = band;
+    const HslBand& b = m_grade.hsl[band];
+    m_hslHue->setValue(b.hue);
+    m_hslSat->setValue(b.saturation);
+    m_hslLum->setValue(b.luminance);
+    // A dot under the ranges that are changed.
+    for (int i = 0; i < kHslBands; ++i)
+        m_hslBands->button(i)->setText(m_grade.hsl[i].isIdentity() ? QString() : QStringLiteral("•"));
+    m_syncing = wasSyncing;
 }
 
 void ColorPanel::refreshLutCombo() {

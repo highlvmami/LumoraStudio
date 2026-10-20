@@ -1,5 +1,7 @@
 #include "ExportPlanner.h"
 
+#include "export/SubtitleStreams.h"
+
 #include <QCoreApplication>
 #include <QFileInfo>
 #include <algorithm>
@@ -141,15 +143,16 @@ ExportPlan ExportPlanner::plan(const TimelineState& tl, const MediaPool& pool, c
         plan.blockers << tr("The timeline is empty.");
         return plan;
     }
-    bool looseAudio = false; // audio clips that do not belong to a storyline clip
-    for (int ti : tl.trackIndices(TrackType::Audio))
-        for (const auto& c : tl.tracks[ti].clips)
-            if (c.linkId.isNull() || ti != 1)
-                looseAudio = true;
-    if (settings.mode == ExportMode::Custom || tl.hasEffects() ||
-        (settings.mode != ExportMode::StreamCopy && looseAudio && settings.includeAudio))
+    // Audio changes (gain, fades, effects, extra audio clips, master
+    // settings) are mixed; the picture can still be copied or encoded clip
+    // by clip, so they never cost picture quality.
+    const bool mixAudio = settings.includeAudio && tl.hasAudioChanges();
+    const bool burn = settings.subtitles == SubtitleMode::BurnIn && tl.hasSubtitles();
+    if (settings.mode == ExportMode::Custom || tl.hasVideoEffects() || burn)
         return settings.mode == ExportMode::StreamCopy ? streamCopyBlocked(tl) : planRender(tl, pool, settings);
     if (tl.tracks[0].clips.empty()) {
+        if (settings.mode != ExportMode::StreamCopy && mixAudio)
+            return planRender(tl, pool, settings);
         plan.blockers << tr("The timeline is empty.");
         return plan;
     }
@@ -166,7 +169,7 @@ ExportPlan ExportPlanner::plan(const TimelineState& tl, const MediaPool& pool, c
         for (const auto& c : aTrack->clips)
             if (c.linkId.isNull())
                 unlinkedAudio = true;
-    if (unlinkedAudio)
+    if (unlinkedAudio && !mixAudio)
         plan.notes << tr("Audio-only clips cannot be joined without re-encoding, so they are left out of a lossless "
                          "cut. Choose another mode to include them.");
 
@@ -193,7 +196,7 @@ ExportPlan ExportPlanner::plan(const TimelineState& tl, const MediaPool& pool, c
             for (const auto& ac : aTrack->clips)
                 if (ac.linkId == c.linkId)
                     linkedAudio = true;
-        seg.hasAudio = settings.includeAudio && linkedAudio && media->info.audio.has_value();
+        seg.hasAudio = settings.includeAudio && !mixAudio && linkedAudio && media->info.audio.has_value();
         plan.segments.push_back(seg);
     }
     if (plan.segments.empty()) {
@@ -299,7 +302,35 @@ ExportPlan ExportPlanner::plan(const TimelineState& tl, const MediaPool& pool, c
     }
 
     // --- Audio strategy ---
-    if (!settings.includeAudio || !anyAudio) {
+    bool audible = false;
+    for (int ti : tl.trackIndices(TrackType::Audio))
+        if (!tl.tracks[ti].muted)
+            for (const auto& c : tl.tracks[ti].clips)
+                if (auto m = pool.find(c.mediaId); m && m->info.audio)
+                    audible = true;
+    if (mixAudio) {
+        if (!audible) {
+            plan.audio = AudioStrategy::None;
+        } else {
+            plan.audio = AudioStrategy::Encode;
+            plan.audioMixed = true;
+            plan.timeline = tl;
+            plan.pool = &pool;
+            AVCodecID target = settings.mode == ExportMode::LosslessIntermediate ? AV_CODEC_ID_FLAC
+                               : first.hasAudio                                 ? first.audio.codec
+                                                                                : AV_CODEC_ID_AAC;
+            QStringList enc = encodersFor(target);
+            if (enc.isEmpty() || !containerSupports(ofmt, target)) {
+                target = plan.containerName == QLatin1String("webm") ? AV_CODEC_ID_OPUS : AV_CODEC_ID_AAC;
+                enc = encodersFor(target);
+            }
+            if (enc.isEmpty()) {
+                plan.blockers << tr("No audio encoder available.");
+            } else {
+                plan.audioEncoder = enc.front();
+            }
+        }
+    } else if (!settings.includeAudio || !anyAudio) {
         plan.audio = AudioStrategy::None;
     } else if (audioCompatible && allAudio && containerSupports(ofmt, first.audio.codec)) {
         plan.audio = AudioStrategy::Copy;
@@ -324,7 +355,76 @@ ExportPlan ExportPlanner::plan(const TimelineState& tl, const MediaPool& pool, c
 
     for (const auto& seg : plan.segments)
         plan.expectedDuration += seg.requestedOut - seg.actualIn;
+    planSubtitles(plan, tl, settings);
     return plan;
+}
+
+void ExportPlanner::planSubtitles(ExportPlan& plan, const TimelineState& tl, const ExportSettings& settings) {
+    if (!tl.hasSubtitles() || settings.subtitles == SubtitleMode::Off)
+        return;
+    if (settings.subtitles == SubtitleMode::BurnIn) {
+        if (plan.video == VideoStrategy::Render) {
+            plan.burnSubtitles = true;
+        }
+        return;
+    }
+    // Timeline -> output time. The render path writes the range as it is;
+    // clip by clip exports shift each clip by the frames added before its
+    // cut (key frame snapping).
+    struct Span {
+        Ticks tlStart, tlEnd, outStart;
+    };
+    std::vector<Span> spans;
+    if (plan.video == VideoStrategy::Render) {
+        spans.push_back({plan.rangeStart, plan.rangeEnd, 0});
+    } else {
+        Ticks out = 0;
+        for (const auto& seg : plan.segments) {
+            const Clip* c = tl.findClip(seg.clipId);
+            if (!c)
+                continue;
+            const Ticks tlStart = c->timelineStart + (seg.requestedIn - c->sourceIn);
+            const Ticks shift = seg.requestedIn - seg.actualIn;
+            spans.push_back({tlStart, tlStart + (seg.requestedOut - seg.requestedIn), out + shift});
+            out += seg.requestedOut - seg.actualIn;
+        }
+    }
+    std::vector<SubtitleStreamPlan> streams;
+    for (int ti : tl.trackIndices(TrackType::Subtitle)) {
+        const Track& t = tl.tracks[ti];
+        if (t.hidden || t.clips.empty())
+            continue;
+        SubtitleStreamPlan sp;
+        sp.language = t.language;
+        for (const auto& cue : tl.subtitleCues(ti)) {
+            for (const auto& span : spans) {
+                const Ticks s = std::max(cue.start, span.tlStart), e = std::min(cue.end, span.tlEnd);
+                if (e <= s)
+                    continue;
+                const Ticks os = span.outStart + (s - span.tlStart), oe = span.outStart + (e - span.tlStart);
+                // A cue across a cut continues in the next clip: keep it one cue.
+                if (!sp.cues.empty() && sp.cues.back().text == cue.text && std::abs(os - sp.cues.back().end) < kTicksPerSecond / 20)
+                    sp.cues.back().end = std::max(sp.cues.back().end, oe);
+                else
+                    sp.cues.push_back({os, oe, cue.text});
+            }
+        }
+        if (!sp.cues.empty())
+            streams.push_back(sp);
+    }
+    if (streams.empty())
+        return;
+    if (settings.subtitles == SubtitleMode::Embed) {
+        const AVCodecID codec = SubtitleStreams::codecFor(plan.containerName);
+        if (codec != AV_CODEC_ID_NONE && avcodec_find_encoder(codec)) {
+            plan.subtitleCodec = codec;
+            plan.subtitleStreams = streams;
+            return;
+        }
+        plan.notes << tr("The %1 container cannot hold subtitles, so they are saved as .srt next to the video.")
+                          .arg(plan.containerName);
+    }
+    plan.sidecarSubtitles = streams;
 }
 
 AVRational ExportPlanner::timelineRate(const TimelineState& tl, const MediaPool& pool) {
@@ -561,7 +661,8 @@ ExportPlan ExportPlanner::planRender(const TimelineState& tl, const MediaPool& p
             for (const Clip* c : audible)
                 if (!vc.linkId.isNull() && c->linkId == vc.linkId)
                     ac = c;
-            if (!ac || ac->gainDb != 0.0 || ac->fadeIn > 0 || ac->fadeOut > 0 || ac->timelineStart != vc.timelineStart ||
+            if (!ac || ac->gainDb != 0.0 || ac->fadeIn > 0 || ac->fadeOut > 0 || !ac->audio.isIdentity() ||
+                !tl.audioMaster.isIdentity() || ac->timelineStart != vc.timelineStart ||
                 ac->duration() != vc.duration() || ac->sourceIn != vc.sourceIn || ac->mediaId != vc.mediaId)
                 simple = false;
             if (!simple)
@@ -643,6 +744,7 @@ ExportPlan ExportPlanner::planRender(const TimelineState& tl, const MediaPool& p
         plan.notes << tr("The timeline is rendered with its titles, transitions and effects and encoded with the "
                          "source's settings. Frames without effects are converted directly from the source.");
     plan.expectedDuration = plan.rangeEnd - plan.rangeStart;
+    planSubtitles(plan, tl, settings);
     return plan;
 }
 

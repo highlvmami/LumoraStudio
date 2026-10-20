@@ -6,8 +6,11 @@
 #include <deque>
 
 #include "export/ExportCommon.h"
+#include "audio/Loudness.h"
 #include "export/RenderExport.h"
+#include "export/SubtitleStreams.h"
 #include "ffmpeg/FFmpeg.h"
+#include "render/AudioMixer.h"
 
 extern "C" {
 #include <libavutil/audio_fifo.h>
@@ -43,6 +46,8 @@ private:
     bool pushAudioSamples(const float* const* data, int count);
     bool pushSilence(int count);
     bool encodeAudioFromFifo(bool flush);
+    // Mixed audio: pushes the mix up to output time `until`.
+    bool pumpMix(Ticks until);
     bool flushEncoders();
     bool fail(const QString& msg) {
         if (m_error.isEmpty())
@@ -81,7 +86,22 @@ private:
     std::int64_t m_audioSamplesQueued = 0; // samples written to the fifo so far (all segments)
     int m_audioChannels = 2;
 
+    // Mixed audio (plan.audioMixed): timeline time = output time + offset of
+    // the current segment.
+    std::unique_ptr<AudioMixer> m_mixer;
+    Ticks m_mixOffset = 0;
+    bool m_pumping = false;
+
     Ticks m_cursor = 0; // output time at which the current segment starts
+    SubtitleStreams m_subs;
+    std::map<int, std::int64_t> m_lastSubDts;
+    bool writeSubtitles(Ticks until) {
+        return m_subs.writeUntil(until, [this](AVPacket* p, int idx) {
+            auto [it, _] = m_lastSubDts.try_emplace(idx, AV_NOPTS_VALUE);
+            return writePacket(p, idx, it->second);
+        });
+    }
+
     QString m_error;
     QStringList m_notes;
 };
@@ -105,6 +125,8 @@ ExportResult Session::run() {
     }
     if (ok)
         ok = flushEncoders();
+    if (ok)
+        ok = writeSubtitles(INT64_MAX);
     if (ok) {
         int ret = av_write_trailer(m_out.get());
         if (ret < 0)
@@ -192,6 +214,21 @@ bool Session::setupOutput() {
                 return false;
             avcodec_parameters_from_context(outA->codecpar, m_aenc.get());
             outA->time_base = m_aenc->time_base;
+            if (m_plan.audioMixed) {
+                m_mixer = std::make_unique<AudioMixer>(m_plan.pool, m_aenc->sample_rate, m_audioChannels);
+                m_mixer->setTimeline(m_plan.timeline);
+                if (m_plan.timeline.audioMaster.normalize) {
+                    const Ticks from = m_settings.rangeStart == kInvalidTicks ? 0 : m_settings.rangeStart;
+                    const Ticks to = m_settings.rangeEnd == kInvalidTicks ? m_plan.timeline.duration() : m_settings.rangeEnd;
+                    const auto r = loudness::measureTimeline(m_plan.timeline, m_plan.pool, from, to, {}, m_cancel);
+                    const double gain = loudness::normalizationGain(r.integrated, m_plan.timeline.audioMaster.targetLufs);
+                    m_mixer->setNormalizationGainDb(gain);
+                    m_notes << TimelineExporter::tr("Loudness %1 LUFS, brought to %2 LUFS (%3 dB).")
+                                   .arg(r.integrated, 0, 'f', 1)
+                                   .arg(m_plan.timeline.audioMaster.targetLufs, 0, 'f', 1)
+                                   .arg(gain, 0, 'f', 1);
+                }
+            }
         }
         if (inA) {
             av_dict_copy(&outA->metadata, inA->metadata, 0);
@@ -208,6 +245,11 @@ bool Session::setupOutput() {
     const QString muxer = m_plan.containerName;
     if (muxer == QLatin1String("mp4") || muxer == QLatin1String("mov"))
         av_dict_set(&opts, "movflags", "+faststart+use_metadata_tags", 0);
+    {
+        QString subErr;
+        if (!m_subs.addStreams(m_out.get(), m_plan, &subErr))
+            return fail(TimelineExporter::tr("Cannot add the subtitles: %1").arg(subErr));
+    }
     ret = avformat_write_header(m_out.get(), &opts);
     av_dict_free(&opts);
     if (ret < 0)
@@ -355,6 +397,27 @@ bool Session::writePacket(AVPacket* pkt, int outIndex, std::int64_t& lastDts) {
     }
     if (pkt->dts != AV_NOPTS_VALUE)
         lastDts = pkt->dts;
+    // Keep the mixed sound just ahead of the picture so the file stays well
+    // interleaved.
+    if (m_mixer && outIndex == m_outVideo && pkt->dts != AV_NOPTS_VALUE && !m_pumping) {
+        const Ticks t = ticksFromStream(pkt->dts, m_out->streams[outIndex]->time_base);
+        AVPacket* held = av_packet_clone(pkt);
+        const bool ok = pumpMix(std::max<Ticks>(m_cursor, t));
+        av_packet_unref(pkt);
+        av_packet_move_ref(pkt, held);
+        av_packet_free(&held);
+        if (!ok)
+            return false;
+    }
+    if (outIndex == m_outVideo && pkt->dts != AV_NOPTS_VALUE && !m_subs.empty()) {
+        AVPacket* held = av_packet_clone(pkt);
+        const bool ok = writeSubtitles(ticksFromStream(pkt->dts, m_out->streams[outIndex]->time_base));
+        av_packet_unref(pkt);
+        av_packet_move_ref(pkt, held);
+        av_packet_free(&held);
+        if (!ok)
+            return false;
+    }
     const int ret = av_interleaved_write_frame(m_out.get(), pkt);
     if (ret < 0)
         return fail(TimelineExporter::tr("Write error: %1").arg(av::errorString(ret)));
@@ -442,6 +505,32 @@ bool Session::encodeAudioFromFifo(bool flush) {
     return true;
 }
 
+bool Session::pumpMix(Ticks until) {
+    if (!m_mixer)
+        return true;
+    m_pumping = true;
+    const int rate = m_aenc->sample_rate;
+    const std::int64_t target = av_rescale(until, rate, kTicksPerSecond);
+    const std::int64_t offset = av_rescale(m_mixOffset, rate, kTicksPerSecond);
+    constexpr int block = 2048;
+    std::vector<float> mixed(static_cast<size_t>(block) * m_audioChannels);
+    std::vector<std::vector<float>> planar(m_audioChannels, std::vector<float>(block));
+    std::vector<const float*> ptrs(m_audioChannels);
+    bool ok = true;
+    while (ok && m_audioSamplesQueued < target) {
+        const int n = static_cast<int>(std::min<std::int64_t>(block, target - m_audioSamplesQueued));
+        m_mixer->mix(m_audioSamplesQueued + offset, n, mixed.data());
+        for (int ch = 0; ch < m_audioChannels; ++ch) {
+            for (int i = 0; i < n; ++i)
+                planar[ch][i] = mixed[static_cast<size_t>(i) * m_audioChannels + ch];
+            ptrs[ch] = planar[ch].data();
+        }
+        ok = pushAudioSamples(ptrs.data(), n);
+    }
+    m_pumping = false;
+    return ok;
+}
+
 bool Session::flushEncoders() {
     if (m_aenc) {
         if (!encodeAudioFromFifo(true))
@@ -502,7 +591,12 @@ bool Session::processSegment(const SegmentPlan& seg, Ticks& segmentLength) {
 
     // --- audio state ---
     const bool copyAudio = m_plan.audio == AudioStrategy::Copy && as;
-    const bool encodeAudio = m_plan.audio == AudioStrategy::Encode;
+    const bool encodeAudio = m_plan.audio == AudioStrategy::Encode && !m_plan.audioMixed;
+    if (m_mixer) {
+        // Timeline position of this segment's first output sample.
+        const Clip* clip = m_plan.timeline.findClip(seg.clipId);
+        m_mixOffset = clip ? clip->timelineStart + (segStart - clip->sourceIn) - m_cursor : 0;
+    }
     bool aDone = !(copyAudio || (encodeAudio && as));
     std::deque<av::PacketPtr> audioQueue; // copy path: packets waiting for the video end to be known
     av::CodecContextPtr adec;
@@ -785,6 +879,8 @@ bool Session::processSegment(const SegmentPlan& seg, Ticks& segmentLength) {
     } else {
         segmentLength = requestedOut - seg.requestedIn;
     }
+    if (m_mixer && !pumpMix(m_cursor + segmentLength))
+        return false;
     // Keep encoded audio exactly as long as the segment.
     if (encodeAudio) {
         const std::int64_t target =
@@ -799,10 +895,22 @@ bool Session::processSegment(const SegmentPlan& seg, Ticks& segmentLength) {
 
 ExportResult TimelineExporter::run(const ExportPlan& plan, const ExportSettings& settings, const ProgressFn& progress,
                                    const std::atomic_bool* cancel) {
-    if (plan.video == VideoStrategy::Render)
-        return runRenderExport(plan, settings, progress, cancel);
-    Session session(plan, settings, progress, cancel);
-    return session.run();
+    ExportResult r;
+    if (plan.video == VideoStrategy::Render) {
+        r = runRenderExport(plan, settings, progress, cancel);
+    } else {
+        Session session(plan, settings, progress, cancel);
+        r = session.run();
+    }
+    if (r.ok && !plan.sidecarSubtitles.empty()) {
+        QString err;
+        const QStringList files = SubtitleStreams::writeSidecars(plan, settings.outputPath, &err);
+        if (!err.isEmpty())
+            r.notes << tr("The subtitle file could not be written: %1").arg(err);
+        for (const auto& f : files)
+            r.notes << tr("Subtitles saved to %1").arg(QFileInfo(f).fileName());
+    }
+    return r;
 }
 
 } // namespace lumora

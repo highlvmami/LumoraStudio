@@ -8,6 +8,7 @@
 #include "export/TimelineExporter.h"
 #include "media/MediaPool.h"
 #include "media/VideoDecoder.h"
+#include "timeline/Subtitles.h"
 #include "timeline/Timeline.h"
 
 using namespace lumora;
@@ -530,6 +531,83 @@ private slots:
             }
         }
     }
+
+    void audioEffectsKeepThePictureCopied() {
+        Timeline tl;
+        tl.insertMedia(m_item->id, 0, m_item->info.duration, true, true);
+        AudioEffects fx;
+        fx.eqLow = 3;
+        QVERIFY(tl.setAudioEffects(tl.tracks()[1].clips[0].id, fx));
+        tl.setGain(tl.tracks()[1].clips[0].id, -3);
+        const int a2 = tl.addTrack(TrackType::Audio);
+        tl.placeMedia(m_item2->id, 0, sec(1), false, true, a2, sec(1));
+        ExportPlan plan;
+        const QString path = out("mixed-copy.mp4");
+        auto r = exportTimeline(tl, ExportMode::StreamCopy, path, &plan);
+        QVERIFY2(r.ok, qPrintable(r.error));
+        QCOMPARE(int(plan.video), int(VideoStrategy::Copy));
+        QVERIFY(plan.audioMixed);
+        QCOMPARE(videoPacketHashes(path), videoPacketHashes(m_src)); // picture bit exact
+        QVERIFY(std::abs(audioDuration(path) - 4.0) < 0.06);
+        QCOMPARE(decodeAll(path).decodeErrors, 0);
+    }
+
+    void subtitlesAreEmbeddedBurntOrSaved() {
+        Timeline tl;
+        tl.insertMedia(m_item->id, 0, m_item->info.duration, true, true);
+        tl.addSubtitleTrack({{sec(1), sec(2), QStringLiteral("Merhaba")}, {sec(2.5), sec(3), QStringLiteral("Dünya")}},
+                            QStringLiteral("tur"));
+        // MKV: a SubRip stream, the picture still copied.
+        ExportPlan plan;
+        auto r = exportTimeline(tl, ExportMode::StreamCopy, out("subs.mkv"), &plan);
+        QVERIFY2(r.ok, qPrintable(r.error));
+        QCOMPARE(int(plan.video), int(VideoStrategy::Copy));
+        QCOMPARE(int(plan.subtitleStreams.size()), 1);
+        auto countSubs = [](const QString& path, QString* lang) {
+            auto in = av::openInput(path);
+            if (!in)
+                return -1;
+            const int idx = av_find_best_stream(in.get(), AVMEDIA_TYPE_SUBTITLE, -1, -1, nullptr, 0);
+            if (idx < 0)
+                return 0;
+            if (auto* e = av_dict_get(in->streams[idx]->metadata, "language", nullptr, 0))
+                *lang = QString::fromUtf8(e->value);
+            int n = 0;
+            auto pkt = av::makePacket();
+            while (av_read_frame(in.get(), pkt.get()) >= 0) {
+                n += pkt->stream_index == idx && pkt->size > 2; // mp4 fills gaps with empty samples
+                av_packet_unref(pkt.get());
+            }
+            return n;
+        };
+        QString lang;
+        QCOMPARE(countSubs(out("subs.mkv"), &lang), 2);
+        QCOMPARE(lang, QStringLiteral("tur"));
+        // MP4: mov_text.
+        r = exportTimeline(tl, ExportMode::StreamCopy, out("subs.mp4"), &plan);
+        QVERIFY2(r.ok, qPrintable(r.error));
+        QCOMPARE(countSubs(out("subs.mp4"), &lang), 2);
+        // Sidecar.
+        ExportSettings s;
+        s.mode = ExportMode::StreamCopy;
+        s.outputPath = out("side.mp4");
+        s.subtitles = SubtitleMode::Sidecar;
+        r = exportWith(tl, s);
+        QVERIFY2(r.ok, qPrintable(r.error));
+        const auto cues = subtitles::readFile(out("side.srt"));
+        QCOMPARE(int(cues.size()), 2);
+        QCOMPARE(cues[1].text, QStringLiteral("Dünya"));
+        // Burnt in: a lossless cut is not possible, the render path draws them.
+        s.subtitles = SubtitleMode::BurnIn;
+        QVERIFY(!ExportPlanner::plan(tl.state(), m_pool, s).ok());
+        s.mode = ExportMode::MatchSource;
+        s.outputPath = out("burnt.mp4");
+        r = exportWith(tl, s, &plan);
+        QVERIFY2(r.ok, qPrintable(r.error));
+        QVERIFY(plan.burnSubtitles);
+        QCOMPARE(countSubs(out("burnt.mp4"), &lang), 0);
+    }
+
 };
 
 QTEST_MAIN(ExportTest)

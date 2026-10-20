@@ -52,6 +52,7 @@ private:
     QLineEdit* m_path = nullptr;
     QHash<int, QLabel*> m_modeHelp;
     QCheckBox* m_audio;
+    QComboBox* m_subtitles;
     QLabel* m_planLabel;
     QPushButton* m_snapBtn;
     QPushButton* m_exportBtn;

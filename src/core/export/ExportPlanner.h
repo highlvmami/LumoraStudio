@@ -35,6 +35,9 @@ public:
 private:
     static ExportPlan planRender(const TimelineState& timeline, const MediaPool& pool, const ExportSettings& settings);
     static ExportPlan streamCopyBlocked(const TimelineState& timeline);
+    // Fills the plan's subtitle fields (embedded streams or sidecar files),
+    // with cue times mapped to the output.
+    static void planSubtitles(ExportPlan& plan, const TimelineState& timeline, const ExportSettings& settings);
 };
 
 // Snaps `t` back to the closest key frame at or before it. Returns `t` when no

@@ -122,11 +122,82 @@ bool is8Bit(QImage::Format f) {
 
 } // namespace
 
+// Tone curves are sampled into one table per channel (master curve, then
+// the channel's own curve) and read with linear interpolation.
+constexpr int kToneSteps = 8192;
+
 struct ColorCurves {
     PowCurve contrast; // l^p, scaled by kMiddleGrey^(1-p)
     float contrastScale = 1.0f;
     PowCurve gamma[3];
+    std::vector<float> tone[3]; // kToneSteps + 1 entries each
 };
+
+namespace {
+
+inline float toneLookup(const std::vector<float>& table, float v) {
+    const float p = std::clamp(v, 0.0f, 1.0f) * kToneSteps;
+    const int i = std::min(static_cast<int>(p), kToneSteps - 1);
+    return table[i] + (table[i + 1] - table[i]) * (p - i);
+}
+
+// HSL mixer on display encoded values. Each pixel's hue falls between two
+// neighbouring band centres and takes a smooth mix of both bands' settings.
+void applyHsl(float rgb[3], const float hue[kHslBands], const float sat[kHslBands], const float lum[kHslBands]) {
+    float r = std::clamp(rgb[0], 0.0f, 1.0f), g = std::clamp(rgb[1], 0.0f, 1.0f), b = std::clamp(rgb[2], 0.0f, 1.0f);
+    const float mx = std::max({r, g, b}), mn = std::min({r, g, b});
+    const float chroma = mx - mn;
+    if (chroma < 1e-5f)
+        return;
+    const float l = (mx + mn) / 2;
+    const float s = chroma / std::max(1e-6f, 1.0f - std::abs(2 * l - 1));
+    float h;
+    if (mx == r)
+        h = 60.0f * std::fmod((g - b) / chroma + 6.0f, 6.0f);
+    else if (mx == g)
+        h = 60.0f * ((b - r) / chroma + 2.0f);
+    else
+        h = 60.0f * ((r - g) / chroma + 4.0f);
+    int i = kHslBands - 1;
+    for (int k = 0; k + 1 < kHslBands; ++k)
+        if (h < hslBandHue(k + 1)) {
+            i = k;
+            break;
+        }
+    const int j = (i + 1) % kHslBands;
+    const float c0 = static_cast<float>(hslBandHue(i));
+    const float c1 = j == 0 ? 360.0f : static_cast<float>(hslBandHue(j));
+    const float t = std::clamp((h - c0) / (c1 - c0), 0.0f, 1.0f);
+    const float wj = 0.5f - 0.5f * std::cos(t * static_cast<float>(M_PI));
+    const float wi = 1.0f - wj;
+    const float dh = wi * hue[i] + wj * hue[j];
+    const float ds = wi * sat[i] + wj * sat[j];
+    const float dl = wi * lum[i] + wj * lum[j];
+    // Strength of the effect follows how coloured the pixel is.
+    const float strength = std::min(1.0f, s);
+    float h2 = std::fmod(h + dh * 30.0f * strength + 360.0f, 360.0f);
+    float s2 = std::clamp(s * (1.0f + ds), 0.0f, 1.0f);
+    float l2 = dl >= 0 ? l + (1 - l) * dl * 0.5f * strength : l * (1 + dl * 0.5f * strength);
+    l2 = std::clamp(l2, 0.0f, 1.0f);
+    const float c2 = (1 - std::abs(2 * l2 - 1)) * s2;
+    const float hp = h2 / 60.0f;
+    const float x = c2 * (1 - std::abs(std::fmod(hp, 2.0f) - 1));
+    float r1 = 0, g1 = 0, b1 = 0;
+    switch (static_cast<int>(hp) % 6) {
+    case 0: r1 = c2, g1 = x; break;
+    case 1: r1 = x, g1 = c2; break;
+    case 2: g1 = c2, b1 = x; break;
+    case 3: g1 = x, b1 = c2; break;
+    case 4: r1 = x, b1 = c2; break;
+    default: r1 = c2, b1 = x; break;
+    }
+    const float m = l2 - c2 / 2;
+    rgb[0] = r1 + m;
+    rgb[1] = g1 + m;
+    rgb[2] = b1 + m;
+}
+
+} // namespace
 
 ColorProcessor::ColorProcessor(const ColorGrade& g) : m_grade(g) {
     m_identity = g.isIdentity();
@@ -175,7 +246,26 @@ ColorProcessor::ColorProcessor(const ColorGrade& g) : m_grade(g) {
         m_lutAmount = static_cast<float>(std::clamp(g.lutAmount, 0.0, 1.0));
     }
 
+    m_hsl = g.hasHsl();
+    for (int i = 0; i < kHslBands; ++i) {
+        m_hslHue[i] = static_cast<float>(g.hsl[i].hue / 100.0);
+        m_hslSat[i] = static_cast<float>(g.hsl[i].saturation / 100.0);
+        m_hslLum[i] = static_cast<float>(g.hsl[i].luminance / 100.0);
+    }
+
     m_curves = std::make_unique<ColorCurves>();
+    m_toneCurves = g.hasCurves();
+    if (m_toneCurves) {
+        std::vector<float> master;
+        g.curveMaster.sample(master, kToneSteps + 1);
+        const ToneCurve* channel[3] = {&g.curveRed, &g.curveGreen, &g.curveBlue};
+        for (int c = 0; c < 3; ++c) {
+            auto& t = m_curves->tone[c];
+            t.resize(kToneSteps + 1);
+            for (int i = 0; i <= kToneSteps; ++i)
+                t[i] = channel[c]->isIdentity() ? master[i] : static_cast<float>(channel[c]->eval(master[i]));
+        }
+    }
     if (m_contrast) {
         m_curves->contrast.init(m_contrastPower);
         m_curves->contrastScale = std::pow(kMiddleGrey, 1.0f - m_contrastPower);
@@ -245,6 +335,13 @@ void ColorProcessor::process(float rgb[3]) const {
             rgb[c] = m_curves->gamma[c](o);
         }
     }
+
+    if (m_hsl)
+        applyHsl(rgb, m_hslHue, m_hslSat, m_hslLum);
+
+    if (m_toneCurves)
+        for (int c = 0; c < 3; ++c)
+            rgb[c] = toneLookup(m_curves->tone[c], rgb[c]);
 
     if (m_lut) {
         float in[3], out[3];

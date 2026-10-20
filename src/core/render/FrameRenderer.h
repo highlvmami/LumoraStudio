@@ -49,6 +49,10 @@ public:
     // (e.g. millisecond based containers) still pick the right frame.
     void setSampleOffset(Ticks offset) { m_sampleOffset = offset; }
 
+    // Subtitle cues are drawn on top of the picture (preview, burnt in
+    // exports); off by default.
+    void setDrawSubtitles(bool on) { m_subtitles = on; }
+
     QImage render(Ticks t);
 
     // When the frame at `t` is exactly one storyline media frame shown at its
@@ -90,6 +94,9 @@ private:
     std::list<QUuid> m_lru;
     Ticks m_lastTime = 0;
     Ticks m_sampleOffset = 0;
+    bool m_subtitles = false;
+    // The subtitle cue under `t` on each visible subtitle track.
+    std::vector<std::pair<const Track*, const Clip*>> subtitlesAt(Ticks t) const;
 };
 
 // Blurs an image by `radius` pixels (cheap approximation, used by the blur

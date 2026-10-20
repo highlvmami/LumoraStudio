@@ -9,7 +9,8 @@
 namespace lumora {
 
 // Displays the processed photo; in crop mode shows the full frame with an
-// editable crop rectangle (normalised coordinates).
+// editable crop rectangle (normalised coordinates). With a brush mask
+// selected it is a canvas for painting the mask.
 class PhotoView : public QWidget {
     Q_OBJECT
 public:
@@ -26,10 +27,14 @@ public:
     void setBadge(const QString& text);
     // Outline of the selected layer's mask; dragging inside it moves it.
     void setMaskOverlay(const std::optional<LayerMask>& mask);
+    // With a brush mask selected, dragging paints a stroke with this brush;
+    // `tint` shows the mask as a coloured overlay.
+    void setBrush(const BrushStroke& brush, bool tint);
 
 signals:
     void cropEdited(const QRectF& normalized); // emitted on mouse release
     void maskMoved(const QRectF& normalized);  // emitted on mouse release
+    void strokePainted(const lumora::BrushStroke& stroke); // emitted on mouse release
     void filesDropped(const QStringList& paths);
 
 protected:
@@ -37,6 +42,7 @@ protected:
     void mousePressEvent(QMouseEvent*) override;
     void mouseMoveEvent(QMouseEvent*) override;
     void mouseReleaseEvent(QMouseEvent*) override;
+    void leaveEvent(QEvent*) override;
     void dragEnterEvent(QDragEnterEvent*) override;
     void dropEvent(QDropEvent*) override;
 
@@ -48,6 +54,9 @@ private:
     void applyAspect(QRectF& r, Handle h) const;
     void paintMask(QPainter& p, const QRectF& imageRect) const;
     QRectF maskWidgetRect() const;
+    bool brushMode() const;
+    void rebuildTint();
+    QPointF toImage(QPointF widgetPos) const;
 
     QImage m_image;
     QRectF m_crop{0, 0, 1, 1};
@@ -61,6 +70,11 @@ private:
     std::optional<LayerMask> m_mask;
     bool m_maskDrag = false;
     QRectF m_pressMask;
+    BrushStroke m_brush;
+    bool m_tint = true;
+    QImage m_tintImage;
+    std::optional<BrushStroke> m_stroke; // being painted
+    std::optional<QPointF> m_hover;
 };
 
 } // namespace lumora

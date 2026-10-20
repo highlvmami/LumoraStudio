@@ -23,7 +23,7 @@ class ColorPanel;
 
 // Layer stack of the current photo: adjustment layers (colour settings seen
 // through a mask) and picture layers (another image placed on top), each with
-// blend mode, opacity and a rectangle / ellipse / gradient mask. The panel
+// blend mode, opacity and a rectangle / ellipse / gradient / brush mask. The panel
 // reports edits; the photo workspace turns them into undo steps.
 class LayersPanel : public QWidget {
     Q_OBJECT
@@ -33,10 +33,15 @@ public:
     void setLayers(const std::vector<PhotoLayer>& layers, bool enabled);
     QUuid currentLayer() const { return m_current; }
     const PhotoLayer* current() const;
+    // The brush the photo is painted with when the mask is a brush mask:
+    // size, hardness, flow and paint / erase (no points).
+    BrushStroke brush() const;
+    bool showMaskOverlay() const;
 
 signals:
     void layersEdited(const std::vector<lumora::PhotoLayer>& layers, const QString& undoText, const QString& field);
     void currentLayerChanged();
+    void brushChanged();
 
 private:
     void rebuildList();
@@ -78,6 +83,13 @@ private:
     SliderRow* m_maskFeather;
     QCheckBox* m_maskInvert;
     QLabel* m_maskHint;
+    QWidget* m_brushEditors;
+    SliderRow* m_brushSize;
+    SliderRow* m_brushHardness;
+    SliderRow* m_brushFlow;
+    QCheckBox* m_brushErase;
+    QCheckBox* m_brushOverlay;
+    QPushButton* m_brushClear;
     QGroupBox* m_colorBox;
     ColorPanel* m_color;
 };

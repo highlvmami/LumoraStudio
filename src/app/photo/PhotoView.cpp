@@ -19,7 +19,10 @@ PhotoView::PhotoView(QWidget* parent) : QWidget(parent) {
 }
 
 void PhotoView::setImage(const QImage& img) {
+    const bool resized = img.size() != m_image.size();
     m_image = img;
+    if (resized)
+        rebuildTint();
     update();
 }
 
@@ -62,6 +65,49 @@ void PhotoView::setMaskOverlay(const std::optional<LayerMask>& mask) {
     m_mask = mask;
     if (!m_maskDrag)
         unsetCursor();
+    rebuildTint();
+    update();
+}
+
+void PhotoView::setBrush(const BrushStroke& brush, bool tint) {
+    m_brush = brush;
+    if (tint != m_tint) {
+        m_tint = tint;
+        rebuildTint();
+    }
+    update();
+}
+
+bool PhotoView::brushMode() const {
+    return !m_cropMode && m_mask && m_mask->shape == MaskShape::Brush && !m_image.isNull();
+}
+
+void PhotoView::rebuildTint() {
+    m_tintImage = {};
+    if (!m_tint || !m_mask || m_mask->shape != MaskShape::Brush || m_image.isNull())
+        return;
+    // A reduced copy is plenty for an overlay.
+    const QSize size = m_image.size().scaled(QSize(720, 720), Qt::KeepAspectRatio).expandedTo(QSize(1, 1));
+    const std::vector<float> m = m_mask->render(size.width(), size.height());
+    QImage img(size, QImage::Format_ARGB32_Premultiplied);
+    const QColor c = themeColors().accentAlt;
+    for (int y = 0; y < size.height(); ++y) {
+        auto* line = reinterpret_cast<QRgb*>(img.scanLine(y));
+        for (int x = 0; x < size.width(); ++x) {
+            const int a = static_cast<int>(m[size_t(y) * size.width() + x] * 120.0f);
+            line[x] = qPremultiply(qRgba(c.red(), c.green(), c.blue(), a));
+        }
+    }
+    m_tintImage = img;
+}
+
+QPointF PhotoView::toImage(QPointF pos) const {
+    const QRectF ir = imageRect();
+    return {(pos.x() - ir.x()) / ir.width(), (pos.y() - ir.y()) / ir.height()};
+}
+
+void PhotoView::leaveEvent(QEvent*) {
+    m_hover.reset();
     update();
 }
 
@@ -77,6 +123,34 @@ void PhotoView::paintMask(QPainter& p, const QRectF& ir) const {
         return;
     p.save();
     p.setClipRect(cropWidgetRect());
+    if (m_mask->shape == MaskShape::Brush) {
+        if (!m_tintImage.isNull())
+            p.drawImage(ir, m_tintImage);
+        const QColor accent = themeColors().accentAlt;
+        if (m_stroke && !m_stroke->points.empty()) {
+            QPainterPath path;
+            path.moveTo(ir.x() + m_stroke->points[0].x() * ir.width(), ir.y() + m_stroke->points[0].y() * ir.height());
+            for (const QPointF& pt : m_stroke->points)
+                path.lineTo(ir.x() + pt.x() * ir.width(), ir.y() + pt.y() * ir.height());
+            QColor c = m_stroke->erase ? QColor(255, 255, 255) : accent;
+            c.setAlpha(m_stroke->erase ? 70 : static_cast<int>(40 + 80 * m_stroke->flow));
+            p.setPen(QPen(c, 2 * m_stroke->radius * ir.height(), Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
+            p.drawPath(path);
+        }
+        if (m_hover) {
+            // The brush outline: the hard core and the full reach.
+            const double r = m_brush.radius * ir.height();
+            p.setBrush(Qt::NoBrush);
+            for (double rr : {r, r * std::max(0.05, m_brush.hardness)}) {
+                p.setPen(QPen(QColor(0, 0, 0, 150), 3));
+                p.drawEllipse(*m_hover, rr, rr);
+                p.setPen(QPen(Qt::white, rr == r ? 1.5 : 1, rr == r ? Qt::SolidLine : Qt::DotLine));
+                p.drawEllipse(*m_hover, rr, rr);
+            }
+        }
+        p.restore();
+        return;
+    }
     const QRectF r = maskWidgetRect();
     const QColor accent = themeColors().accent;
     QPen outline(accent, 1.5, Qt::DashLine);
@@ -109,7 +183,8 @@ void PhotoView::paintMask(QPainter& p, const QRectF& ir) const {
         });
         break;
     }
-    case MaskShape::None: break;
+    case MaskShape::None:
+    case MaskShape::Brush: break;
     }
     // Centre handle.
     p.setPen(QPen(QColor(0, 0, 0, 160), 3));
@@ -249,6 +324,17 @@ void PhotoView::applyAspect(QRectF& r, Handle h) const {
 }
 
 void PhotoView::mousePressEvent(QMouseEvent* e) {
+    if (brushMode()) {
+        if (e->button() != Qt::LeftButton)
+            return;
+        BrushStroke s = m_brush;
+        if (e->modifiers() & Qt::AltModifier)
+            s.erase = !s.erase;
+        s.points = {toImage(e->position())};
+        m_stroke = s;
+        update();
+        return;
+    }
     if (!m_cropMode && m_mask && m_mask->shape != MaskShape::None && !m_image.isNull() &&
         e->button() == Qt::LeftButton) {
         m_maskDrag = true;
@@ -265,6 +351,21 @@ void PhotoView::mousePressEvent(QMouseEvent* e) {
 }
 
 void PhotoView::mouseMoveEvent(QMouseEvent* e) {
+    if (brushMode()) {
+        setCursor(Qt::CrossCursor);
+        m_hover = e->position();
+        if (m_stroke) {
+            const QPointF pt = toImage(e->position());
+            const QPointF last = m_stroke->points.back();
+            const double aspect = double(m_image.width()) / m_image.height();
+            // Points closer than a quarter of the radius add nothing.
+            if (std::hypot((pt.x() - last.x()) * aspect, pt.y() - last.y()) >= m_stroke->radius * 0.25)
+                m_stroke->points.push_back(pt);
+        }
+        update();
+        return;
+    }
+    m_hover.reset();
     if (m_maskDrag && m_mask) {
         const QRectF ir = imageRect();
         const QPointF d((e->position().x() - m_pressPos.x()) / ir.width(), (e->position().y() - m_pressPos.y()) / ir.height());
@@ -320,6 +421,13 @@ void PhotoView::mouseMoveEvent(QMouseEvent* e) {
 }
 
 void PhotoView::mouseReleaseEvent(QMouseEvent*) {
+    if (m_stroke) {
+        const BrushStroke s = *m_stroke;
+        m_stroke.reset();
+        update();
+        emit strokePainted(s);
+        return;
+    }
     if (m_maskDrag) {
         m_maskDrag = false;
         setCursor(Qt::OpenHandCursor);

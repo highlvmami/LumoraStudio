@@ -1,13 +1,14 @@
 # Mimari
 
-Bu belge 0.1, 0.2 ve 0.3'ün nasıl kurulduğunu ve [özellik listesindeki](ozellikler.md) her şeyin ileride nereye oturacağını anlatır.
+Bu belge 0.1, 0.2, 0.3 ve 0.4'ün nasıl kurulduğunu ve [özellik listesindeki](ozellikler.md) her şeyin ileride nereye oturacağını anlatır.
 
 ## Katmanlar
 
 ```
 ┌──────────────────────────── src/app (Qt Widgets) ────────────────────────────┐
 │ MainWindow · çalışma alanları (Kurgu / Renk / Ses / Fotoğraf)                │
-│ Paneller: Dosyalar, Önizleme, Özellikler, Zaman çizelgesi, Renk, Kapsamlar   │
+│ Paneller: Dosyalar, Önizleme, Özellikler, Zaman çizelgesi, Renk, Kapsamlar,  │
+│           Ses                                                                │
 │ PlaybackEngine (video iş parçacığı + ses iş parçacığı) · MediaCache          │
 └───────────────┬──────────────────────────────────────────────────────────────┘
                 │ yalnızca çekirdeğin genel API'si
@@ -17,7 +18,8 @@ Bu belge 0.1, 0.2 ve 0.3'ün nasıl kurulduğunu ve [özellik listesindeki](ozel
 │ export/   ExportPlanner (karar) → TimelineExporter / RenderExport (uygulama) │
 │ render/   FrameRenderer · TitleRenderer · AudioMixer                         │
 │ color/    ColorGrade · ColorProcessor (32-bit float) · Lut (.cube) · Scopes  │
-│ image/    PhotoProcessor (renk + katmanlar + maskeler) · PhotoExporter       │
+│ audio/    AudioEffects · dsp (filtre, gürültü, kompresör, limit.) · Loudness │
+│ image/    PhotoProcessor (renk + katmanlar + maskeler) · PhotoExporter · RAW │
 │ media/    MediaInfo · VideoDecoder · AudioDecoder                            │
 │ ffmpeg/   RAII sarmalayıcılar, sürüm uyumluluğu (FFmpeg 6.1 – 8.x)           │
 └──────────────────────────────────────────────────────────────────────────────┘
@@ -41,7 +43,15 @@ Bu belge 0.1, 0.2 ve 0.3'ün nasıl kurulduğunu ve [özellik listesindeki](ozel
 
 **Renk tek bir hattan geçer.** `ColorGrade` birkaç sayıdan (ışık, beyaz dengesi, doygunluk, lift/gamma/gain, LUT yolu ve miktarı) ibarettir ve video klipte (`Clip::color`), fotoğrafta (`PhotoAdjustments::color`) ve fotoğrafın ayar katmanlarında aynıdır. `ColorProcessor` bunu her piksel için 32-bit float'ta uygular: beyaz dengesi, pozlama ve kontrast doğrusal ışıkta; ton aralıkları algısal parlaklıkta; tekerlekler ve LUT ekran kodlu değerlerde (.cube dosyalarının neredeyse hepsi bunu bekler). Üs eğrileri yoğun tablolardan okunur (hata 1e-6'nın altında), böylece önizleme de tam hesabı yapar, ayrı bir "hızlı" yol yoktur. `FrameRenderer` klip karesini çıktı boyutuna dönüştürdükten hemen sonra, birleştirmeden önce rengi uygular; renk ayarı olan kare `passthroughFrame` yolundan geçmez, planlayıcı da kayıpsız kesimi engeller. Okunamayan bir LUT dışa aktarmayı başlamadan durdurur. Görünüm `Lut::sample` ile 3B tabloya çevrilip .cube olarak kaydedilebilir.
 
-**Fotoğraf katmanları.** `PhotoAdjustments` = genel renk + kırpma + katman listesi (alttan üste). Ayar katmanı, alttaki her şeyin renk ayarlı kopyasını maske ve opaklıkla karıştırır; resim katmanı başka bir resmi konum/boyutla yerleştirir. İkisi de karışım modunu (W3C tanımları) ekran kodlu değerlerde uygular. Maskeler (dikdörtgen, elips, degrade; yumuşak kenar, ters) kırpılmamış fotoğrafın normalize koordinatlarındadır, böylece önizleme vekilinde ve tam çözünürlükte aynı yere düşer. Kırpma en son yapılır. Katmanı olmayan ve rengi değişmeyen fotoğraf yine bit bit aynı kaydedilir.
+**Eğriler ve HSL aynı renk hattının adımlarıdır.** Sıra: tekerlekler → HSL → ton eğrileri → LUT. Eğriler Fritsch–Carlson monoton kübik ara değerlemeyle noktaların arasında taşmaz; ana eğri ile kanal eğrisi tek bir 8192 adımlık tabloya birleştirilir. HSL 8 renk merkezi arasında yumuşak geçişle çalışır ve etkisini pikselin doygunluğuyla ölçekler, böylece griler yerinde kalır.
+
+**Ses efektleri karıştırıcının içindedir.** Her ses klibinin kendi zinciri (`dsp::ClipChain`) vardır: 2×2. derece alçak kesme → spektral gürültü azaltma (STFT, en küçük istatistik ile gürültü tabanı) → üç bantlı ekolayzer → kompresör. Zincirin gecikmesi (gürültü azaltmada tam olarak bir pencere) karıştırıcının ileri okumasıyla telafi edilir, ses görüntüyle hizalı kalır. Kısma iki geçişlidir: önce kısılmayan kliplerin toplamından bir anahtar sinyal çıkar, sonra kısılacak klipler buna göre zarflanır. Ana çıkışta eşitleme kazancı ve ileriye bakan limitleyici vardır. `Loudness` ITU-R BS.1770-4 / EBU R128'i (K-ağırlıklama, 400 ms bloklar, -70 ve -10 LU kapıları) uygular; dışa aktarma önce miksi ölçer, sonra kazancı ayarlar. Planlayıcı yalnızca ses değiştiğinde görüntüyü `Copy` olarak bırakır (`audioMixed`): video paketleri bit bit kopyalanırken ses karıştırıcıdan kodlanıp aynı dosyaya araya yazılır.
+
+**Altyazılar ayrı bir iz türüdür.** `TrackType::Subtitle` izleri medya taşımayan `ClipKind::Subtitle` klipleri tutar; düzenleme işlemleri başlıklarla aynıdır. Dışa aktarma planı satırları çıktı zamanına çevirir (kayıpsız kesimde anahtar kare kaymaları dahil) ve üç yoldan birini seçer: kabın desteklediği metin kodeğiyle (mov_text / SubRip / WebVTT) ayrı akış, `FrameRenderer` ile görüntüye yakma (o zaman `Render`) ya da yanına .srt. Proje dosyası altyazı izi varsa sürüm 3 yazılır; yoksa 2 kalır, böylece 0.3 o projeleri açabilir.
+
+**RAW.** `image/RawDecoder` LibRaw ile (isteğe bağlı derleme bağımlılığı) kameranın beyaz dengesi ve renk matrisiyle 16 bit sRGB'ye geliştirir; `PhotoProcessor::load`, `probeMedia` ve küçük resimler bunu kullanır. Dosya Qt ile okunup LibRaw'a bellekten verilir, böylece Türkçe karakterli yollar her sistemde açılır.
+
+**Fotoğraf katmanları.** `PhotoAdjustments` = genel renk + kırpma + katman listesi (alttan üste). Ayar katmanı, alttaki her şeyin renk ayarlı kopyasını maske ve opaklıkla karıştırır; resim katmanı başka bir resmi konum/boyutla yerleştirir. İkisi de karışım modunu (W3C tanımları) ekran kodlu değerlerde uygular. Maskeler (dikdörtgen, elips, degrade, fırça; yumuşak kenar, ters) kırpılmamış fotoğrafın normalize koordinatlarındadır, böylece önizleme vekilinde ve tam çözünürlükte aynı yere düşer. Kırpma en son yapılır. Katmanı olmayan ve rengi değişmeyen fotoğraf yine bit bit aynı kaydedilir.
 
 **Geri al her şeyi kapsar.** Zaman çizelgesi değişiklikleri anlık görüntü (snapshot) komutlarıyla, fotoğraf ayarları birleşebilen komutlarla (`mergeWith`) kaydedilir. Video ve fotoğrafın ayrı geçmişi vardır (`QUndoGroup`).
 
@@ -56,11 +66,12 @@ Bu belge 0.1, 0.2 ve 0.3'ün nasıl kurulduğunu ve [özellik listesindeki](ozel
 | Akıllı render (yalnızca efektli kısmı kodla) | `SegmentPlan` bölüm bölümdür; efektli bölümler `Render`, diğerleri `Copy` olabilir. GOP sınırında yeniden kodlama `TimelineExporter`'a eklenir. |
 | Ripple/roll/slip/slide, iç içe zaman çizelgesi | Yeni düzenleme işlemleri `Timeline` metotları + snapshot geri alma olarak eklenir. |
 | PNG/TIFF dizisi, GIF/WebP | `encoders` tablosuna yeni çıktı türü; `RenderExport` kare kare yazar. |
-| Efektler, eğriler, anahtar kareler | `ClipEffects` (başlık, dönüşüm, geçiş, ses, renk) bir efekt yığınına ve anahtar karelere genişler; `FrameRenderer` GPU üzerinde 32-bit float işleyen bir render grafiğine dönüşür. Eğriler ve HSL, `ColorProcessor` zincirine yeni adımlar olarak eklenir ve video ile fotoğrafta aynı anda çalışır. |
+| Efektler, anahtar kareler | `ClipEffects` (başlık, dönüşüm, geçiş, ses, renk) bir efekt yığınına ve anahtar karelere genişler; `FrameRenderer` GPU üzerinde 32-bit float işleyen bir render grafiğine dönüşür. |
 | Renk yönetimi, HDR, OCIO/ACES | `VideoStreamInfo` renk alanı, aktarım ve HDR bilgisini zaten taşır; dışa aktarma bunları korur. Dönüşümler render grafiğine düğüm olarak gelir. |
-| Ses araçları, LUFS, ducking | `AudioDecoder` + ayrı bir ses grafiği; A izleri zaten var. |
+| Eko azaltma, seslendirme kaydı, sessiz kısımları silme | `dsp::ClipChain`'e yeni adım; kayıt `QAudioSource` ile yeni bir medya dosyası üretir; sessizlik tespiti `Loudness` bloklarını kullanır. |
+| Otomatik altyazı | `src/ai` (Whisper) satırları üretir, `Timeline::addSubtitleTrack` ile iz olarak eklenir. |
 | Proxy düzenleme | `MediaItem`'a proxy yolu; oynatma proxy'yi, dışa aktarma asıl dosyayı okur (önizleme/çıktı ayrımı zaten var). |
-| Fotoğraf: fırça maskesi, seçim araçları, RAW, HEIC/AVIF | `LayerMask`'a bitmap maske türü eklenir (fırça, sihirli değnek, konu seçimi aynı maskeyi üretir); okuyucular (LibRaw vb.) `PhotoProcessor::load` arkasına eklenir. |
+| Fotoğraf: seçim araçları, HEIC/AVIF | Sihirli değnek ve konu seçimi `LayerMask`'a bitmap maske türü olarak eklenir (fırça darbeleriyle birleşir); okuyucular `PhotoProcessor::load` arkasına RAW gibi eklenir. |
 | EXIF / meta veri koruma | Video meta verisi ve yan veriler (HDR, döndürme) şimdiden kopyalanıyor; fotoğraf EXIF'i 0.2'de `PhotoExporter`'a eklenecek. |
 | Otomatik kayıt, kurtarma | `Project::toJson` hazır; zamanlayıcı ile ayrı bir dosyaya yazılır. |
 | Yapay zeka araçları | Ayrı bir `src/ai` modülü (ONNX Runtime); çekirdekle yalnızca kare/ses arabellekleri üzerinden konuşur. |

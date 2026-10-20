@@ -1,6 +1,7 @@
 #include <QUndoStack>
 #include <QtTest>
 
+#include "timeline/Subtitles.h"
 #include "timeline/Timeline.h"
 #include "undo/TimelineCommands.h"
 
@@ -252,6 +253,59 @@ private slots:
         stack.redo();
         QCOMPARE(tl.tracks()[0].clips.size(), size_t(2));
     }
+
+    void subtitleFilesRoundTrip() {
+        const QString srt = QStringLiteral(
+            "1\r\n00:00:01,000 --> 00:00:02,500\r\n<i>Merhaba</i> dünya\r\n\r\n"
+            "2\r\n00:00:03,000 --> 00:00:04,000\r\nİkinci\r\nsatır\r\n\r\n");
+        QString err;
+        const auto cues = subtitles::parse(srt, &err);
+        QCOMPARE(int(cues.size()), 2);
+        QCOMPARE(cues[0].start, ticksFromSeconds(1.0));
+        QCOMPARE(cues[0].end, ticksFromSeconds(2.5));
+        QCOMPARE(cues[0].text, QStringLiteral("Merhaba dünya"));
+        QCOMPARE(cues[1].text, QStringLiteral("İkinci\nsatır"));
+        QCOMPARE(subtitles::parse(subtitles::write(cues, subtitles::Format::Srt)), cues);
+        const QString vtt = subtitles::write(cues, subtitles::Format::Vtt);
+        QVERIFY(vtt.startsWith(QLatin1String("WEBVTT")));
+        QVERIFY(vtt.contains(QLatin1String("00:00:01.000 --> 00:00:02.500")));
+        QCOMPARE(subtitles::parse(vtt), cues);
+        // VTT with cue settings and short times.
+        const auto v = subtitles::parse(QStringLiteral("WEBVTT\n\n01:02.250 --> 01:03.000 align:start\nSelam\n"));
+        QCOMPARE(int(v.size()), 1);
+        QCOMPARE(v[0].start, ticksFromSeconds(62.25));
+        QVERIFY(subtitles::parse(QStringLiteral("not a subtitle"), &err).empty());
+        QVERIFY(!err.isEmpty());
+        QCOMPARE(subtitles::isoLanguage(QStringLiteral("tr")), QStringLiteral("tur"));
+    }
+
+    void subtitleTrackEditing() {
+        Timeline tl;
+        const int s = tl.addSubtitleTrack({{ticksFromSeconds(1), ticksFromSeconds(2), QStringLiteral("a")},
+                                           {ticksFromSeconds(1.5), ticksFromSeconds(3), QStringLiteral("b")}},
+                                          QStringLiteral("tur"));
+        QCOMPARE(tl.tracks()[s].name, QStringLiteral("S1"));
+        QVERIFY(tl.tracks()[s].isSubtitle());
+        QCOMPARE(int(tl.tracks()[s].clips.size()), 2);
+        // Overlapping cues were made to follow each other.
+        QCOMPARE(tl.tracks()[s].clips[0].timelineEnd(), ticksFromSeconds(1.5));
+        const QUuid id = tl.addSubtitle(s, ticksFromSeconds(5), ticksFromSeconds(1), QStringLiteral("c"));
+        QVERIFY(!id.isNull());
+        QVERIFY(tl.setSubtitleText(id, QStringLiteral("d")));
+        QVERIFY(tl.setDuration(id, ticksFromSeconds(2)));
+        QVERIFY(tl.trimIn(id, -ticksFromSeconds(0.5)));
+        const auto cues = tl.state().subtitleCues(s, ticksFromSeconds(1));
+        QCOMPARE(int(cues.size()), 3);
+        QCOMPARE(cues[0].start, Ticks(0));
+        QCOMPARE(cues[2].text, QStringLiteral("d"));
+        // Subtitles alone are no effect: a lossless cut stays possible.
+        tl.insertMedia(QUuid::createUuid(), 0, ticksFromSeconds(4), true, true);
+        QVERIFY(!tl.state().hasEffects());
+        QVERIFY(tl.state().hasSubtitles());
+        // Media cannot go onto a subtitle track.
+        QVERIFY(tl.placeMedia(QUuid::createUuid(), 0, ticksFromSeconds(1), true, false, s, 0).isNull());
+    }
+
 };
 
 QTEST_GUILESS_MAIN(TimelineTest)

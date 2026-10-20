@@ -27,6 +27,7 @@ class PropertiesPanel;
 class PhotoWorkspace;
 class ClipColorPanel;
 class ScopesWidget;
+class AudioPanel;
 
 class MainWindow : public QMainWindow {
     Q_OBJECT
@@ -70,6 +71,9 @@ private:
     Ticks addRangeToTimeline(const QUuid& media, Ticks in, Ticks out, Ticks at = kInvalidTicks, int track = -1);
     void addTitle(int track = -1, Ticks at = kInvalidTicks);
     void addTransition();
+    void addSubtitle(int track = -1, Ticks at = kInvalidTicks);
+    void importSubtitles();
+    void exportSubtitles();
     void removeTransition();
     void exportFrame();
     void removeMedia(const QList<QUuid>& ids);
@@ -102,11 +106,13 @@ private:
     PhotoWorkspace* m_photo;
     ClipColorPanel* m_clipColor;
     ScopesWidget* m_scopes;
+    AudioPanel* m_audio;
     QDockWidget* m_binDock;
     QDockWidget* m_propsDock;
     QDockWidget* m_timelineDock;
     QDockWidget* m_colorDock;
     QDockWidget* m_scopesDock;
+    QDockWidget* m_audioDock;
     QLabel* m_statusRight;
     QHash<int, QByteArray> m_dockStates; // per workspace
 
@@ -142,6 +148,10 @@ private:
     QAction* m_actAddTransition;
     QAction* m_actAddVideoTrack;
     QAction* m_actAddAudioTrack;
+    QAction* m_actAddSubtitle;
+    QAction* m_actAddSubtitleTrack;
+    QAction* m_actImportSubtitles;
+    QAction* m_actExportSubtitles;
     QAction* m_actExportFrame;
     class Updater* m_updater = nullptr;
 };

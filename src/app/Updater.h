@@ -46,6 +46,7 @@ private:
     void install(const QString& zipPath);
     bool canReplaceFiles() const;
 
+    QWidget* dialogParent() const;
     QMainWindow* m_window;
     QNetworkAccessManager m_net;
     QPointer<QNetworkReply> m_reply;

@@ -10,6 +10,7 @@
 #include <QLabel>
 #include <QLineEdit>
 #include <QListWidget>
+#include <QPushButton>
 #include <QSettings>
 #include <QSignalBlocker>
 #include <QToolButton>
@@ -114,6 +115,7 @@ LayersPanel::LayersPanel(QWidget* parent) : QWidget(parent) {
     m_maskShape->addItem(tr("Rectangle"), static_cast<int>(MaskShape::Rectangle));
     m_maskShape->addItem(tr("Ellipse"), static_cast<int>(MaskShape::Ellipse));
     m_maskShape->addItem(tr("Gradient"), static_cast<int>(MaskShape::Linear));
+    m_maskShape->addItem(tr("Brush"), static_cast<int>(MaskShape::Brush));
     ml->addWidget(m_maskShape);
     m_maskEditors = new QWidget;
     auto* mel = new QVBoxLayout(m_maskEditors);
@@ -130,9 +132,38 @@ LayersPanel::LayersPanel(QWidget* parent) : QWidget(parent) {
     m_maskFeather->setDefault(15);
     m_maskInvert = new QCheckBox(tr("Invert"));
     for (QWidget* w : std::initializer_list<QWidget*>{m_maskHint, m_maskX, m_maskY, m_maskW, m_maskH, m_maskAngle,
-                                                      m_maskFeather, m_maskInvert})
+                                                      m_maskFeather})
         mel->addWidget(w);
     ml->addWidget(m_maskEditors);
+
+    // Brush masks: the settings belong to the brush, not to the layer, and
+    // are remembered between sessions.
+    m_brushEditors = new QWidget;
+    auto* bel = new QVBoxLayout(m_brushEditors);
+    bel->setContentsMargins(0, 0, 0, 0);
+    auto* brushHint = new QLabel(tr("Paint on the photo where the layer should show. Hold Alt to erase."));
+    brushHint->setWordWrap(true);
+    brushHint->setStyleSheet(QStringLiteral("color: palette(placeholder-text);"));
+    QSettings bs;
+    m_brushSize = new SliderRow(tr("Brush size (%)"), 1, 50, 0.5, 1);
+    m_brushSize->setDefault(8);
+    m_brushSize->setValue(bs.value(QStringLiteral("photo/brushSize"), 8.0).toDouble());
+    m_brushHardness = new SliderRow(tr("Hardness (%)"), 0, 100, 1, 0);
+    m_brushHardness->setDefault(50);
+    m_brushHardness->setValue(bs.value(QStringLiteral("photo/brushHardness"), 50.0).toDouble());
+    m_brushFlow = new SliderRow(tr("Flow (%)"), 1, 100, 1, 0);
+    m_brushFlow->setDefault(100);
+    m_brushFlow->setValue(bs.value(QStringLiteral("photo/brushFlow"), 100.0).toDouble());
+    m_brushErase = new QCheckBox(tr("Erase"));
+    m_brushErase->setToolTip(tr("Take away from the mask instead of adding (or hold Alt while painting)"));
+    m_brushOverlay = new QCheckBox(tr("Show the mask on the photo"));
+    m_brushOverlay->setChecked(bs.value(QStringLiteral("photo/brushOverlay"), true).toBool());
+    m_brushClear = new QPushButton(Icons::reset(), tr("Clear brush strokes"));
+    for (QWidget* w : std::initializer_list<QWidget*>{brushHint, m_brushSize, m_brushHardness, m_brushFlow,
+                                                      m_brushErase, m_brushOverlay, m_brushClear})
+        bel->addWidget(w);
+    ml->addWidget(m_brushEditors);
+    ml->addWidget(m_maskInvert);
     el->addWidget(maskBox);
 
     m_colorBox = new QGroupBox(tr("Layer colour"));
@@ -209,6 +240,23 @@ LayersPanel::LayersPanel(QWidget* parent) : QWidget(parent) {
             if (l.mask.shape == MaskShape::Linear && l.mask.rect == LayerMask().rect)
                 l.mask.rect = QRectF(0, 0, 1, 1); // a gradient across the middle of the photo
         });
+    });
+    auto brushSetting = [this](SliderRow* row, const char* key) {
+        connect(row, &SliderRow::valueChanged, this, [this, key](double v) {
+            QSettings().setValue(QLatin1String(key), v);
+            emit brushChanged();
+        });
+    };
+    brushSetting(m_brushSize, "photo/brushSize");
+    brushSetting(m_brushHardness, "photo/brushHardness");
+    brushSetting(m_brushFlow, "photo/brushFlow");
+    connect(m_brushErase, &QCheckBox::toggled, this, &LayersPanel::brushChanged);
+    connect(m_brushOverlay, &QCheckBox::toggled, this, [this](bool on) {
+        QSettings().setValue(QStringLiteral("photo/brushOverlay"), on);
+        emit brushChanged();
+    });
+    connect(m_brushClear, &QPushButton::clicked, this, [this] {
+        editCurrent(tr("Clear brush strokes"), {}, [](PhotoLayer& l) { l.mask.strokes.clear(); });
     });
     connect(m_maskInvert, &QCheckBox::toggled, this, [this](bool on) {
         editCurrent(tr("Invert mask"), {}, [&](PhotoLayer& l) { l.mask.invert = on; });
@@ -298,7 +346,11 @@ void LayersPanel::syncEditors() {
         m_picScale->setValue(l->scale * 100);
         m_maskShape->setCurrentIndex(m_maskShape->findData(static_cast<int>(l->mask.shape)));
         const bool masked = l->mask.shape != MaskShape::None;
-        m_maskEditors->setVisible(masked);
+        const bool brush = l->mask.shape == MaskShape::Brush;
+        m_maskEditors->setVisible(masked && !brush);
+        m_brushEditors->setVisible(brush);
+        m_brushClear->setEnabled(!l->mask.strokes.empty());
+        m_maskInvert->setVisible(masked);
         const bool linear = l->mask.shape == MaskShape::Linear;
         m_maskW->setVisible(!linear);
         m_maskH->setVisible(!linear);
@@ -314,6 +366,19 @@ void LayersPanel::syncEditors() {
         m_color->setGrade(l->grade);
     }
     m_syncing = false;
+}
+
+BrushStroke LayersPanel::brush() const {
+    BrushStroke b;
+    b.radius = m_brushSize->value() / 200.0; // the size is the diameter, in % of the photo height
+    b.hardness = m_brushHardness->value() / 100.0;
+    b.flow = m_brushFlow->value() / 100.0;
+    b.erase = m_brushErase->isChecked();
+    return b;
+}
+
+bool LayersPanel::showMaskOverlay() const {
+    return m_brushOverlay->isChecked();
 }
 
 void LayersPanel::commit(std::vector<PhotoLayer> layers, const QString& text, const QString& field) {

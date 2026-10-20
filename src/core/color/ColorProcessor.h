@@ -58,7 +58,10 @@ private:
     float m_saturation = 1, m_vibrance = 0;
     bool m_wheels = false;
     float m_lift[3] = {0, 0, 0}, m_gain[3] = {1, 1, 1};
-    std::unique_ptr<struct ColorCurves> m_curves; // contrast and gamma power curves
+    bool m_hsl = false;
+    float m_hslHue[kHslBands] = {}, m_hslSat[kHslBands] = {}, m_hslLum[kHslBands] = {};
+    bool m_toneCurves = false;
+    std::unique_ptr<struct ColorCurves> m_curves; // contrast and gamma power curves, tone curve tables
     float m_lutAmount = 0;
 };
 

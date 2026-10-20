@@ -17,7 +17,9 @@ class Project : public QObject {
     Q_OBJECT
 public:
     // 2: multiple tracks, titles, transitions, transforms, fades, gain.
-    static constexpr int kFormatVersion = 2;
+    // 3 adds subtitle tracks; projects without them are still written as 2 so
+    // older versions can open them.
+    static constexpr int kFormatVersion = 3;
     static constexpr const char* kExtension = "lumora";
 
     explicit Project(QObject* parent = nullptr);

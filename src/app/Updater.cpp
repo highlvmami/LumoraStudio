@@ -60,6 +60,14 @@ bool extractZip(const QString& zip, const QString& dir) {
 
 Updater::Updater(QMainWindow* window) : QObject(window), m_window(window) {}
 
+QWidget* Updater::dialogParent() const {
+    // When the check was started from a dialog (Settings), our windows go on
+    // top of that dialog instead of behind it.
+    if (QWidget* modal = QApplication::activeModalWidget())
+        return modal;
+    return m_window;
+}
+
 bool Updater::autoCheck() { return QSettings().value(QLatin1String(kAutoKey), true).toBool(); }
 
 void Updater::setAutoCheck(bool on) { QSettings().setValue(QLatin1String(kAutoKey), on); }
@@ -94,7 +102,7 @@ void Updater::check(bool interactive) {
         const int status = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
         if (reply->error() != QNetworkReply::NoError && status != 404) {
             if (interactive)
-                QMessageBox::warning(m_window, tr("Check for updates"),
+                QMessageBox::warning(dialogParent(), tr("Check for updates"),
                                      tr("Could not reach GitHub: %1").arg(reply->errorString()));
             return;
         }
@@ -104,7 +112,7 @@ void Updater::check(bool interactive) {
         if (status == 404 || !isNewer(release.value(QLatin1String("tag_name")).toString(),
                                       QCoreApplication::applicationVersion())) {
             if (interactive)
-                QMessageBox::information(m_window, tr("Check for updates"),
+                QMessageBox::information(dialogParent(), tr("Check for updates"),
                                          tr("LumoraStudio %1 is the latest version.")
                                              .arg(QCoreApplication::applicationVersion()));
             return;
@@ -128,7 +136,7 @@ void Updater::offer(const QJsonObject& release, bool interactive) {
     const bool automatic = false;
 #endif
 
-    QMessageBox box(m_window);
+    QMessageBox box(dialogParent());
     box.setIcon(QMessageBox::Information);
     box.setWindowTitle(tr("Update available"));
     box.setText(tr("LumoraStudio %1 is available. You have %2.")
@@ -175,13 +183,14 @@ void Updater::download(const QJsonObject& asset, const QString& newVersion) {
                                   .arg(newVersion, QUuid::createUuid().toString(QUuid::WithoutBraces).left(8)));
     auto* file = new QSaveFile(zipPath, this);
     if (!file->open(QIODevice::WriteOnly)) {
-        QMessageBox::warning(m_window, tr("Update"), tr("Cannot write %1.").arg(QDir::toNativeSeparators(zipPath)));
+        QMessageBox::warning(dialogParent(), tr("Update"), tr("Cannot write %1.").arg(QDir::toNativeSeparators(zipPath)));
         file->deleteLater();
         return;
     }
     auto* hash = new QCryptographicHash(QCryptographicHash::Sha256);
 
-    m_progress = new QProgressDialog(tr("Downloading LumoraStudio %1…").arg(newVersion), tr("Cancel"), 0, 100, m_window);
+    m_progress = new QProgressDialog(tr("Downloading LumoraStudio %1…").arg(newVersion), tr("Cancel"), 0, 100, dialogParent());
+    m_progress->setWindowModality(Qt::WindowModal);
     m_progress->setWindowTitle(tr("Update"));
     m_progress->setMinimumDuration(0);
     m_progress->setAutoClose(false);
@@ -215,13 +224,13 @@ void Updater::download(const QJsonObject& asset, const QString& newVersion) {
             file->cancelWriting();
             file->deleteLater();
             if (reply->error() != QNetworkReply::OperationCanceledError)
-                QMessageBox::warning(m_window, tr("Update"), tr("The download failed: %1").arg(reply->errorString()));
+                QMessageBox::warning(dialogParent(), tr("Update"), tr("The download failed: %1").arg(reply->errorString()));
             return;
         }
         if (!expected.isEmpty() && got != expected) {
             file->cancelWriting();
             file->deleteLater();
-            QMessageBox::warning(m_window, tr("Update"),
+            QMessageBox::warning(dialogParent(), tr("Update"),
                                  tr("The downloaded file is damaged (its checksum does not match). Nothing was "
                                     "changed; please try again later."));
             return;
@@ -229,7 +238,7 @@ void Updater::download(const QJsonObject& asset, const QString& newVersion) {
         const bool committed = file->commit();
         file->deleteLater();
         if (!committed) {
-            QMessageBox::warning(m_window, tr("Update"), tr("Cannot write %1.").arg(QDir::toNativeSeparators(zipPath)));
+            QMessageBox::warning(dialogParent(), tr("Update"), tr("Cannot write %1.").arg(QDir::toNativeSeparators(zipPath)));
             return;
         }
         install(zipPath);
@@ -251,11 +260,18 @@ void Updater::install(const QString& zipPath) {
     }
     if (source.isEmpty()) {
         cleanup();
-        QMessageBox::warning(m_window, tr("Update"), tr("The downloaded package could not be unpacked."));
+        QMessageBox::warning(dialogParent(), tr("Update"), tr("The downloaded package could not be unpacked."));
         return;
     }
     // Closing goes through the usual "save changes?" question; if the user
     // cancels it, nothing is replaced.
+    // Close the dialog the update was started from first, so the main
+    // window can close and the new version start.
+    for (int i = 0; i < 4; ++i) {
+        QWidget* modal = QApplication::activeModalWidget();
+        if (!modal || modal == m_progress || !modal->close())
+            break;
+    }
     if (!m_window->close()) {
         cleanup();
         return;

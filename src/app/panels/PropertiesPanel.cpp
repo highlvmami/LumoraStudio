@@ -10,6 +10,7 @@
 #include <QFormLayout>
 #include <QHBoxLayout>
 #include <QLabel>
+#include <QLineEdit>
 #include <QLocale>
 #include <QPlainTextEdit>
 #include <QPushButton>
@@ -23,6 +24,7 @@
 #include "Theme.h"
 #include "export/ExportPlanner.h"
 #include "project/Project.h"
+#include "timeline/Subtitles.h"
 #include "undo/TimelineCommands.h"
 
 extern "C" {
@@ -162,6 +164,58 @@ PropertiesPanel::PropertiesPanel(Project* project, QUndoStack* undo, QWidget* pa
     f->addRow(tr("Duration"), m_titleDuration);
     layout->addWidget(m_titleSection);
 
+    // --- subtitle ---
+    m_subSection = makeSection(tr("Subtitle"), &f);
+    m_subText = new QPlainTextEdit;
+    m_subText->setFixedHeight(56);
+    m_subText->setPlaceholderText(tr("Type what is said; two lines at most read best"));
+    f->addRow(m_subText);
+    m_subDuration = dspin(0.04, 600, 0.1, 2, sec);
+    f->addRow(tr("Duration"), m_subDuration);
+    layout->addWidget(m_subSection);
+
+    m_subTrackSection = makeSection(tr("Subtitle track"), &f);
+    m_subLanguage = new QLineEdit;
+    m_subLanguage->setPlaceholderText(tr("e.g. tur, eng"));
+    m_subLanguage->setToolTip(tr("Language of the track (ISO 639-2 code or a name); players show it in their subtitle menu"));
+    f->addRow(tr("Language"), m_subLanguage);
+    m_subFont = new QFontComboBox;
+    f->addRow(tr("Font"), m_subFont);
+    auto* subStyleRow = new QHBoxLayout;
+    m_subSize = dspin(1, 20, 0.5, 1, QStringLiteral(" %"));
+    m_subSize->setToolTip(tr("Text height as a percentage of the frame height"));
+    m_subBold = new QToolButton;
+    m_subBold->setText(QStringLiteral("B"));
+    m_subBold->setCheckable(true);
+    m_subBold->setFont(bf);
+    m_subColor = makeColorButton();
+    m_subColor->setToolTip(tr("Text colour"));
+    subStyleRow->addWidget(m_subSize, 1);
+    subStyleRow->addWidget(m_subBold);
+    subStyleRow->addWidget(m_subColor);
+    f->addRow(tr("Size"), subStyleRow);
+    auto* subOutlineRow = new QHBoxLayout;
+    m_subOutline = dspin(0, 30, 1, 0, QStringLiteral(" %"));
+    m_subOutlineColor = makeColorButton();
+    subOutlineRow->addWidget(m_subOutline, 1);
+    subOutlineRow->addWidget(m_subOutlineColor);
+    f->addRow(tr("Outline"), subOutlineRow);
+    m_subBackOpacity = new QSpinBox;
+    m_subBackOpacity->setRange(0, 100);
+    m_subBackOpacity->setSuffix(QStringLiteral(" %"));
+    m_subBackOpacity->setKeyboardTracking(false);
+    m_subBackOpacity->setToolTip(tr("A dark box behind the text"));
+    f->addRow(tr("Background"), m_subBackOpacity);
+    m_subY = dspin(5, 100, 1, 0, QStringLiteral(" %"));
+    m_subY->setToolTip(tr("Where the bottom line sits, from the top of the frame"));
+    f->addRow(tr("Height in frame"), m_subY);
+    auto* subNote = new QLabel(tr("The style is used when subtitles are burnt into the picture and in the preview. "
+                                  "Embedded subtitles are styled by the player."));
+    subNote->setWordWrap(true);
+    subNote->setStyleSheet(QStringLiteral("color: palette(placeholder-text);"));
+    f->addRow(subNote);
+    layout->addWidget(m_subTrackSection);
+
     // --- transform ---
     m_transformSection = makeSection(tr("Position and size"), &f);
     auto* xy = new QHBoxLayout;
@@ -259,6 +313,35 @@ PropertiesPanel::PropertiesPanel(Project* project, QUndoStack* undo, QWidget* pa
             if (c.isValid()) {
                 setButtonColor(b, c);
                 applyTitle();
+            }
+        });
+    connect(m_subText, &QPlainTextEdit::textChanged, this, [this] {
+        edit(tr("Edit subtitle"), QStringLiteral("subtitle"),
+             [&](const Clip& c) { return m_project->timeline()->setSubtitleText(c.id, m_subText->toPlainText()); });
+    });
+    connect(m_subDuration, &QDoubleSpinBox::valueChanged, this, [this](double v) {
+        edit(tr("Change subtitle length"), QStringLiteral("duration"),
+             [&](const Clip& c) { return m_project->timeline()->setDuration(c.id, ticksFromSeconds(v)); });
+    });
+    connect(m_subLanguage, &QLineEdit::editingFinished, this, [this] {
+        edit(tr("Subtitle language"), {}, [&](const Clip& c) {
+            const auto loc = m_project->timeline()->locate(c.id);
+            const QString text = m_subLanguage->text().trimmed();
+            const QString code = text.isEmpty() ? QString() : subtitles::isoLanguage(text);
+            return loc && m_project->timeline()->setTrackLanguage(loc->track, code.isEmpty() ? text : code);
+        });
+    });
+    connect(m_subFont, &QFontComboBox::currentFontChanged, this, [this] { applySubtitleStyle(); });
+    for (QDoubleSpinBox* sb : {m_subSize, m_subOutline, m_subY})
+        connect(sb, &QDoubleSpinBox::valueChanged, this, [this] { applySubtitleStyle(); });
+    connect(m_subBackOpacity, &QSpinBox::valueChanged, this, [this] { applySubtitleStyle(); });
+    connect(m_subBold, &QToolButton::toggled, this, [this] { applySubtitleStyle(); });
+    for (QToolButton* b : {m_subColor, m_subOutlineColor})
+        connect(b, &QToolButton::clicked, this, [this, b] {
+            const QColor c = QColorDialog::getColor(b->property("color").value<QColor>(), this, tr("Choose a colour"));
+            if (c.isValid()) {
+                setButtonColor(b, c);
+                applySubtitleStyle();
             }
         });
     connect(m_titleDuration, &QDoubleSpinBox::valueChanged, this, [this](double v) {
@@ -380,6 +463,33 @@ void PropertiesPanel::applyTitle() {
     });
 }
 
+void PropertiesPanel::applySubtitleStyle() {
+    if (m_updating)
+        return;
+    edit(tr("Subtitle style"), QStringLiteral("subtitleStyle"), [&](const Clip& c) {
+        const auto loc = m_project->timeline()->locate(c.id);
+        if (!loc)
+            return false;
+        SubtitleStyle st = m_project->timeline()->tracks()[loc->track].subtitleStyle;
+        st.fontFamily = m_subFont->currentFont().family();
+        st.size = m_subSize->value() / 100.0;
+        st.bold = m_subBold->isChecked();
+        st.color = m_subColor->property("color").value<QColor>();
+        st.outlineColor = m_subOutlineColor->property("color").value<QColor>();
+        st.outlineWidth = m_subOutline->value() / 100.0;
+        st.backgroundOpacity = m_subBackOpacity->value() / 100.0;
+        st.y = m_subY->value() / 100.0;
+        return m_project->timeline()->setSubtitleStyle(loc->track, st);
+    });
+}
+
+void PropertiesPanel::focusText() {
+    if (m_subSection->isVisible())
+        m_subText->setFocus();
+    else if (m_titleSection->isVisible())
+        m_titleText->setFocus();
+}
+
 void PropertiesPanel::applyTransform() {
     edit(tr("Change position and size"), QStringLiteral("transform"), [&](const Clip& c) {
         ClipTransform t;
@@ -427,13 +537,19 @@ void PropertiesPanel::refreshEditors(const Clip* clip) {
     }
     const Timeline* tl = m_project->timeline();
     const bool isTitle = clip && clip->kind == ClipKind::Title;
+    const bool isSubtitle = clip && clip->kind == ClipKind::Subtitle;
     const bool video = clip && track >= 0 && tl->tracks()[track].type == TrackType::Video;
     const bool audio = clip && track >= 0 && tl->tracks()[track].type == TrackType::Audio;
 
     if (clip) {
         const QString trackName = track >= 0 ? tl->tracks()[track].name : QString();
         m_header->setText(QStringLiteral("<span style='color:%3'>%1 · %2</span>")
-                              .arg(trackName, isTitle ? tr("Title") : video ? tr("Video clip") : tr("Audio clip"), g_dim));
+                              .arg(trackName,
+                                   isTitle      ? tr("Title")
+                                   : isSubtitle ? tr("Subtitle")
+                                   : video      ? tr("Video clip")
+                                                : tr("Audio clip"),
+                                   g_dim));
     }
     m_header->setVisible(clip != nullptr);
 
@@ -464,6 +580,27 @@ void PropertiesPanel::refreshEditors(const Clip* clip) {
         m_titleAnimOut->setCurrentIndex(m_titleAnimOut->findData(static_cast<int>(t.animationOut)));
         setSpin(m_titleAnimDuration, ticksToSeconds(t.animationDuration));
         setSpin(m_titleDuration, ticksToSeconds(clip->duration()));
+    }
+
+    m_subSection->setVisible(isSubtitle);
+    m_subTrackSection->setVisible(isSubtitle);
+    if (isSubtitle) {
+        if (m_subText->toPlainText() != clip->text)
+            m_subText->setPlainText(clip->text);
+        setSpin(m_subDuration, ticksToSeconds(clip->duration()));
+        const Track& t = tl->tracks()[track];
+        if (!m_subLanguage->hasFocus())
+            m_subLanguage->setText(t.language);
+        const SubtitleStyle& st = t.subtitleStyle;
+        if (!st.fontFamily.isEmpty() && m_subFont->currentFont().family() != st.fontFamily)
+            m_subFont->setCurrentFont(QFont(st.fontFamily));
+        setSpin(m_subSize, st.size * 100);
+        m_subBold->setChecked(st.bold);
+        setButtonColor(m_subColor, st.color);
+        setButtonColor(m_subOutlineColor, st.outlineColor);
+        setSpin(m_subOutline, st.outlineWidth * 100);
+        m_subBackOpacity->setValue(qRound(st.backgroundOpacity * 100));
+        setSpin(m_subY, st.y * 100);
     }
 
     m_transformSection->setVisible(video);
@@ -501,8 +638,8 @@ void PropertiesPanel::refreshEditors(const Clip* clip) {
         m_transitionNote->setVisible(!note.isEmpty());
     }
 
-    m_fadeSection->setVisible(clip != nullptr);
-    if (clip) {
+    m_fadeSection->setVisible(clip && !isSubtitle);
+    if (clip && !isSubtitle) {
         const double maxFade = ticksToSeconds(clip->duration());
         m_fadeIn->setMaximum(maxFade);
         m_fadeOut->setMaximum(maxFade);

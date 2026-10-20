@@ -6,6 +6,7 @@
 #include <cmath>
 
 #include "ffmpeg/FFmpeg.h"
+#include "image/RawDecoder.h"
 
 extern "C" {
 #include <libavutil/channel_layout.h>
@@ -27,7 +28,7 @@ QStringList videoFileExtensions() {
 }
 
 QStringList imageFileExtensions() {
-    return {"jpg", "jpeg", "png", "tif", "tiff", "webp", "bmp"};
+    return QStringList{"jpg", "jpeg", "png", "tif", "tiff", "webp", "bmp"} + raw::fileExtensions();
 }
 
 bool isImageFile(const QString& path) {
@@ -51,6 +52,21 @@ static int displayRotation(const AVStream* st) {
 }
 
 static std::optional<MediaInfo> probeImage(const QString& path, QString* error) {
+    if (raw::isRawFile(path)) {
+        raw::Info ri;
+        if (!raw::probe(path, &ri, error))
+            return std::nullopt;
+        MediaInfo info;
+        info.path = path;
+        info.kind = MediaKind::Image;
+        info.formatName = QStringLiteral("raw");
+        info.formatLongName = ri.camera.isEmpty() ? QStringLiteral("RAW") : QStringLiteral("RAW (%1)").arg(ri.camera);
+        info.imageWidth = ri.size.width();
+        info.imageHeight = ri.size.height();
+        info.imageBitDepth = ri.bitDepth;
+        info.fileSize = QFileInfo(path).size();
+        return info;
+    }
     QImageReader reader(path);
     reader.setAutoTransform(true);
     const QSize size = reader.size();
