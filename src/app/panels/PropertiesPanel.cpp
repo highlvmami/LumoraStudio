@@ -235,6 +235,10 @@ PropertiesPanel::PropertiesPanel(Project* project, QUndoStack* undo, QWidget* pa
     }
     for (QAbstractSpinBox* sb : content->findChildren<QAbstractSpinBox*>())
         sb->setMinimumWidth(60);
+    // Paired X / Y fields: the arrows would leave no room for the value; the
+    // wheel and arrow keys still step them.
+    for (QDoubleSpinBox* sb : {m_titleX, m_titleY, m_posX, m_posY})
+        sb->setButtonSymbols(QAbstractSpinBox::NoButtons);
 
     // --- wiring ---
     auto titleChanged = [this] { applyTitle(); };

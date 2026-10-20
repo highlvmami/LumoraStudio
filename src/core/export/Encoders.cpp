@@ -17,7 +17,7 @@ namespace lumora::encoders {
 
 namespace {
 
-QString tr(const char* text) { return QCoreApplication::translate("Encoders", text); }
+QString tr(const char* text) { return QCoreApplication::translate("lumora::encoders", text); }
 
 bool startsWith(const QString& s, const char* prefix) { return s.startsWith(QLatin1String(prefix)); }
 bool endsWith(const QString& s, const char* suffix) { return s.endsWith(QLatin1String(suffix)); }

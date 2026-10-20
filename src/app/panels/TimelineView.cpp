@@ -146,6 +146,7 @@ void TimelineView::setScrollY(int y) {
         return;
     m_scrollY = y;
     update();
+    emit scrollChanged();
 }
 
 double TimelineView::xOf(Ticks t) const { return kHeader + ticksToSeconds(t) * m_pps - m_scrollX; }

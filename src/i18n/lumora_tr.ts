@@ -1,4 +1,4 @@
-<?xml version='1.0' encoding='utf-8'?>
+<?xml version="1.0" encoding="utf-8"?>
 <!DOCTYPE TS>
 <TS version="2.1" language="tr_TR">
 <context>
@@ -6,10 +6,6 @@
     <message>
         <source>The timeline is empty.</source>
         <translation>Zaman çizelgesi boş.</translation>
-    </message>
-    <message>
-        <source>Audio-only clips on A1 are not exported in version 0.1.</source>
-        <translation>A1'deki yalnızca ses içeren klipler 0.1 sürümünde dışa aktarılmaz.</translation>
     </message>
     <message>
         <source>A clip refers to media that is missing from the project.</source>
@@ -20,25 +16,25 @@
         <translation>Seçilen aralıkta dışa aktarılacak bir şey yok.</translation>
     </message>
     <message>
-        <source>Unknown output container for "%1".</source>
-        <translation>"%1" için çıktı kapsayıcısı bilinmiyor.</translation>
+        <source>Unknown output container for &quot;%1&quot;.</source>
+        <translation>&quot;%1&quot; için çıktı kapsayıcısı bilinmiyor.</translation>
     </message>
     <message>
-        <source>Cannot read "%1".</source>
-        <translation>"%1" okunamıyor.</translation>
+        <source>Cannot read &quot;%1&quot;.</source>
+        <translation>&quot;%1&quot; okunamıyor.</translation>
     </message>
     <message>
-        <source>The clips use different video encodings, so they cannot be joined without re-encoding. Choose "Match source" or "Lossless intermediate".</source>
-        <translation>Klipler farklı video kodlamaları kullanıyor, bu yüzden yeniden kodlamadan birleştirilemezler. "Kaynakla aynı" ya da "Kayıpsız ara format" seçeneğini kullanın.</translation>
+        <source>The clips use different video encodings, so they cannot be joined without re-encoding. Choose &quot;Match source&quot; or &quot;Lossless intermediate&quot;.</source>
+        <translation>Klipler farklı video kodlamaları kullanıyor, bu yüzden yeniden kodlamadan birleştirilemezler. &quot;Kaynakla aynı&quot; ya da &quot;Kayıpsız ara format&quot; seçeneğini kullanın.</translation>
     </message>
     <message>
         <source>The %1 container cannot hold %2 video without re-encoding.</source>
         <translation>%1 kapsayıcısı %2 videoyu yeniden kodlamadan taşıyamaz.</translation>
     </message>
     <message numerus="yes">
-        <source>%n cut(s) do not start on a key frame. Without re-encoding the clip must start at the previous key frame, so up to %1 s extra is included at the start. Use "Snap cuts to key frames" to see exactly what will be exported.</source>
+        <source>%n cut(s) do not start on a key frame. Without re-encoding the clip must start at the previous key frame, so up to %1 s extra is included at the start. Use &quot;Snap cuts to key frames&quot; to see exactly what will be exported.</source>
         <translation>
-            <numerusform>%n kesim bir anahtar karede başlamıyor. Yeniden kodlama olmadan klip bir önceki anahtar karede başlamak zorunda, bu yüzden başa en fazla %1 sn fazladan görüntü eklenir. Tam olarak neyin dışa aktarılacağını görmek için "Kesimleri anahtar karelere hizala" seçeneğini kullanın.</numerusform>
+            <numerusform>%n kesim bir anahtar karede başlamıyor. Yeniden kodlama olmadan klip bir önceki anahtar karede başlamak zorunda, bu yüzden başa en fazla %1 sn fazladan görüntü eklenir. Tam olarak neyin dışa aktarılacağını görmek için &quot;Kesimleri anahtar karelere hizala&quot; seçeneğini kullanın.</numerusform>
         </translation>
     </message>
     <message numerus="yes">
@@ -60,7 +56,7 @@
         <translation>%1 kapsayıcısı %2 videoyu taşıyamaz.</translation>
     </message>
     <message>
-        <source>Video is re-encoded with the source's settings (resolution, frame rate, bit depth, colour and bit rate). Every re-encode loses a little detail; use the lossless cut when you only cut and join.</source>
+        <source>Video is re-encoded with the source&apos;s settings (resolution, frame rate, bit depth, colour and bit rate). Every re-encode loses a little detail; use the lossless cut when you only cut and join.</source>
         <translation>Video, kaynağın ayarlarıyla (çözünürlük, kare hızı, bit derinliği, renk ve bit hızı) yeniden kodlanır. Her yeniden kodlama biraz ayrıntı kaybettirir; yalnızca kesip birleştiriyorsanız kayıpsız kesimi kullanın.</translation>
     </message>
     <message>
@@ -74,6 +70,54 @@
     <message>
         <source>No audio encoder available.</source>
         <translation>Ses kodlayıcı yok.</translation>
+    </message>
+    <message>
+        <source>Audio-only clips cannot be joined without re-encoding, so they are left out of a lossless cut. Choose another mode to include them.</source>
+        <translation>Yalnızca ses içeren klipler yeniden kodlanmadan birleştirilemez, bu yüzden kayıpsız kesime alınmaz. Onları da eklemek için başka bir mod seçin.</translation>
+    </message>
+    <message>
+        <source>The timeline has titles, transitions, effects, audio changes or more than one track. These have to be drawn into the picture, which a lossless cut cannot do. Choose &quot;Match source&quot;, &quot;Lossless intermediate&quot; or &quot;Custom&quot;.</source>
+        <translation>Zaman çizelgesinde başlık, geçiş, efekt, ses değişikliği ya da birden fazla iz var. Bunların görüntüye işlenmesi gerekir ve kayıpsız kesim bunu yapamaz. &quot;Kaynakla aynı&quot;, &quot;Kayıpsız ara format&quot; ya da &quot;Özel&quot; seçeneğini seçin.</translation>
+    </message>
+    <message>
+        <source>The picture is scaled from %1×%2 to %3×%4%5.</source>
+        <translation>Görüntü %1×%2 boyutundan %3×%4 boyutuna ölçeklenir%5.</translation>
+    </message>
+    <message>
+        <source> with black bars to fill %1×%2</source>
+        <translation>; %1×%2 alanı siyah bantlarla doldurulur</translation>
+    </message>
+    <message>
+        <source>The %1 encoder does not work on this computer; %2 is used instead.</source>
+        <translation>%1 kodlayıcısı bu bilgisayarda çalışmıyor; yerine %2 kullanılır.</translation>
+    </message>
+    <message>
+        <source>The %1 encoder cannot write %2-bit video.</source>
+        <translation>%1 kodlayıcısı %2 bit video yazamaz.</translation>
+    </message>
+    <message>
+        <source>%1 MB is too small for %2 s of video.</source>
+        <translation>%1 MB, %2 sn video için çok küçük.</translation>
+    </message>
+    <message>
+        <source>The %1 encoder has no constant quality mode; choose a bit rate.</source>
+        <translation>%1 kodlayıcısının sabit kalite modu yok; bir bit hızı seçin.</translation>
+    </message>
+    <message>
+        <source>%1 cannot encode in two passes; one pass is used.</source>
+        <translation>%1 iki geçişte kodlayamaz; tek geçiş kullanılır.</translation>
+    </message>
+    <message>
+        <source>The %1 container cannot hold %2 audio.</source>
+        <translation>%1 kabı %2 sesi taşıyamaz.</translation>
+    </message>
+    <message>
+        <source>The audio is mixed (several clips, gain, fades or crossfades) and encoded as %1.</source>
+        <translation>Ses karıştırılır (birden çok klip, ses düzeyi, kararmalar ya da çapraz geçişler) ve %1 olarak kodlanır.</translation>
+    </message>
+    <message>
+        <source>The timeline is rendered with its titles, transitions and effects and encoded with the source&apos;s settings. Frames without effects are converted directly from the source.</source>
+        <translation>Zaman çizelgesi başlıkları, geçişleri ve efektleriyle işlenir ve kaynağın ayarlarıyla kodlanır. Efekt içermeyen kareler doğrudan kaynaktan dönüştürülür.</translation>
     </message>
 </context>
 <context>
@@ -174,7 +218,7 @@
         <translation>Kayıpsız kesim (yeniden kodlamasız) — önerilen</translation>
     </message>
     <message>
-        <source>Video and audio are copied bit for bit. Quality is exactly the source's and export takes seconds. Cuts start on key frames.</source>
+        <source>Video and audio are copied bit for bit. Quality is exactly the source&apos;s and export takes seconds. Cuts start on key frames.</source>
         <translation>Video ve ses bit bit kopyalanır. Kalite birebir kaynakla aynıdır ve dışa aktarma saniyeler sürer. Kesimler anahtar karelerde başlar.</translation>
     </message>
     <message>
@@ -214,7 +258,7 @@
         <translation>Kesimleri anahtar karelere hizala</translation>
     </message>
     <message>
-        <source>Moves each clip's start back to the previous key frame on the timeline, so the timeline shows exactly what the lossless export contains. Can be undone.</source>
+        <source>Moves each clip&apos;s start back to the previous key frame on the timeline, so the timeline shows exactly what the lossless export contains. Can be undone.</source>
         <translation>Her klibin başlangıcını zaman çizelgesinde bir önceki anahtar kareye çeker; böylece zaman çizelgesi kayıpsız dışa aktarmanın tam olarak ne içereceğini gösterir. Geri alınabilir.</translation>
     </message>
     <message>
@@ -286,6 +330,182 @@
     <message>
         <source>Show in folder</source>
         <translation>Klasörde göster</translation>
+    </message>
+    <message>
+        <source>Custom: codec, size and quality of your choice</source>
+        <translation>Özel: kodek, boyut ve kalite sizin seçiminiz</translation>
+    </message>
+    <message>
+        <source>Ready-made settings for YouTube, Instagram, TikTok, ProRes and more, or choose everything yourself, including your graphics card&apos;s encoder.</source>
+        <translation>YouTube, Instagram, TikTok, ProRes ve daha fazlası için hazır ayarlar; ya da ekran kartınızın kodlayıcısı dahil her şeyi kendiniz seçin.</translation>
+    </message>
+    <message>
+        <source>Custom settings</source>
+        <translation>Özel ayarlar</translation>
+    </message>
+    <message>
+        <source>Custom</source>
+        <translation>Özel</translation>
+    </message>
+    <message>
+        <source>Preset</source>
+        <translation>Hazır ayar</translation>
+    </message>
+    <message>
+        <source>Video codec</source>
+        <translation>Video kodeği</translation>
+    </message>
+    <message>
+        <source>Profile</source>
+        <translation>Profil</translation>
+    </message>
+    <message>
+        <source>Quality mode</source>
+        <translation>Kalite modu</translation>
+    </message>
+    <message>
+        <source>Bit rate</source>
+        <translation>Bit hızı</translation>
+    </message>
+    <message>
+        <source>automatic</source>
+        <translation>otomatik</translation>
+    </message>
+    <message>
+        <source>Peak bit rate</source>
+        <translation>En yüksek bit hızı</translation>
+    </message>
+    <message>
+        <source>File size</source>
+        <translation>Dosya boyutu</translation>
+    </message>
+    <message>
+        <source>Two passes (better quality for the same size, takes longer)</source>
+        <translation>İki geçiş (aynı boyutta daha iyi kalite, daha uzun sürer)</translation>
+    </message>
+    <message>
+        <source>Same as timeline</source>
+        <translation>Zaman çizelgesiyle aynı</translation>
+    </message>
+    <message>
+        <source>1080 × 1920 (vertical 9:16)</source>
+        <translation>1080 × 1920 (dikey 9:16)</translation>
+    </message>
+    <message>
+        <source>1080 × 1350 (portrait 4:5)</source>
+        <translation>1080 × 1350 (portre 4:5)</translation>
+    </message>
+    <message>
+        <source>1080 × 1080 (square)</source>
+        <translation>1080 × 1080 (kare)</translation>
+    </message>
+    <message>
+        <source>Other…</source>
+        <translation>Diğer…</translation>
+    </message>
+    <message>
+        <source>Fit, black bars</source>
+        <translation>Sığdır, siyah bantlı</translation>
+    </message>
+    <message>
+        <source>Fit inside, no bars</source>
+        <translation>İçine sığdır, bantsız</translation>
+    </message>
+    <message>
+        <source>Frame size</source>
+        <translation>Kare boyutu</translation>
+    </message>
+    <message>
+        <source>Frame rate / depth</source>
+        <translation>Kare hızı / derinlik</translation>
+    </message>
+    <message>
+        <source>Faster</source>
+        <translation>Daha hızlı</translation>
+    </message>
+    <message>
+        <source>Smaller file</source>
+        <translation>Daha küçük dosya</translation>
+    </message>
+    <message>
+        <source>Encoding speed</source>
+        <translation>Kodlama hızı</translation>
+    </message>
+    <message>
+        <source>Copy when possible, else AAC</source>
+        <translation>Mümkünse kopyala, değilse AAC</translation>
+    </message>
+    <message>
+        <source>FLAC (lossless)</source>
+        <translation>FLAC (kayıpsız)</translation>
+    </message>
+    <message>
+        <source>PCM 24-bit (uncompressed)</source>
+        <translation>PCM 24 bit (sıkıştırmasız)</translation>
+    </message>
+    <message>
+        <source>Audio</source>
+        <translation>Ses</translation>
+    </message>
+    <message>
+        <source>visually lossless</source>
+        <translation>gözle kayıpsız</translation>
+    </message>
+    <message>
+        <source>high</source>
+        <translation>yüksek</translation>
+    </message>
+    <message>
+        <source>smaller file</source>
+        <translation>daha küçük dosya</translation>
+    </message>
+    <message>
+        <source>Constant quality (recommended)</source>
+        <translation>Sabit kalite (önerilen)</translation>
+    </message>
+    <message>
+        <source>Variable bit rate</source>
+        <translation>Değişken bit hızı</translation>
+    </message>
+    <message>
+        <source>Constant bit rate</source>
+        <translation>Sabit bit hızı</translation>
+    </message>
+    <message>
+        <source>Target file size</source>
+        <translation>Hedef dosya boyutu</translation>
+    </message>
+    <message>
+        <source>Same bit depth as source</source>
+        <translation>Kaynakla aynı bit derinliği</translation>
+    </message>
+    <message>
+        <source> (graphics card)</source>
+        <translation> (ekran kartı)</translation>
+    </message>
+    <message>
+        <source>Video: rendered and encoded losslessly with %1</source>
+        <translation>Video: işlenir ve %1 ile kayıpsız kodlanır</translation>
+    </message>
+    <message>
+        <source>Video: rendered and encoded with %1 using the source settings</source>
+        <translation>Video: işlenir ve kaynak ayarlarıyla %1 kullanılarak kodlanır</translation>
+    </message>
+    <message>
+        <source>Video: rendered and encoded with %1</source>
+        <translation>Video: işlenir ve %1 ile kodlanır</translation>
+    </message>
+    <message>
+        <source> · two passes</source>
+        <translation> · iki geçiş</translation>
+    </message>
+    <message>
+        <source>Audio: mixed and encoded with %1</source>
+        <translation>Ses: karıştırılır ve %1 ile kodlanır</translation>
+    </message>
+    <message>
+        <source>Container: %1 · about %2</source>
+        <translation>Kap: %1 · yaklaşık %2</translation>
     </message>
 </context>
 <context>
@@ -575,10 +795,6 @@
         <translation>Fotoğraflar Fotoğraf çalışma alanında düzenlenir; fotoğraftan videoya sonraki bir sürümde geliyor.</translation>
     </message>
     <message>
-        <source>Audio-only files arrive on the timeline in version 0.2.</source>
-        <translation>Yalnızca ses içeren dosyalar zaman çizelgesine 0.2 sürümünde geliyor.</translation>
-    </message>
-    <message>
         <source>Add clip</source>
         <translation>Klip ekle</translation>
     </message>
@@ -627,8 +843,80 @@
         <translation>Zaman çizelgesini yakınlaştır</translation>
     </message>
     <message>
-        <source>&lt;h3&gt;LumoraStudio %1&lt;/h3&gt;&lt;p&gt;A free video and photo editor whose first rule is: quality never drops unless you ask for it.&lt;/p&gt;&lt;p&gt;Cut and join without re-encoding, export with the source's own settings, edit photos non-destructively and save them losslessly.&lt;/p&gt;&lt;p&gt;FFmpeg %2 · Qt %3&lt;/p&gt;</source>
+        <source>&lt;h3&gt;LumoraStudio %1&lt;/h3&gt;&lt;p&gt;A free video and photo editor whose first rule is: quality never drops unless you ask for it.&lt;/p&gt;&lt;p&gt;Cut and join without re-encoding, export with the source&apos;s own settings, edit photos non-destructively and save them losslessly.&lt;/p&gt;&lt;p&gt;FFmpeg %2 · Qt %3&lt;/p&gt;</source>
         <translation>&lt;h3&gt;LumoraStudio %1&lt;/h3&gt;&lt;p&gt;İlk kuralı şu olan ücretsiz bir video ve fotoğraf düzenleyici: siz istemedikçe kalite asla düşmez.&lt;/p&gt;&lt;p&gt;Yeniden kodlamadan kesin ve birleştirin, kaynağın kendi ayarlarıyla dışa aktarın, fotoğrafları orijinale dokunmadan düzenleyip kayıpsız kaydedin.&lt;/p&gt;&lt;p&gt;FFmpeg %2 · Qt %3&lt;/p&gt;</translation>
+    </message>
+    <message>
+        <source>Remove transition</source>
+        <translation>Geçişi kaldır</translation>
+    </message>
+    <message>
+        <source>Add &amp;title</source>
+        <translation>&amp;Başlık ekle</translation>
+    </message>
+    <message>
+        <source>Add a title at the playhead on a track above the storyline (T)</source>
+        <translation>Oynatma kafasına, ana izin üstündeki bir ize başlık ekle (T)</translation>
+    </message>
+    <message>
+        <source>Add t&amp;ransition</source>
+        <translation>&amp;Geçiş ekle</translation>
+    </message>
+    <message>
+        <source>Cross dissolve into the selected clip, or at the cut nearest the playhead (Ctrl+T)</source>
+        <translation>Seçili klibe ya da oynatma kafasına en yakın kesime çapraz geçiş ekle (Ctrl+T)</translation>
+    </message>
+    <message>
+        <source>Add video track</source>
+        <translation>Video izi ekle</translation>
+    </message>
+    <message>
+        <source>Add audio track</source>
+        <translation>Ses izi ekle</translation>
+    </message>
+    <message>
+        <source>Export current &amp;frame…</source>
+        <translation>Geçerli &amp;kareyi dışa aktar…</translation>
+    </message>
+    <message>
+        <source>This file has no sound; drop it on a video track.</source>
+        <translation>Bu dosyada ses yok; bir video izine bırakın.</translation>
+    </message>
+    <message>
+        <source>Add title</source>
+        <translation>Başlık ekle</translation>
+    </message>
+    <message>
+        <source>Your title</source>
+        <translation>Başlığınız</translation>
+    </message>
+    <message>
+        <source>A transition needs two clips next to each other on the storyline.</source>
+        <translation>Geçiş için ana izde yan yana iki klip gerekir.</translation>
+    </message>
+    <message>
+        <source>Add transition</source>
+        <translation>Geçiş ekle</translation>
+    </message>
+    <message>
+        <source>There is no extra footage beyond this cut, so the transition cannot be shown. Trim the clips to leave some media on both sides.</source>
+        <translation>Bu kesimin ötesinde fazladan görüntü yok, bu yüzden geçiş gösterilemez. Her iki tarafta biraz malzeme kalacak şekilde klipleri kırpın.</translation>
+    </message>
+    <message>
+        <source>Export current frame</source>
+        <translation>Geçerli kareyi dışa aktar</translation>
+    </message>
+    <message>
+        <source>PNG image (*.png);;TIFF image (*.tif *.tiff)</source>
+        <translation>PNG görüntüsü (*.png);;TIFF görüntüsü (*.tif *.tiff)</translation>
+    </message>
+    <message>
+        <source>Could not save %1.</source>
+        <translation>%1 kaydedilemedi.</translation>
+    </message>
+    <message>
+        <source>Frame saved to %1</source>
+        <translation>Kare %1 konumuna kaydedildi</translation>
     </message>
 </context>
 <context>
@@ -831,10 +1119,10 @@
         <translation>Fotoğraf aç…</translation>
     </message>
     <message>
-        <source>Open a photo (JPEG, PNG, TIFF, WebP) with "Open photos…" or drag it here.
+        <source>Open a photo (JPEG, PNG, TIFF, WebP) with &quot;Open photos…&quot; or drag it here.
 
 The original file is never changed: edits are stored in the project and applied when you export.</source>
-        <translation>"Fotoğraf aç…" ile bir fotoğraf (JPEG, PNG, TIFF, WebP) açın ya da buraya sürükleyin.
+        <translation>&quot;Fotoğraf aç…&quot; ile bir fotoğraf (JPEG, PNG, TIFF, WebP) açın ya da buraya sürükleyin.
 
 Orijinal dosya asla değişmez: düzenlemeler projede saklanır ve dışa aktarırken uygulanır.</translation>
     </message>
@@ -1098,6 +1386,305 @@ Orijinal dosya asla değişmez: düzenlemeler projede saklanır ve dışa aktar�
         <source>not tagged</source>
         <translation>etiketsiz</translation>
     </message>
+    <message>
+        <source>Title</source>
+        <translation>Başlık</translation>
+    </message>
+    <message>
+        <source>Type the title text</source>
+        <translation>Başlık metnini yazın</translation>
+    </message>
+    <message>
+        <source>Font</source>
+        <translation>Yazı tipi</translation>
+    </message>
+    <message>
+        <source>Text height as a percentage of the frame height</source>
+        <translation>Metin yüksekliği, kare yüksekliğinin yüzdesi olarak</translation>
+    </message>
+    <message>
+        <source>Text colour</source>
+        <translation>Metin rengi</translation>
+    </message>
+    <message>
+        <source>Left</source>
+        <translation>Sol</translation>
+    </message>
+    <message>
+        <source>Centre</source>
+        <translation>Orta</translation>
+    </message>
+    <message>
+        <source>Right</source>
+        <translation>Sağ</translation>
+    </message>
+    <message>
+        <source>Alignment</source>
+        <translation>Hizalama</translation>
+    </message>
+    <message>
+        <source>Position</source>
+        <translation>Konum</translation>
+    </message>
+    <message>
+        <source>Outline width as a percentage of the text size</source>
+        <translation>Kontur kalınlığı, metin boyutunun yüzdesi olarak</translation>
+    </message>
+    <message>
+        <source>Outline</source>
+        <translation>Kontur</translation>
+    </message>
+    <message>
+        <source>Background</source>
+        <translation>Arka plan</translation>
+    </message>
+    <message>
+        <source>Soft shadow</source>
+        <translation>Yumuşak gölge</translation>
+    </message>
+    <message>
+        <source>None</source>
+        <translation>Yok</translation>
+    </message>
+    <message>
+        <source>Fade</source>
+        <translation>Solma</translation>
+    </message>
+    <message>
+        <source>Slide up</source>
+        <translation>Yukarı kay</translation>
+    </message>
+    <message>
+        <source>Pop</source>
+        <translation>Belirme</translation>
+    </message>
+    <message>
+        <source>Typewriter</source>
+        <translation>Daktilo</translation>
+    </message>
+    <message>
+        <source>Animation in</source>
+        <translation>Giriş animasyonu</translation>
+    </message>
+    <message>
+        <source>Animation out</source>
+        <translation>Çıkış animasyonu</translation>
+    </message>
+    <message>
+        <source>Animation length</source>
+        <translation>Animasyon süresi</translation>
+    </message>
+    <message>
+        <source>Position and size</source>
+        <translation>Konum ve boyut</translation>
+    </message>
+    <message>
+        <source>Scale</source>
+        <translation>Ölçek</translation>
+    </message>
+    <message>
+        <source>Opacity</source>
+        <translation>Opaklık</translation>
+    </message>
+    <message>
+        <source>Reset</source>
+        <translation>Sıfırla</translation>
+    </message>
+    <message>
+        <source>Transition from the previous clip</source>
+        <translation>Önceki klipten geçiş</translation>
+    </message>
+    <message>
+        <source>None (cut)</source>
+        <translation>Yok (kesme)</translation>
+    </message>
+    <message>
+        <source>Cross dissolve</source>
+        <translation>Çapraz geçiş</translation>
+    </message>
+    <message>
+        <source>Dip to black</source>
+        <translation>Siyaha geçiş</translation>
+    </message>
+    <message>
+        <source>Dip to white</source>
+        <translation>Beyaza geçiş</translation>
+    </message>
+    <message>
+        <source>Wipe left</source>
+        <translation>Sola silme</translation>
+    </message>
+    <message>
+        <source>Wipe right</source>
+        <translation>Sağa silme</translation>
+    </message>
+    <message>
+        <source>Wipe up</source>
+        <translation>Yukarı silme</translation>
+    </message>
+    <message>
+        <source>Wipe down</source>
+        <translation>Aşağı silme</translation>
+    </message>
+    <message>
+        <source>Push left</source>
+        <translation>Sola itme</translation>
+    </message>
+    <message>
+        <source>Push right</source>
+        <translation>Sağa itme</translation>
+    </message>
+    <message>
+        <source>Zoom</source>
+        <translation>Yakınlaştırma</translation>
+    </message>
+    <message>
+        <source>Blur</source>
+        <translation>Bulanıklaştırma</translation>
+    </message>
+    <message>
+        <source>Type</source>
+        <translation>Tür</translation>
+    </message>
+    <message>
+        <source>Fades</source>
+        <translation>Kararmalar</translation>
+    </message>
+    <message>
+        <source>Fade in</source>
+        <translation>Belirme</translation>
+    </message>
+    <message>
+        <source>Fade out</source>
+        <translation>Kararma</translation>
+    </message>
+    <message>
+        <source>Sound</source>
+        <translation>Ses</translation>
+    </message>
+    <message>
+        <source>Volume</source>
+        <translation>Ses düzeyi</translation>
+    </message>
+    <message>
+        <source>Choose a colour</source>
+        <translation>Bir renk seçin</translation>
+    </message>
+    <message>
+        <source>Change title length</source>
+        <translation>Başlık süresini değiştir</translation>
+    </message>
+    <message>
+        <source>Reset position and size</source>
+        <translation>Konumu ve boyutu sıfırla</translation>
+    </message>
+    <message>
+        <source>Change volume</source>
+        <translation>Ses düzeyini değiştir</translation>
+    </message>
+    <message>
+        <source>Edit title</source>
+        <translation>Başlığı düzenle</translation>
+    </message>
+    <message>
+        <source>Change position and size</source>
+        <translation>Konumu ve boyutu değiştir</translation>
+    </message>
+    <message>
+        <source>Change transition</source>
+        <translation>Geçişi değiştir</translation>
+    </message>
+    <message>
+        <source>Change fades</source>
+        <translation>Kararmaları değiştir</translation>
+    </message>
+    <message>
+        <source>Video clip</source>
+        <translation>Video klibi</translation>
+    </message>
+    <message>
+        <source>Audio clip</source>
+        <translation>Ses klibi</translation>
+    </message>
+    <message>
+        <source>Not shown: there is no footage beyond this cut. Trim the clips to leave media on both sides.</source>
+        <translation>Gösterilmiyor: bu kesimin ötesinde görüntü yok. Her iki tarafta malzeme kalacak şekilde klipleri kırpın.</translation>
+    </message>
+    <message>
+        <source>Shortened to %1 s by the footage available around the cut.</source>
+        <translation>Kesimin çevresindeki görüntü yetmediği için %1 sn&apos;ye kısaltıldı.</translation>
+    </message>
+</context>
+<context>
+    <name>lumora::RenderSession</name>
+    <message>
+        <source>Export cancelled.</source>
+        <translation>Dışa aktarma iptal edildi.</translation>
+    </message>
+    <message>
+        <source>Could not finish the file: %1</source>
+        <translation>Dosya tamamlanamadı: %1</translation>
+    </message>
+    <message>
+        <source>Encoder %1 is not available.</source>
+        <translation>%1 kodlayıcısı kullanılamıyor.</translation>
+    </message>
+    <message>
+        <source>Cannot start the %1 encoder: %2</source>
+        <translation>%1 kodlayıcısı başlatılamıyor: %2</translation>
+    </message>
+    <message>
+        <source>Out of memory.</source>
+        <translation>Bellek yetersiz.</translation>
+    </message>
+    <message>
+        <source>Cannot create the output file: %1</source>
+        <translation>Çıktı dosyası oluşturulamıyor: %1</translation>
+    </message>
+    <message>
+        <source>Cannot write %1: %2</source>
+        <translation>%1 yazılamıyor: %2</translation>
+    </message>
+    <message>
+        <source>Cannot write the file header: %1</source>
+        <translation>Dosya başlığı yazılamıyor: %1</translation>
+    </message>
+    <message>
+        <source>Cannot open %1: %2</source>
+        <translation>%1 açılamıyor: %2</translation>
+    </message>
+    <message>
+        <source>%1 has no audio stream.</source>
+        <translation>%1 içinde ses akışı yok.</translation>
+    </message>
+    <message>
+        <source>Cannot create the audio converter.</source>
+        <translation>Ses dönüştürücü oluşturulamıyor.</translation>
+    </message>
+    <message>
+        <source>Cannot convert the video frames.</source>
+        <translation>Video kareleri dönüştürülemiyor.</translation>
+    </message>
+    <message>
+        <source>Could not render the frame at %1 s.</source>
+        <translation>%1. saniyedeki kare işlenemedi.</translation>
+    </message>
+    <message>
+        <source>Video encoding failed: %1</source>
+        <translation>Video kodlama başarısız: %1</translation>
+    </message>
+    <message>
+        <source>Write error: %1</source>
+        <translation>Yazma hatası: %1</translation>
+    </message>
+    <message>
+        <source>Out of memory while buffering audio.</source>
+        <translation>Ses arabelleğe alınırken bellek yetmedi.</translation>
+    </message>
+    <message>
+        <source>Audio encoding failed: %1</source>
+        <translation>Ses kodlama başarısız: %1</translation>
+    </message>
 </context>
 <context>
     <name>lumora::SliderRow</name>
@@ -1144,8 +1731,8 @@ Orijinal dosya asla değişmez: düzenlemeler projede saklanır ve dışa aktar�
         <translation>Ses</translation>
     </message>
     <message>
-        <source>Drag files here from the Files panel, or double-click a file and press "Add to timeline".</source>
-        <translation>Dosyaları Dosyalar panelinden buraya sürükleyin ya da bir dosyaya çift tıklayıp "Zaman çizelgesine ekle"ye basın.</translation>
+        <source>Drag files here from the Files panel, or double-click a file and press &quot;Add to timeline&quot;.</source>
+        <translation>Dosyaları Dosyalar panelinden buraya sürükleyin ya da bir dosyaya çift tıklayıp &quot;Zaman çizelgesine ekle&quot;ye basın.</translation>
     </message>
     <message>
         <source>Move clip</source>
@@ -1154,6 +1741,129 @@ Orijinal dosya asla değişmez: düzenlemeler projede saklanır ve dışa aktar�
     <message>
         <source>Trim clip</source>
         <translation>Klibi kırp</translation>
+    </message>
+    <message>
+        <source>Main</source>
+        <translation>Ana</translation>
+    </message>
+    <message>
+        <source>Title</source>
+        <translation>Başlık</translation>
+    </message>
+    <message>
+        <source>Lock track</source>
+        <translation>İzi kilitle</translation>
+    </message>
+    <message>
+        <source>Unlock track</source>
+        <translation>İzin kilidini aç</translation>
+    </message>
+    <message>
+        <source>Hide track</source>
+        <translation>İzi gizle</translation>
+    </message>
+    <message>
+        <source>Show track</source>
+        <translation>İzi göster</translation>
+    </message>
+    <message>
+        <source>Mute track</source>
+        <translation>İzi sustur</translation>
+    </message>
+    <message>
+        <source>Unmute track</source>
+        <translation>İzin sesini aç</translation>
+    </message>
+    <message>
+        <source>Move clip to the storyline</source>
+        <translation>Klibi ana ize taşı</translation>
+    </message>
+    <message>
+        <source>Add title here</source>
+        <translation>Buraya başlık ekle</translation>
+    </message>
+    <message>
+        <source>Add video track</source>
+        <translation>Video izi ekle</translation>
+    </message>
+    <message>
+        <source>Add audio track</source>
+        <translation>Ses izi ekle</translation>
+    </message>
+    <message>
+        <source>Remove track %1</source>
+        <translation>%1 izini kaldır</translation>
+    </message>
+</context>
+<context>
+    <name>lumora::encoders</name>
+    <message>
+        <source>FFV1 (lossless)</source>
+        <translation>FFV1 (kayıpsız)</translation>
+    </message>
+    <message>
+        <source>x264 (software)</source>
+        <translation>x264 (yazılım)</translation>
+    </message>
+    <message>
+        <source>x265 (software)</source>
+        <translation>x265 (yazılım)</translation>
+    </message>
+    <message>
+        <source>SVT-AV1 (software)</source>
+        <translation>SVT-AV1 (yazılım)</translation>
+    </message>
+    <message>
+        <source>libaom (software, slow)</source>
+        <translation>libaom (yazılım, yavaş)</translation>
+    </message>
+    <message>
+        <source>libvpx (software)</source>
+        <translation>libvpx (yazılım)</translation>
+    </message>
+    <message>
+        <source>%1 (software)</source>
+        <translation>%1 (yazılım)</translation>
+    </message>
+    <message>
+        <source>%1 has no constant bit rate mode; a variable bit rate with the same average is used.</source>
+        <translation>%1 sabit bit hızı modunu desteklemiyor; aynı ortalamaya sahip değişken bit hızı kullanılır.</translation>
+    </message>
+    <message>
+        <source>YouTube 1080p</source>
+        <translation>YouTube 1080p</translation>
+    </message>
+    <message>
+        <source>YouTube 4K</source>
+        <translation>YouTube 4K</translation>
+    </message>
+    <message>
+        <source>Instagram Reels / Stories (9:16)</source>
+        <translation>Instagram Reels / Hikâyeler (9:16)</translation>
+    </message>
+    <message>
+        <source>Instagram feed (4:5)</source>
+        <translation>Instagram akışı (4:5)</translation>
+    </message>
+    <message>
+        <source>TikTok (9:16)</source>
+        <translation>TikTok (9:16)</translation>
+    </message>
+    <message>
+        <source>X (Twitter)</source>
+        <translation>X (Twitter)</translation>
+    </message>
+    <message>
+        <source>Archive (HEVC 10-bit, original size)</source>
+        <translation>Arşiv (HEVC 10 bit, özgün boyut)</translation>
+    </message>
+    <message>
+        <source>Apple ProRes 422 HQ (editing)</source>
+        <translation>Apple ProRes 422 HQ (kurgu için)</translation>
+    </message>
+    <message>
+        <source>Avid DNxHR HQ (editing)</source>
+        <translation>Avid DNxHR HQ (kurgu için)</translation>
     </message>
 </context>
 </TS>

@@ -1,6 +1,6 @@
 # Mimari
 
-Bu belge 0.1'in nasıl kurulduğunu ve [özellik listesindeki](ozellikler.md) her şeyin ileride nereye oturacağını anlatır.
+Bu belge 0.1 ve 0.2'nin nasıl kurulduğunu ve [özellik listesindeki](ozellikler.md) her şeyin ileride nereye oturacağını anlatır.
 
 ## Katmanlar
 
@@ -14,7 +14,8 @@ Bu belge 0.1'in nasıl kurulduğunu ve [özellik listesindeki](ozellikler.md) he
 ┌───────────────▼──────────── src/core (lumora_core) ──────────────────────────┐
 │ project/  Project ── media/MediaPool ── timeline/Timeline ── image/PhotoLib. │
 │ undo/     komutlar (QUndoCommand)                                            │
-│ export/   ExportPlanner (karar) → TimelineExporter (uygulama)                │
+│ export/   ExportPlanner (karar) → TimelineExporter / RenderExport (uygulama) │
+│ render/   FrameRenderer · TitleRenderer · AudioMixer                         │
 │ image/    PhotoProcessor (32-bit float hattı) · PhotoExporter                │
 │ media/    MediaInfo · VideoDecoder · AudioDecoder                            │
 │ ffmpeg/   RAII sarmalayıcılar, sürüm uyumluluğu (FFmpeg 6.1 – 8.x)           │
@@ -31,7 +32,11 @@ Bu belge 0.1'in nasıl kurulduğunu ve [özellik listesindeki](ozellikler.md) he
 
 **Önce plan, sonra çıktı.** `ExportPlanner`, zaman çizelgesi ve ayarlardan bir `ExportPlan` çıkarır: her bölüm için video/ses *kopyala* mı *kodla* mı, neden, hangi uyarılar. Kaliteyi düşürecek bir durum varsa bunu engel ya da not olarak bildirir, kendiliğinden düşürmez. Dışa aktarma penceresindeki "Ne olacak" listesi bu plandır. `TimelineExporter` yalnızca planı uygular.
 
-**Önizleme çıktıdan ayrıdır.** Oynatma motoru 8 bit RGB önizleme üretir ve yavaşsa kare atlar; dışa aktarma ise kaynağın kendi piksel biçimiyle çalışır.
+**Önizleme ve çıktı aynı birleştiriciden, farklı hassasiyetle geçer.** `FrameRenderer` bir zaman anı için izleri aşağıdan yukarı birleştirir: klip karesi, dönüşüm (konum, ölçek, döndürme, opaklık), belirme/kararma, geçişler ve başlıklar. Oynatma motoru bunu önizleme boyutunda 8 bit (`Preview`) çağırır ve yavaşsa kare atlar; dışa aktarma tam boyutta, kanal başına 16 bit ve Lanczos ölçeklemeyle (`Final`) çağırır. Hiçbir efekt dokunmayan karelerde `passthroughFrame` kaynağın kendi YUV karesini verir, böylece 8 bit RGB'ye hiç inmeden doğrudan çıktı biçimine dönüştürülür.
+
+**Ses de tek bir karıştırıcıdan geçer.** `AudioMixer` bütün ses izlerini 48 kHz kayan noktada toplar; ses düzeyi, belirme/kararma ve geçişlerde eşit güçte çapraz geçiş uygular. Oynatma ve dışa aktarma aynı sınıfı kullanır. Basit durumlarda (tek A1, efekt yok, uyumlu kodek) ses yine bit bit kopyalanır.
+
+**Üç video stratejisi.** Planlayıcı her dışa aktarma için `Copy` (paket kopyalama), `Encode` (bölüm bölüm yeniden kodlama) ya da `Render` (birleştirici üzerinden sabit kare hızında kodlama) seçer. Başlık, geçiş, birden çok iz ya da dönüşüm varsa kayıpsız kesim engellenir ve neden yazılır. Kodlayıcı ayarları (`encoders::configure`) her kodlayıcının kendi kalite ölçeğine, bit hızı modlarına ve iki geçiş yöntemine çevrilir; donanım kodlayıcıları bir kez gerçekten açılarak denenir.
 
 **Geri al her şeyi kapsar.** Zaman çizelgesi değişiklikleri anlık görüntü (snapshot) komutlarıyla, fotoğraf ayarları birleşebilen komutlarla (`mergeWith`) kaydedilir. Video ve fotoğrafın ayrı geçmişi vardır (`QUndoGroup`).
 
@@ -41,12 +46,10 @@ Bu belge 0.1'in nasıl kurulduğunu ve [özellik listesindeki](ozellikler.md) he
 
 | Özellik (ozellikler.md) | Yeri |
 |---|---|
-| Akıllı render (yalnızca efektli kısmı kodla) | `SegmentPlan` zaten bölüm bölümdür; efektli bölümler `Encode`, diğerleri `Copy` olur. GOP sınırında yeniden kodlama `TimelineExporter`'a eklenir. |
-| Bit hızı modları, iki geçiş, hedef boyut, ön ayarlar | `ExportSettings` genişler; planlayıcı kararı verir. |
-| ProRes, DNxHR, PNG/TIFF dizisi | `ExportPlanner::encodersFor` ve kapsayıcı tablosu. |
-| Donanım hızlandırma | Kodlayıcı seçimi şu an donanım kodlayıcılarını bilerek atlar; 0.2'de açık kalite ayarıyla eklenir. |
-| Çok izli zaman çizelgesi, başlık izleri, ripple/roll/slip/slide | `TimelineState` zaten iz listesi tutar; mıknatıs `Track::magnetic` ile iz başınadır. Yeni düzenleme işlemleri `Timeline` metotları + snapshot geri alma olarak eklenir. |
-| Efektler, geçişler, renk, dönüşüm, anahtar kareler | Klibe eklenecek bir efekt yığını (parametreler + anahtar kareler) ve GPU üzerinde 32-bit float işleyen bir render grafiği. Fotoğraf hattı (`PhotoProcessor`) aynı doğrusal ışık / float modelini kullanır, böylece LUT ve renk ayarları ortak olur. |
+| Akıllı render (yalnızca efektli kısmı kodla) | `SegmentPlan` bölüm bölümdür; efektli bölümler `Render`, diğerleri `Copy` olabilir. GOP sınırında yeniden kodlama `TimelineExporter`'a eklenir. |
+| Ripple/roll/slip/slide, iç içe zaman çizelgesi | Yeni düzenleme işlemleri `Timeline` metotları + snapshot geri alma olarak eklenir. |
+| PNG/TIFF dizisi, GIF/WebP | `encoders` tablosuna yeni çıktı türü; `RenderExport` kare kare yazar. |
+| Efektler, renk, anahtar kareler | `ClipEffects` (başlık, dönüşüm, geçiş, ses) bir efekt yığınına ve anahtar karelere genişler; `FrameRenderer` GPU üzerinde 32-bit float işleyen bir render grafiğine dönüşür. Fotoğraf hattı (`PhotoProcessor`) aynı doğrusal ışık / float modelini kullanır, böylece LUT ve renk ayarları ortak olur. |
 | Renk yönetimi, HDR, OCIO/ACES | `VideoStreamInfo` renk alanı, aktarım ve HDR bilgisini zaten taşır; dışa aktarma bunları korur. Dönüşümler render grafiğine düğüm olarak gelir. |
 | Ses araçları, LUFS, ducking | `AudioDecoder` + ayrı bir ses grafiği; A izleri zaten var. |
 | Proxy düzenleme | `MediaItem`'a proxy yolu; oynatma proxy'yi, dışa aktarma asıl dosyayı okur (önizleme/çıktı ayrımı zaten var). |

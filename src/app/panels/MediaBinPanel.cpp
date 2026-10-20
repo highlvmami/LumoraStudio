@@ -1,5 +1,7 @@
 #include "MediaBinPanel.h"
 
+#include <cmath>
+
 #include <QDragEnterEvent>
 #include <QDir>
 #include <QFileInfo>
@@ -31,6 +33,16 @@ QPixmap decorate(const QImage& thumb, const MediaInfo& info) {
     if (!thumb.isNull()) {
         const QSize s = thumb.size().scaled(kThumb, Qt::KeepAspectRatio);
         p.drawImage(QRect(QPoint((kThumb.width() - s.width()) / 2, (kThumb.height() - s.height()) / 2), s), thumb);
+    } else if (info.kind == MediaKind::Audio) {
+        // Sound files have no picture: a stylised waveform instead.
+        p.setPen(Qt::NoPen);
+        p.setBrush(QColor(70, 200, 150));
+        const int mid = kThumb.height() / 2, bars = 28, w = kThumb.width() - 32;
+        for (int i = 0; i < bars; ++i) {
+            const double v = 0.25 + 0.75 * std::abs(std::sin(i * 0.7) * std::cos(i * 0.23));
+            const int h = static_cast<int>(v * kThumb.height() * 0.32);
+            p.drawRoundedRect(QRectF(16 + i * w / double(bars), mid - h, w / double(bars) * 0.6, 2 * h), 1.5, 1.5);
+        }
     }
     QString badge;
     if (info.kind == MediaKind::Image)
@@ -49,7 +61,7 @@ QPixmap decorate(const QImage& thumb, const MediaInfo& info) {
     p.setPen(Qt::white);
     p.drawText(box, Qt::AlignCenter, badge);
     const QString kind = info.kind == MediaKind::Image ? QStringLiteral("IMG")
-                         : info.kind == MediaKind::Audio ? QStringLiteral("AUDIO")
+                         : info.kind == MediaKind::Audio ? QStringLiteral("♪")
                                                          : (info.video && info.video->isHdr() ? QStringLiteral("HDR") : QString());
     if (!kind.isEmpty()) {
         const QRect kr = p.fontMetrics().boundingRect(kind).adjusted(-4, -2, 4, 2);

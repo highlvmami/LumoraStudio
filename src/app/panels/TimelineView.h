@@ -38,6 +38,9 @@ public:
     int scrollX() const { return m_scrollX; }
     void setScrollX(int x);
     int contentWidth() const;
+    int scrollY() const { return m_scrollY; }
+    void setScrollY(int y);
+    int contentHeight() const;
     void setSnapping(bool on) { m_snap = on; }
     bool snapping() const { return m_snap; }
     void ensurePlayheadVisible();
@@ -89,8 +92,6 @@ private:
     std::vector<Row> rows() const;
     std::optional<Row> rowOf(int track) const;
     int trackAtY(int y) const;
-    int contentHeight() const;
-    void setScrollY(int y);
     double xOf(Ticks t) const;
     Ticks timeAt(double x) const;
     Ticks snapTime(Ticks t, const QUuid& ignoreClip = {}) const;
