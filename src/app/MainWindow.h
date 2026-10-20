@@ -75,6 +75,9 @@ private:
     void refreshProgram();
     void showShortcuts();
     void showAbout();
+public:
+    void checkForUpdatesOnStartup();
+private:
     void setLanguage(const QString& code);
 
     Project* m_project;
@@ -131,6 +134,7 @@ private:
     QAction* m_actAddVideoTrack;
     QAction* m_actAddAudioTrack;
     QAction* m_actExportFrame;
+    class Updater* m_updater = nullptr;
 };
 
 } // namespace lumora

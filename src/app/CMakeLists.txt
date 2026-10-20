@@ -4,6 +4,7 @@ set(APP_SOURCES
     Theme.h Theme.cpp
     Icons.h Icons.cpp
     MediaCache.h MediaCache.cpp
+    Updater.h Updater.cpp
     playback/PlaybackSequence.h playback/PlaybackSequence.cpp
     playback/PlaybackEngine.h playback/PlaybackEngine.cpp
     panels/MimeTypes.h
@@ -15,6 +16,7 @@ set(APP_SOURCES
     panels/PropertiesPanel.h panels/PropertiesPanel.cpp
     dialogs/ExportDialog.h dialogs/ExportDialog.cpp
     dialogs/PhotoExportDialog.h dialogs/PhotoExportDialog.cpp
+    dialogs/SettingsDialog.h dialogs/SettingsDialog.cpp
     photo/PhotoView.h photo/PhotoView.cpp
     photo/PhotoWorkspace.h photo/PhotoWorkspace.cpp
 )
@@ -22,7 +24,7 @@ set(APP_SOURCES
 qt_add_executable(LumoraStudio WIN32 MACOSX_BUNDLE ${APP_SOURCES})
 
 target_include_directories(LumoraStudio PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
-target_link_libraries(LumoraStudio PRIVATE lumora_core Qt6::Widgets Qt6::Multimedia Qt6::Concurrent)
+target_link_libraries(LumoraStudio PRIVATE lumora_core Qt6::Widgets Qt6::Multimedia Qt6::Concurrent Qt6::Network)
 target_compile_definitions(LumoraStudio PRIVATE LUMORA_VERSION="${PROJECT_VERSION}")
 
 # Translations: sources are English, lumora_tr.ts holds Turkish.

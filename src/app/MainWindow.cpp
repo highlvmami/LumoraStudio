@@ -1,4 +1,6 @@
 #include "MainWindow.h"
+#include "Updater.h"
+#include "dialogs/SettingsDialog.h"
 
 #include <QAction>
 #include <QActionGroup>
@@ -342,6 +344,13 @@ void MainWindow::createMenus() {
     edit->addAction(m_actAddSource);
     edit->addSeparator();
     edit->addAction(m_actSnap);
+    edit->addSeparator();
+    QAction* settings = edit->addAction(tr("&Settings…"), this, [this] {
+        SettingsDialog dlg(m_updater, this);
+        dlg.exec();
+    });
+    settings->setShortcut(QKeySequence(QStringLiteral("Ctrl+,")));
+    settings->setMenuRole(QAction::PreferencesRole);
 
     QMenu* play = menuBar()->addMenu(tr("&Playback"));
     play->addAction(m_actPlay);
@@ -391,6 +400,9 @@ void MainWindow::createMenus() {
     help->addAction(tr("Feature list (roadmap)"), this, [] {
         QDesktopServices::openUrl(QUrl(QStringLiteral("https://github.com/highlvmami/LumoraStudio/blob/main/docs/ozellikler.md")));
     });
+    help->addSeparator();
+    m_updater = new Updater(this);
+    help->addAction(tr("Check for updates…"), m_updater, &Updater::checkNow);
     help->addSeparator();
     QAction* about = help->addAction(tr("About LumoraStudio"), this, &MainWindow::showAbout);
     about->setMenuRole(QAction::AboutRole);
@@ -472,6 +484,11 @@ bool MainWindow::maybeSave() {
     if (r == QMessageBox::Save)
         return saveProject();
     return r == QMessageBox::Discard;
+}
+
+void MainWindow::checkForUpdatesOnStartup() {
+    if (m_updater)
+        m_updater->checkOnStartup();
 }
 
 void MainWindow::closeEvent(QCloseEvent* e) {

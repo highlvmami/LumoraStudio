@@ -11,6 +11,7 @@
 #include <QWindow>
 
 #include "MainWindow.h"
+#include "Updater.h"
 #include "Theme.h"
 #include "media/MediaPool.h"
 
@@ -84,6 +85,11 @@ int main(int argc, char* argv[]) {
     }
     if (parser.isSet(seekOpt))
         QTimer::singleShot(800, &w, [&w, s = parser.value(seekOpt).toDouble()] { w.seekSeconds(s); });
+
+    if (!parser.isSet(shotOpt)) {
+        Updater::removeLeftovers();
+        w.checkForUpdatesOnStartup();
+    }
 
     if (parser.isSet(shotOpt)) {
         const QString out = parser.value(shotOpt);

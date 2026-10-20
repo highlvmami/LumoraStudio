@@ -918,6 +918,14 @@
         <source>Frame saved to %1</source>
         <translation>Kare %1 konumuna kaydedildi</translation>
     </message>
+    <message>
+        <source>Check for updates…</source>
+        <translation>Güncellemeleri denetle…</translation>
+    </message>
+    <message>
+        <source>&amp;Settings…</source>
+        <translation>&amp;Ayarlar…</translation>
+    </message>
 </context>
 <context>
     <name>lumora::MediaBinPanel</name>
@@ -1687,6 +1695,37 @@ Orijinal dosya asla değişmez: düzenlemeler projede saklanır ve dışa aktar�
     </message>
 </context>
 <context>
+    <name>lumora::SettingsDialog</name>
+    <message>
+        <source>Settings</source>
+        <translation>Ayarlar</translation>
+    </message>
+    <message>
+        <source>Updates</source>
+        <translation>Güncellemeler</translation>
+    </message>
+    <message>
+        <source>Installed version: %1</source>
+        <translation>Yüklü sürüm: %1</translation>
+    </message>
+    <message>
+        <source>Check for updates</source>
+        <translation>Güncellemeleri denetle</translation>
+    </message>
+    <message>
+        <source>Check automatically once a day</source>
+        <translation>Günde bir kez otomatik denetle</translation>
+    </message>
+    <message>
+        <source>Last checked: %1</source>
+        <translation>Son denetim: %1</translation>
+    </message>
+    <message>
+        <source>Not checked yet</source>
+        <translation>Henüz denetlenmedi</translation>
+    </message>
+</context>
+<context>
     <name>lumora::SliderRow</name>
     <message>
         <source>Double-click to reset</source>
@@ -1793,6 +1832,85 @@ Orijinal dosya asla değişmez: düzenlemeler projede saklanır ve dışa aktar�
     <message>
         <source>Remove track %1</source>
         <translation>%1 izini kaldır</translation>
+    </message>
+</context>
+<context>
+    <name>lumora::Updater</name>
+    <message>
+        <source>Check for updates</source>
+        <translation>Güncellemeleri denetle</translation>
+    </message>
+    <message>
+        <source>Could not reach GitHub: %1</source>
+        <translation>GitHub&apos;a ulaşılamadı: %1</translation>
+    </message>
+    <message>
+        <source>LumoraStudio %1 is the latest version.</source>
+        <translation>LumoraStudio %1 en güncel sürüm.</translation>
+    </message>
+    <message>
+        <source>Update available</source>
+        <translation>Güncelleme var</translation>
+    </message>
+    <message>
+        <source>LumoraStudio %1 is available. You have %2.</source>
+        <translation>LumoraStudio %1 çıktı. Sizdeki sürüm: %2.</translation>
+    </message>
+    <message>
+        <source>Install it now? LumoraStudio will close, update itself and start again. You will be asked to save your project first.</source>
+        <translation>Şimdi yüklensin mi? LumoraStudio kapanacak, kendini güncelleyip yeniden açılacak. Önce projenizi kaydetmeniz istenecek.</translation>
+    </message>
+    <message>
+        <source>Open the download page?</source>
+        <translation>İndirme sayfası açılsın mı?</translation>
+    </message>
+    <message>
+        <source>Update now</source>
+        <translation>Şimdi güncelle</translation>
+    </message>
+    <message>
+        <source>Open download page</source>
+        <translation>İndirme sayfasını aç</translation>
+    </message>
+    <message>
+        <source>Later</source>
+        <translation>Sonra</translation>
+    </message>
+    <message>
+        <source>Don&apos;t check automatically</source>
+        <translation>Otomatik denetleme</translation>
+    </message>
+    <message>
+        <source>Update</source>
+        <translation>Güncelleme</translation>
+    </message>
+    <message>
+        <source>Cannot write %1.</source>
+        <translation>%1 yazılamıyor.</translation>
+    </message>
+    <message>
+        <source>Downloading LumoraStudio %1…</source>
+        <translation>LumoraStudio %1 indiriliyor…</translation>
+    </message>
+    <message>
+        <source>Cancel</source>
+        <translation>İptal</translation>
+    </message>
+    <message>
+        <source>The download failed: %1</source>
+        <translation>İndirme başarısız: %1</translation>
+    </message>
+    <message>
+        <source>The downloaded file is damaged (its checksum does not match). Nothing was changed; please try again later.</source>
+        <translation>İndirilen dosya bozuk (sağlama toplamı tutmuyor). Hiçbir şey değiştirilmedi; lütfen daha sonra yeniden deneyin.</translation>
+    </message>
+    <message>
+        <source>The downloaded package could not be unpacked.</source>
+        <translation>İndirilen paket açılamadı.</translation>
+    </message>
+    <message>
+        <source>LumoraStudio could not be updated, so the current version was kept. Close any other copy of LumoraStudio and try again.</source>
+        <translation>LumoraStudio güncellenemedi, mevcut sürüm korundu. Açık başka bir LumoraStudio penceresi varsa kapatıp yeniden deneyin.</translation>
     </message>
 </context>
 <context>

@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.21)
 
 project(LumoraStudio
-    VERSION 0.1.0
+    VERSION 0.2.0
     DESCRIPTION "Free video and photo editor that never loses quality unless asked to"
     LANGUAGES CXX)
 
@@ -24,7 +24,7 @@ endif()
 set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTORCC ON)
 
-find_package(Qt6 6.4 REQUIRED COMPONENTS Core Gui Widgets Concurrent Multimedia LinguistTools)
+find_package(Qt6 6.4 REQUIRED COMPONENTS Core Gui Widgets Concurrent Multimedia Network LinguistTools)
 find_package(FFmpeg REQUIRED COMPONENTS avformat avcodec avutil swscale swresample)
 
 add_subdirectory(src/core)
