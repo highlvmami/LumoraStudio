@@ -137,7 +137,7 @@ QImage FrameRenderer::clipImage(const Clip& clip, Ticks sourceTime, QSize* fitSi
     if (slot->failed)
         return {};
     Ticks pts = 0;
-    const AVFrame* f = slot->decoder->frameAt(sourceTime, &pts);
+    const AVFrame* f = slot->decoder->frameAt(sourceTime + m_sampleOffset, &pts);
     if (!f || f->width <= 0 || f->height <= 0)
         return {};
     const int rot = slot->decoder->info().rotation;
@@ -404,7 +404,7 @@ const AVFrame* FrameRenderer::passthroughFrame(Ticks t) {
         Slot* slot = slotFor(c);
         if (slot->failed || slot->decoder->info().rotation != 0)
             return nullptr;
-        const AVFrame* f = slot->decoder->frameAt(c.toSource(t));
+        const AVFrame* f = slot->decoder->frameAt(c.toSource(t) + m_sampleOffset);
         if (!f || f->width != m_output.width() || f->height != m_output.height())
             return nullptr;
         if (f->sample_aspect_ratio.num > 0 && f->sample_aspect_ratio.num != f->sample_aspect_ratio.den)

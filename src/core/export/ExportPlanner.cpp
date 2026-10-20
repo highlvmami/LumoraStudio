@@ -5,8 +5,11 @@
 #include <algorithm>
 #include <cmath>
 #include <map>
+#include <optional>
 
+#include "export/Encoders.h"
 #include "ffmpeg/FFmpeg.h"
+#include "render/FrameRenderer.h"
 
 namespace lumora {
 
@@ -133,7 +136,19 @@ QString ExportPlanner::suggestedExtension(ExportMode mode, const QString& source
 ExportPlan ExportPlanner::plan(const TimelineState& tl, const MediaPool& pool, const ExportSettings& settings) {
     ExportPlan plan;
     plan.mode = settings.mode;
-    if (tl.tracks.empty() || tl.tracks[0].clips.empty()) {
+    if (tl.tracks.empty() || tl.duration() <= 0) {
+        plan.blockers << tr("The timeline is empty.");
+        return plan;
+    }
+    bool looseAudio = false; // audio clips that do not belong to a storyline clip
+    for (int ti : tl.trackIndices(TrackType::Audio))
+        for (const auto& c : tl.tracks[ti].clips)
+            if (c.linkId.isNull() || ti != 1)
+                looseAudio = true;
+    if (settings.mode == ExportMode::Custom || tl.hasEffects() ||
+        (settings.mode != ExportMode::StreamCopy && looseAudio && settings.includeAudio))
+        return settings.mode == ExportMode::StreamCopy ? streamCopyBlocked(tl) : planRender(tl, pool, settings);
+    if (tl.tracks[0].clips.empty()) {
         plan.blockers << tr("The timeline is empty.");
         return plan;
     }
@@ -151,7 +166,8 @@ ExportPlan ExportPlanner::plan(const TimelineState& tl, const MediaPool& pool, c
             if (c.linkId.isNull())
                 unlinkedAudio = true;
     if (unlinkedAudio)
-        plan.notes << tr("Audio-only clips on A1 are not exported in version 0.1.");
+        plan.notes << tr("Audio-only clips cannot be joined without re-encoding, so they are left out of a lossless "
+                         "cut. Choose another mode to include them.");
 
     // Build segments from the primary storyline.
     for (const auto& c : vTrack.clips) {
@@ -307,6 +323,314 @@ ExportPlan ExportPlanner::plan(const TimelineState& tl, const MediaPool& pool, c
 
     for (const auto& seg : plan.segments)
         plan.expectedDuration += seg.requestedOut - seg.actualIn;
+    return plan;
+}
+
+AVRational ExportPlanner::timelineRate(const TimelineState& tl, const MediaPool& pool) {
+    if (tl.frameRate.num > 0 && tl.frameRate.den > 0)
+        return tl.frameRate;
+    for (int ti : tl.trackIndices(TrackType::Video))
+        for (const auto& c : tl.tracks[ti].clips)
+            if (auto m = pool.find(c.mediaId); m && m->info.video && m->info.video->frameRate.num > 0)
+                return m->info.video->frameRate;
+    return AVRational{25, 1};
+}
+
+ExportPlan ExportPlanner::streamCopyBlocked(const TimelineState&) {
+    ExportPlan plan;
+    plan.mode = ExportMode::StreamCopy;
+    plan.blockers << tr("The timeline has titles, transitions, effects, audio changes or more than one track. These "
+                        "have to be drawn into the picture, which a lossless cut cannot do. Choose \"Match source\", "
+                        "\"Lossless intermediate\" or \"Custom\".");
+    return plan;
+}
+
+ExportPlan ExportPlanner::planRender(const TimelineState& tl, const MediaPool& pool, const ExportSettings& settings) {
+    ExportPlan plan;
+    plan.mode = settings.mode;
+    plan.video = VideoStrategy::Render;
+    plan.timeline = tl;
+    plan.pool = &pool;
+    plan.rangeStart = settings.rangeStart == kInvalidTicks ? 0 : std::max<Ticks>(0, settings.rangeStart);
+    plan.rangeEnd = settings.rangeEnd == kInvalidTicks ? tl.duration() : std::min(tl.duration(), settings.rangeEnd);
+    if (plan.rangeEnd <= plan.rangeStart) {
+        plan.blockers << tr("Nothing to export in the selected range.");
+        return plan;
+    }
+    const double seconds = ticksToSeconds(plan.rangeEnd - plan.rangeStart);
+
+    // Every clip must have its media.
+    for (const auto& t : tl.tracks)
+        for (const auto& c : t.clips)
+            if (c.kind == ClipKind::Media && !pool.find(c.mediaId)) {
+                plan.blockers << tr("A clip refers to media that is missing from the project.");
+                return plan;
+            }
+
+    const AVOutputFormat* ofmt = guessFormat(settings.outputPath);
+    if (!ofmt) {
+        plan.blockers << tr("Unknown output container for \"%1\".").arg(QFileInfo(settings.outputPath).fileName());
+        return plan;
+    }
+    plan.containerName = QString::fromUtf8(ofmt->name);
+
+    // The reference source: first video clip of the storyline, else of any track.
+    std::optional<VideoStreamInfo> src;
+    for (int ti : tl.trackIndices(TrackType::Video)) {
+        for (const auto& c : tl.tracks[ti].clips)
+            if (auto m = pool.find(c.mediaId); c.kind == ClipKind::Media && m && m->info.video) {
+                src = m->info.video;
+                break;
+            }
+        if (src)
+            break;
+    }
+
+    // --- frame size and rate ---
+    const QSize canvas = FrameRenderer::defaultCanvasSize(tl, pool);
+    const bool custom = settings.mode == ExportMode::Custom;
+    VideoEncodeOptions o = custom ? settings.video : VideoEncodeOptions{};
+    auto even = [](int v) { return std::max(2, v & ~1); };
+    QSize output = canvas, picture = canvas;
+    if (custom && o.resolution.isValid() && !o.resolution.isEmpty()) {
+        const QSize wanted(even(o.resolution.width()), even(o.resolution.height()));
+        QSize fit = canvas.scaled(wanted, Qt::KeepAspectRatio);
+        fit = QSize(even(fit.width()), even(fit.height()));
+        if (o.scaleMode == ScaleMode::Fit) {
+            output = wanted;
+            picture = fit;
+        } else {
+            picture = (canvas.width() <= wanted.width() && canvas.height() <= wanted.height()) ? canvas : fit;
+            output = picture;
+        }
+    }
+    plan.outputSize = output;
+    plan.pictureSize = picture;
+    plan.pictureOffset = QPoint(((output.width() - picture.width()) / 2) & ~1, ((output.height() - picture.height()) / 2) & ~1);
+    plan.outputRate = (custom && o.frameRate.num > 0 && o.frameRate.den > 0) ? o.frameRate : timelineRate(tl, pool);
+    if (picture != canvas)
+        plan.notes << tr("The picture is scaled from %1×%2 to %3×%4%5.")
+                          .arg(canvas.width())
+                          .arg(canvas.height())
+                          .arg(picture.width())
+                          .arg(picture.height())
+                          .arg(picture != output ? tr(" with black bars to fill %1×%2").arg(output.width()).arg(output.height())
+                                                 : QString());
+
+    // --- video encoder ---
+    AVCodecID codec = AV_CODEC_ID_NONE;
+    if (settings.mode == ExportMode::LosslessIntermediate) {
+        codec = AV_CODEC_ID_FFV1;
+        plan.videoEncoder = QStringLiteral("ffv1");
+    } else if (settings.mode == ExportMode::MatchSource) {
+        codec = src ? src->codecId : AV_CODEC_ID_H264;
+        QStringList enc = encodersFor(codec);
+        if (enc.isEmpty()) {
+            plan.notes << tr("No %1 encoder is available in this FFmpeg build; H.264 is used instead.")
+                              .arg(QString::fromUtf8(avcodec_get_name(codec)));
+            codec = AV_CODEC_ID_H264;
+            enc = encodersFor(codec);
+        }
+        if (!enc.isEmpty())
+            plan.videoEncoder = enc.front();
+        plan.videoBitrate = src ? src->bitRate : 0;
+    } else {
+        codec = o.codec;
+        const auto list = encoders::available(codec);
+        for (const auto& e : list)
+            if (e.name == o.encoder)
+                plan.videoEncoder = e.name;
+        if (plan.videoEncoder.isEmpty() && !list.empty()) {
+            plan.videoEncoder = list.front().name;
+            if (!o.encoder.isEmpty())
+                plan.notes << tr("The %1 encoder does not work on this computer; %2 is used instead.")
+                                  .arg(o.encoder, list.front().label);
+        }
+    }
+    if (plan.videoEncoder.isEmpty()) {
+        plan.blockers << tr("No encoder available for %1.").arg(QString::fromUtf8(avcodec_get_name(codec)));
+        return plan;
+    }
+    if (!containerSupports(ofmt, codec))
+        plan.blockers << tr("The %1 container cannot hold %2 video.")
+                             .arg(plan.containerName, QString::fromUtf8(avcodec_get_name(codec)));
+    plan.hardwareEncoder = encoders::isHardware(plan.videoEncoder);
+    o.codec = codec;
+    o.encoder = plan.videoEncoder;
+    if (custom) {
+        if (o.profile.isEmpty())
+            o.profile = encoders::defaultProfile(codec);
+        const int srcFormat = src ? src->pixelFormat : AV_PIX_FMT_YUV420P;
+        plan.pixelFormat = encoders::pixelFormat(plan.videoEncoder, codec, srcFormat, o.bitDepth, o.profile);
+        if (plan.pixelFormat == AV_PIX_FMT_NONE)
+            plan.blockers << tr("The %1 encoder cannot write %2-bit video.").arg(plan.videoEncoder).arg(o.bitDepth);
+        if (encoders::hasRateControl(codec)) {
+            if (o.rateControl == RateControl::TargetSize) {
+                const std::int64_t audio = settings.includeAudio ? (settings.audio.bitrate > 0 ? settings.audio.bitrate : 320000) : 0;
+                plan.videoBitrate = encoders::bitrateForSize(o.targetSizeMB, seconds, audio);
+                if (plan.videoBitrate <= 0)
+                    plan.blockers << tr("%1 MB is too small for %2 s of video.").arg(o.targetSizeMB).arg(seconds, 0, 'f', 1);
+            } else if (o.rateControl != RateControl::Quality) {
+                plan.videoBitrate = o.bitrate;
+                if (plan.videoBitrate <= 0 && src && src->bitRate > 0)
+                    plan.videoBitrate = static_cast<std::int64_t>(
+                        static_cast<double>(src->bitRate) * output.width() * output.height() /
+                        std::max(1, src->width * src->height));
+                if (plan.videoBitrate <= 0)
+                    plan.videoBitrate = static_cast<std::int64_t>(output.width() * output.height() * av_q2d(plan.outputRate) * 0.1);
+            } else if (!encoders::qualityScale(plan.videoEncoder).supported) {
+                plan.blockers << tr("The %1 encoder has no constant quality mode; choose a bit rate.").arg(plan.videoEncoder);
+            }
+            if (o.twoPass && o.rateControl != RateControl::Quality) {
+                if (encoders::supportsTwoPass(plan.videoEncoder))
+                    plan.twoPass = true;
+                else
+                    plan.notes << tr("%1 cannot encode in two passes; one pass is used.").arg(plan.videoEncoder);
+            }
+        }
+    }
+    plan.videoOptions = o;
+
+    // --- colour description of the output ---
+    if (src) {
+        plan.colorPrimaries = src->colorPrimaries;
+        plan.colorTrc = src->colorTrc;
+        plan.colorSpace = src->colorSpace;
+        plan.colorRange = src->colorRange;
+    }
+    if (plan.colorSpace == AVCOL_SPC_UNSPECIFIED || plan.colorSpace == AVCOL_SPC_RGB) {
+        const bool hd = (src ? src->height : output.height()) >= 720;
+        plan.colorSpace = hd ? AVCOL_SPC_BT709 : AVCOL_SPC_SMPTE170M;
+        if (plan.colorPrimaries == AVCOL_PRI_UNSPECIFIED)
+            plan.colorPrimaries = hd ? AVCOL_PRI_BT709 : AVCOL_PRI_SMPTE170M;
+        if (plan.colorTrc == AVCOL_TRC_UNSPECIFIED)
+            plan.colorTrc = hd ? AVCOL_TRC_BT709 : AVCOL_TRC_SMPTE170M;
+    }
+    if (plan.colorRange == AVCOL_RANGE_UNSPECIFIED || (custom && codec != AV_CODEC_ID_FFV1))
+        plan.colorRange = AVCOL_RANGE_MPEG; // what players expect from delivery files
+
+    // --- audio ---
+    // Audio clips that will sound.
+    std::vector<const Clip*> audible;
+    for (int ti : tl.trackIndices(TrackType::Audio)) {
+        if (tl.tracks[ti].muted)
+            continue;
+        for (const auto& c : tl.tracks[ti].clips)
+            if (c.timelineEnd() > plan.rangeStart && c.timelineStart < plan.rangeEnd)
+                if (auto m = pool.find(c.mediaId); m && m->info.audio)
+                    audible.push_back(&c);
+    }
+    std::optional<AudioStreamInfo> asrc;
+    for (const Clip* c : audible)
+        if (!asrc)
+            asrc = pool.find(c->mediaId)->info.audio;
+    if (!settings.includeAudio || audible.empty()) {
+        plan.audio = AudioStrategy::None;
+    } else {
+        // Copy when the audio is exactly the storyline cut together: only
+        // A1, each piece belonging to a storyline clip, no gaps, gain, fades
+        // or crossfades, every piece in the same format.
+        bool simple = audible.size() > 0;
+        const Track& v1 = tl.tracks[0];
+        auto dur = [&pool](const QUuid& id) {
+            auto m = pool.find(id);
+            return m ? m->info.duration : Ticks(0);
+        };
+        std::vector<SegmentPlan> pieces;
+        for (int k = 0; simple && k < static_cast<int>(v1.clips.size()); ++k) {
+            const Clip& vc = v1.clips[k];
+            const Ticks s = std::max(vc.timelineStart, plan.rangeStart), e = std::min(vc.timelineEnd(), plan.rangeEnd);
+            if (e <= s)
+                continue;
+            if (tl.transitionDuration(k, dur) > 0 || (k + 1 < static_cast<int>(v1.clips.size()) &&
+                                                       tl.transitionDuration(k + 1, dur) > 0))
+                simple = false;
+            const Clip* ac = nullptr;
+            for (const Clip* c : audible)
+                if (!vc.linkId.isNull() && c->linkId == vc.linkId)
+                    ac = c;
+            if (!ac || ac->gainDb != 0.0 || ac->fadeIn > 0 || ac->fadeOut > 0 || ac->timelineStart != vc.timelineStart ||
+                ac->duration() != vc.duration() || ac->sourceIn != vc.sourceIn || ac->mediaId != vc.mediaId)
+                simple = false;
+            if (!simple)
+                break;
+            SegmentPlan seg;
+            seg.clipId = ac->id;
+            seg.mediaId = ac->mediaId;
+            seg.path = pool.find(ac->mediaId)->path;
+            seg.requestedIn = seg.actualIn = ac->toSource(s);
+            seg.requestedOut = ac->toSource(e);
+            seg.hasAudio = true;
+            seg.outputStart = s - plan.rangeStart;
+            pieces.push_back(seg);
+        }
+        Ticks covered = 0;
+        for (const auto& p : pieces)
+            covered += p.requestedOut - p.requestedIn;
+        simple = simple && pieces.size() == audible.size() && covered == plan.rangeEnd - plan.rangeStart;
+        if (simple) {
+            std::map<QString, SourceStreams> sources;
+            for (const auto& p : pieces)
+                if (!sources.count(p.path))
+                    sources[p.path] = inspect(p.path);
+            const SourceStreams& first = sources[pieces.front().path];
+            for (const auto& [path, st] : sources)
+                simple = simple && st.ok && st.hasAudio && st.audio == first.audio;
+            simple = simple && containerSupports(ofmt, first.audio.codec);
+        }
+        bool allowCopy = settings.mode != ExportMode::Custom ||
+                         (settings.audio.copyWhenPossible &&
+                          (settings.audio.codec == AV_CODEC_ID_NONE || (asrc && settings.audio.codec == asrc->codecId)) &&
+                          settings.audio.bitrate <= 0 &&
+                          (settings.audio.sampleRate <= 0 || (asrc && settings.audio.sampleRate == asrc->sampleRate)));
+        if (simple && allowCopy) {
+            plan.audio = AudioStrategy::Copy;
+            plan.segments = pieces;
+        } else {
+            plan.audio = AudioStrategy::Encode;
+            AVCodecID acodec = AV_CODEC_ID_AAC;
+            if (settings.mode == ExportMode::LosslessIntermediate)
+                acodec = AV_CODEC_ID_FLAC;
+            else if (settings.mode == ExportMode::MatchSource && asrc)
+                acodec = asrc->codecId;
+            else if (custom && settings.audio.codec != AV_CODEC_ID_NONE)
+                acodec = settings.audio.codec;
+            else if (custom && plan.containerName == QLatin1String("webm"))
+                acodec = AV_CODEC_ID_OPUS;
+            QStringList enc = encodersFor(acodec);
+            if (enc.isEmpty() || !containerSupports(ofmt, acodec)) {
+                if (custom && settings.audio.codec != AV_CODEC_ID_NONE) {
+                    plan.blockers << tr("The %1 container cannot hold %2 audio.")
+                                         .arg(plan.containerName, QString::fromUtf8(avcodec_get_name(acodec)));
+                } else {
+                    acodec = settings.mode == ExportMode::LosslessIntermediate && containerSupports(ofmt, AV_CODEC_ID_FLAC)
+                                 ? AV_CODEC_ID_FLAC
+                                 : (plan.containerName == QLatin1String("webm") ? AV_CODEC_ID_OPUS : AV_CODEC_ID_AAC);
+                    enc = encodersFor(acodec);
+                }
+            }
+            if (enc.isEmpty())
+                plan.blockers << tr("No audio encoder available.");
+            else
+                plan.audioEncoder = enc.front();
+            plan.audioSampleRate = custom && settings.audio.sampleRate > 0 ? settings.audio.sampleRate
+                                   : asrc && asrc->sampleRate > 0       ? asrc->sampleRate
+                                                                        : 48000;
+            plan.audioChannels = asrc ? std::clamp(asrc->channels, 1, 8) : 2;
+            plan.audioBitrate = custom && settings.audio.bitrate > 0 ? settings.audio.bitrate
+                                : settings.mode == ExportMode::MatchSource && asrc && asrc->bitRate > 0
+                                    ? asrc->bitRate
+                                    : std::min<std::int64_t>(640000, 160000 * std::max(2, plan.audioChannels));
+            if (settings.mode != ExportMode::Custom || settings.audio.copyWhenPossible)
+                plan.notes << tr("The audio is mixed (several clips, gain, fades or crossfades) and encoded as %1.")
+                                  .arg(QString::fromUtf8(avcodec_get_name(acodec)));
+        }
+    }
+
+    if (settings.mode == ExportMode::MatchSource)
+        plan.notes << tr("The timeline is rendered with its titles, transitions and effects and encoded with the "
+                         "source's settings. Frames without effects are converted directly from the source.");
+    plan.expectedDuration = plan.rangeEnd - plan.rangeStart;
     return plan;
 }
 

@@ -3,9 +3,11 @@
 
 #include "TestMedia.h"
 #include "ffmpeg/FFmpeg.h"
+#include "export/Encoders.h"
 #include "export/ExportPlanner.h"
 #include "export/TimelineExporter.h"
 #include "media/MediaPool.h"
+#include "media/VideoDecoder.h"
 #include "timeline/Timeline.h"
 
 using namespace lumora;
@@ -14,6 +16,19 @@ using namespace lumora::test;
 namespace {
 constexpr int kFps = 25;
 Ticks frames(int n) { return n * frameDuration(AVRational{kFps, 1}); }
+
+Ticks sec(double s) { return ticksFromSeconds(s); }
+
+// Decoded picture of frame `index` of a file, as an image.
+QImage frameImage(const QString& path, int index) {
+    VideoDecoder dec;
+    if (!dec.open(path))
+        return {};
+    const Ticks fd = frameDuration(dec.info().frameRate);
+    FrameConverter conv;
+    const AVFrame* f = dec.frameAt(index * fd + fd / 2);
+    return f ? conv.convert(f) : QImage();
+}
 
 std::vector<int> range(int from, int to) {
     std::vector<int> v;
@@ -38,6 +53,10 @@ private:
         ExportSettings s;
         s.mode = mode;
         s.outputPath = path;
+        return exportWith(tl, s, planOut);
+    }
+
+    ExportResult exportWith(Timeline& tl, ExportSettings s, ExportPlan* planOut = nullptr) {
         ExportPlan plan = ExportPlanner::plan(tl.state(), m_pool, s);
         if (planOut)
             *planOut = plan;
@@ -273,7 +292,245 @@ private slots:
         const auto plan2 = ExportPlanner::plan(tl.state(), m_pool, s);
         QVERIFY2(plan2.ok(), qPrintable(plan2.blockers.join('\n')));
     }
+
+    void streamCopyIsBlockedByEffects() {
+        Timeline tl;
+        tl.insertMedia(m_item->id, 0, frames(40), true, true);
+        tl.setFades(tl.tracks()[0].clips[0].id, frames(5), 0);
+        ExportSettings s;
+        s.mode = ExportMode::StreamCopy;
+        s.outputPath = out("blocked.mp4");
+        QVERIFY(!ExportPlanner::plan(tl.state(), m_pool, s).ok());
+        s.mode = ExportMode::MatchSource;
+        const auto plan = ExportPlanner::plan(tl.state(), m_pool, s);
+        QVERIFY2(plan.ok(), qPrintable(plan.blockers.join('\n')));
+        QCOMPARE(int(plan.video), int(VideoStrategy::Render));
+    }
+
+    void customH264KeepsEveryFrame() {
+        if (!avcodec_find_encoder_by_name("libx264"))
+            QSKIP("FFmpeg build has no libx264");
+        Timeline tl;
+        tl.insertMedia(m_item->id, frames(13), frames(47), true, true);
+        ExportSettings s;
+        s.mode = ExportMode::Custom;
+        s.outputPath = out("custom.mp4");
+        s.video.codec = AV_CODEC_ID_H264;
+        s.video.quality = 16;
+        ExportPlan plan;
+        auto r = exportWith(tl, s, &plan);
+        QVERIFY2(r.ok, qPrintable(r.error));
+        QCOMPARE(int(plan.video), int(VideoStrategy::Render));
+        QCOMPARE(plan.videoEncoder, QStringLiteral("libx264"));
+        QCOMPARE(int(plan.audio), int(AudioStrategy::Copy)); // plain cut: audio is copied untouched
+        const auto info = probeMedia(s.outputPath);
+        QVERIFY(info && info->video && info->audio);
+        QCOMPARE(info->video->codecId, AV_CODEC_ID_H264);
+        QCOMPARE(info->video->pixelFormat, AV_PIX_FMT_YUV420P);
+        QCOMPARE(info->video->colorRange, AVCOL_RANGE_MPEG);
+        const auto d = decodeAll(s.outputPath);
+        QCOMPARE(d.decodeErrors, 0);
+        QCOMPARE(d.frameIndices, range(13, 47));
+        QVERIFY(std::abs(audioDuration(s.outputPath) - 34 / 25.0) < 0.05);
+    }
+
+    void customScalesWithBarsAndChangesFrameRate() {
+        if (!avcodec_find_encoder_by_name("libx264"))
+            QSKIP("FFmpeg build has no libx264");
+        Timeline tl;
+        tl.insertMedia(m_item->id, 0, frames(20), true, true);
+        ExportSettings s;
+        s.mode = ExportMode::Custom;
+        s.outputPath = out("scaled.mp4");
+        s.video.resolution = QSize(640, 360);
+        s.video.scaleMode = ScaleMode::Fit;
+        s.video.frameRate = AVRational{50, 1};
+        s.video.quality = 14;
+        ExportPlan plan;
+        auto r = exportWith(tl, s, &plan);
+        QVERIFY2(r.ok, qPrintable(r.error));
+        QCOMPARE(plan.outputSize, QSize(640, 360));
+        QCOMPARE(plan.pictureSize, QSize(480, 360));
+        const auto info = probeMedia(s.outputPath);
+        QCOMPARE(info->video->width, 640);
+        QCOMPARE(info->video->height, 360);
+        QCOMPARE(av_q2d(info->video->frameRate), 50.0);
+        const QImage img = frameImage(s.outputPath, 3);
+        QVERIFY(!img.isNull());
+        QVERIFY(meanLuma(img, QRect(0, 0, 70, 360)) < 20);     // pillar box
+        QVERIFY(meanLuma(img, QRect(570, 0, 70, 360)) < 20);
+        QCOMPARE(decodeAll(s.outputPath).frameIndices.size(), size_t(40));
+
+        // Inside: no bars and never upscaled.
+        s.video.scaleMode = ScaleMode::Inside;
+        s.video.frameRate = AVRational{0, 1};
+        plan = ExportPlanner::plan(tl.state(), m_pool, s);
+        QCOMPARE(plan.outputSize, QSize(320, 240));
+        s.video.resolution = QSize(160, 160);
+        plan = ExportPlanner::plan(tl.state(), m_pool, s);
+        QCOMPARE(plan.outputSize, QSize(160, 120));
+    }
+
+    void bitRateModesHitTheirTarget() {
+        if (!avcodec_find_encoder_by_name("libx264"))
+            QSKIP("FFmpeg build has no libx264");
+        Timeline tl;
+        tl.insertMedia(m_item->id, 0, m_item->info.duration, true, true);
+        ExportSettings s;
+        s.mode = ExportMode::Custom;
+        s.includeAudio = false;
+        s.outputPath = out("target.mp4");
+        s.video.rateControl = RateControl::TargetSize;
+        s.video.targetSizeMB = 0.4;
+        s.video.twoPass = true;
+        ExportPlan plan;
+        auto r = exportWith(tl, s, &plan);
+        QVERIFY2(r.ok, qPrintable(r.error));
+        QVERIFY(plan.twoPass);
+        qInfo() << "target size: wanted 400000, got" << r.fileSize;
+        QVERIFY(r.fileSize < 400000 * 1.05);
+        QVERIFY(r.fileSize > 400000 * 0.6);
+        QCOMPARE(decodeAll(s.outputPath).frameIndices, range(0, 100));
+        // The first pass statistics are cleaned up.
+        QVERIFY(QDir::temp().entryList({"lumora-2pass-*"}).isEmpty());
+
+        s.outputPath = out("cbr.mp4");
+        s.video.rateControl = RateControl::ConstantBitrate;
+        s.video.bitrate = 600000;
+        s.video.twoPass = false;
+        r = exportWith(tl, s, &plan);
+        QVERIFY2(r.ok, qPrintable(r.error));
+        const double kbps = r.fileSize * 8 / 4.0 / 1000;
+        qInfo() << "CBR 600 kbit/s ->" << kbps;
+        QVERIFY(kbps > 450 && kbps < 700);
+    }
+
+    void renderedTimelineHasTitlesTransitionsAndMixedAudio() {
+        const QString brightPath = m_dir.filePath("bright.mp4"), darkPath = m_dir.filePath("dark.mp4");
+        TestVideoSpec spec;
+        spec.solidLuma = 200;
+        QVERIFY(writeTestVideo(brightPath, spec));
+        spec.solidLuma = 40;
+        QVERIFY(writeTestVideo(darkPath, spec));
+        auto bright = m_pool.import(brightPath), dark = m_pool.import(darkPath);
+        Timeline tl;
+        tl.insertMedia(bright->id, 0, sec(2), true, true);
+        tl.insertMedia(dark->id, sec(1), sec(3), true, true);
+        QVERIFY(tl.setTransition(tl.tracks()[0].clips[1].id, {TransitionType::CrossDissolve, sec(1)}));
+        const int v2 = tl.addTrack(TrackType::Video);
+        TitleData title;
+        title.text = QStringLiteral("Lumora");
+        title.color = QColor(255, 0, 0);
+        title.size = 0.25;
+        title.y = 0.5;
+        title.shadow = false;
+        title.animationIn = title.animationOut = TitleAnimation::None;
+        tl.addTitle(title, sec(1), v2, sec(3));
+        // An audio-only clip on its own track.
+        const int a2 = tl.audioTrackFor(v2);
+        tl.placeMedia(m_item->id, 0, sec(1), false, true, a2, sec(0.5));
+
+        ExportPlan plan;
+        auto r = exportTimeline(tl, ExportMode::MatchSource, out("rendered.mp4"), &plan);
+        QVERIFY2(r.ok, qPrintable(r.error));
+        QCOMPARE(int(plan.video), int(VideoStrategy::Render));
+        QCOMPARE(int(plan.audio), int(AudioStrategy::Encode));
+        QCOMPARE(plan.videoEncoder, QStringLiteral("mpeg4"));
+        const auto d = decodeAll(out("rendered.mp4"));
+        QCOMPARE(d.decodeErrors, 0);
+        QCOMPARE(int(d.frameIndices.size()), 100); // 4 s at 25 fps
+        QVERIFY(std::abs(audioDuration(out("rendered.mp4")) - 4.0) < 0.05);
+        const QRect all(0, 0, 320, 240);
+        QVERIFY(meanLuma(frameImage(out("rendered.mp4"), 10), all) > 180);
+        const double mid = meanLuma(frameImage(out("rendered.mp4"), 50), all);
+        QVERIFY2(mid > 100 && mid < 140, qPrintable(QString::number(mid)));
+        // The title (red) is on screen from 3 s.
+        auto redPixels = [](const QImage& img) {
+            int n = 0;
+            for (int y = 0; y < img.height(); ++y)
+                for (int x = 0; x < img.width(); ++x) {
+                    const QColor c = img.pixelColor(x, y);
+                    n += c.red() > 150 && c.green() < 90 ? 1 : 0;
+                }
+            return n;
+        };
+        QCOMPARE(redPixels(frameImage(out("rendered.mp4"), 70)), 0);
+        QVERIFY(redPixels(frameImage(out("rendered.mp4"), 85)) > 300);
+    }
+
+    void intermediatePresetsWriteTheRightFormat() {
+        if (!avcodec_find_encoder_by_name("prores_ks"))
+            QSKIP("FFmpeg build has no prores_ks");
+        Timeline tl;
+        tl.insertMedia(m_item->id, 0, frames(10), true, true);
+        ExportSettings s;
+        s.mode = ExportMode::Custom;
+        for (const auto& p : encoders::presets())
+            if (p.id == QLatin1String("prores-hq")) {
+                s.video = p.video;
+                s.audio = p.audio;
+            }
+        s.outputPath = out("prores.mov");
+        ExportPlan plan;
+        auto r = exportWith(tl, s, &plan);
+        QVERIFY2(r.ok, qPrintable(r.error));
+        const auto info = probeMedia(s.outputPath);
+        QCOMPARE(info->video->codecId, AV_CODEC_ID_PRORES);
+        QCOMPARE(info->video->pixelFormat, AV_PIX_FMT_YUV422P10LE);
+        QCOMPARE(info->video->profile, QStringLiteral("HQ"));
+        QCOMPARE(info->audio->codecId, AV_CODEC_ID_PCM_S24LE);
+        QCOMPARE(decodeAll(s.outputPath).frameIndices, range(0, 10));
+    }
+
+    void everyPresetPlans() {
+        Timeline tl;
+        tl.insertMedia(m_item->id, 0, frames(10), true, true);
+        for (const auto& p : encoders::presets()) {
+            if (encoders::available(p.video.codec).empty())
+                continue;
+            ExportSettings s;
+            s.mode = ExportMode::Custom;
+            s.video = p.video;
+            s.audio = p.audio;
+            s.outputPath = out(QStringLiteral("preset.%1").arg(p.extension));
+            const auto plan = ExportPlanner::plan(tl.state(), m_pool, s);
+            QVERIFY2(plan.ok(), qPrintable(p.id + ": " + plan.blockers.join('\n')));
+        }
+    }
+
+    void otherEncodersInOneAndTwoPasses() {
+        Timeline tl;
+        tl.insertMedia(m_item->id, 0, frames(20), true, true);
+        const std::pair<AVCodecID, const char*> list[] = {
+            {AV_CODEC_ID_HEVC, "mkv"}, {AV_CODEC_ID_VP9, "webm"}, {AV_CODEC_ID_AV1, "mkv"}};
+        for (const auto& [codec, ext] : list) {
+            for (const auto& enc : encoders::available(codec)) {
+                if (enc.hardware)
+                    continue;
+                for (int mode = 0; mode < 2; ++mode) {
+                    ExportSettings s;
+                    s.mode = ExportMode::Custom;
+                    s.video.codec = codec;
+                    s.video.encoder = enc.name;
+                    s.video.speed = 0;
+                    if (mode == 1) {
+                        s.video.rateControl = RateControl::VariableBitrate;
+                        s.video.bitrate = 500000;
+                        s.video.twoPass = true;
+                    }
+                    s.outputPath = out(QStringLiteral("%1-%2.%3").arg(enc.name).arg(mode).arg(ext));
+                    ExportPlan plan;
+                    auto r = exportWith(tl, s, &plan);
+                    QVERIFY2(r.ok, qPrintable(enc.name + ": " + r.error));
+                    const auto d = decodeAll(s.outputPath);
+                    QVERIFY2(d.decodeErrors == 0, qPrintable(enc.name));
+                    QCOMPARE(d.frameIndices, range(0, 20));
+                    QVERIFY(d.hasAudio);
+                }
+            }
+        }
+    }
 };
 
-QTEST_GUILESS_MAIN(ExportTest)
+QTEST_MAIN(ExportTest)
 #include "tst_export.moc"

@@ -27,6 +27,14 @@ public:
     // Encoder names FFmpeg offers for `codec`, best first, filtered to those
     // available in the linked FFmpeg build.
     static QStringList encodersFor(int codecId);
+
+    // Frame rate the timeline is edited in (the project's, else the first
+    // clip's, else 25 fps).
+    static AVRational timelineRate(const TimelineState& timeline, const MediaPool& pool);
+
+private:
+    static ExportPlan planRender(const TimelineState& timeline, const MediaPool& pool, const ExportSettings& settings);
+    static ExportPlan streamCopyBlocked(const TimelineState& timeline);
 };
 
 // Snaps `t` back to the closest key frame at or before it. Returns `t` when no

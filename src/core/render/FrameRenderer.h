@@ -44,6 +44,10 @@ public:
     // Size of the rendered image; the canvas is scaled to it.
     void setOutputSize(QSize size) { m_output = size; }
     void setPrecision(Precision p);
+    // Source frames are looked up this much later than the rendered time.
+    // Exports use half a frame so timestamps that are rounded in the file
+    // (e.g. millisecond based containers) still pick the right frame.
+    void setSampleOffset(Ticks offset) { m_sampleOffset = offset; }
 
     QImage render(Ticks t);
 
@@ -85,6 +89,7 @@ private:
     std::map<QUuid, std::unique_ptr<Slot>> m_slots; // per clip
     std::list<QUuid> m_lru;
     Ticks m_lastTime = 0;
+    Ticks m_sampleOffset = 0;
 };
 
 // Blurs an image by `radius` pixels (cheap approximation, used by the blur

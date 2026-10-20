@@ -1,5 +1,6 @@
 #pragma once
 
+#include <QPoint>
 #include <QSize>
 #include <QString>
 #include <QStringList>
@@ -8,12 +9,15 @@
 #include <vector>
 
 #include "TimeBase.h"
+#include "timeline/Timeline.h"
 
 extern "C" {
 #include <libavcodec/codec_id.h>
 }
 
 namespace lumora {
+
+class MediaPool;
 
 enum class ExportMode {
     // Lossless cut: packets are copied bit for bit, nothing is re-encoded.
@@ -68,7 +72,11 @@ struct AudioEncodeOptions {
     int sampleRate = 0;          // 0 = same as source
 };
 
-enum class VideoStrategy { Copy, Encode };
+enum class VideoStrategy {
+    Copy,   // packets copied (lossless cut)
+    Encode, // each storyline clip decoded and re-encoded on its own
+    Render, // the composited timeline (all tracks, titles, transitions) is encoded
+};
 enum class AudioStrategy { None, Copy, Encode };
 
 struct ExportSettings {
@@ -93,6 +101,7 @@ struct SegmentPlan {
     Ticks actualIn = 0;     // media time the export really starts at (key frame for stream copy)
     bool hasAudio = false;
     int keyframeShiftFrames = 0; // frames added at the start by snapping to a key frame
+    Ticks outputStart = 0;  // render path: where the segment starts in the output
 };
 
 struct ExportPlan {
@@ -109,12 +118,27 @@ struct ExportPlan {
     std::int64_t videoBitrate = 0; // resolved bit rate for bit-rate based modes
     bool twoPass = false;
     bool hardwareEncoder = false;
+    // Render path only.
+    TimelineState timeline;
+    const MediaPool* pool = nullptr;
+    Ticks rangeStart = 0, rangeEnd = 0;  // timeline range written
+    QPoint pictureOffset;                // where the picture sits inside the padded frame
+    VideoEncodeOptions videoOptions;     // resolved custom options (Custom mode)
+    int pixelFormat = -1;                // encoder input format; -1 = closest to the source
+    int colorPrimaries = 2, colorTrc = 2, colorSpace = 2, colorRange = 0; // AVCOL_* tags of the output
+    int audioSampleRate = 0;
+    int audioChannels = 2;
+    std::int64_t audioBitrate = 0;
+    // Copy: one demuxer per segment. Render + audio copy: segments are the
+    // audio pieces, placed at outputStart.
     std::vector<SegmentPlan> segments;
     QStringList blockers;   // reasons this plan cannot run
     QStringList notes;      // user-facing remarks (key frame snapping etc.)
     Ticks expectedDuration = 0;
 
-    bool ok() const { return blockers.isEmpty() && !segments.empty(); }
+    bool ok() const {
+        return blockers.isEmpty() && (video == VideoStrategy::Render ? expectedDuration > 0 : !segments.empty());
+    }
 };
 
 struct ExportResult {
