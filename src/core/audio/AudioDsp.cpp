@@ -114,16 +114,21 @@ SpectralDenoiser::SpectralDenoiser(int rate, int channels, double strength)
     m_window.resize(m_n);
     for (int i = 0; i < m_n; ++i)
         m_window[i] = static_cast<float>(std::sqrt(0.5 - 0.5 * std::cos(2 * M_PI * i / m_n)));
-    // The floor estimate may rise by about 3 dB per second.
-    const double framesPerSecond = double(rate) / m_hop;
-    m_rise = static_cast<float>(std::pow(10.0, 0.3 / framesPerSecond));
+    // Six sub-windows of a third of a second: the floor follows a change
+    // of noise within about two seconds.
+    m_subLength = std::max(1, static_cast<int>(rate / 3.0 / m_hop));
     reset();
 }
 
 void SpectralDenoiser::reset() {
     m_in.assign(m_channels, std::vector<float>(m_n, 0.0f));
     m_out.assign(m_channels, std::vector<float>(m_n, 0.0f));
+    m_smooth.assign(m_n / 2 + 1, 0.0f);
+    m_curMin.assign(m_n / 2 + 1, 0.0f);
     m_noise.assign(m_n / 2 + 1, 0.0f);
+    m_windowMins.clear();
+    m_subFill = 0;
+    m_settle = 0;
     m_prevGain.assign(m_n / 2 + 1, 1.0f);
     m_spec.assign(m_n, {});
     m_chanSpec.assign(m_channels, std::vector<std::complex<float>>(m_n));
@@ -170,31 +175,57 @@ void SpectralDenoiser::runFrame() {
     for (float& p : power)
         p /= static_cast<float>(m_channels);
 
-    // Noise floor: quick to fall, slow to rise.
-    for (int k = 0; k < bins; ++k) {
-        float& nz = m_noise[k];
-        if (m_frames == 0)
-            nz = power[k];
-        else if (power[k] < nz)
-            nz = 0.7f * nz + 0.3f * power[k];
-        else
-            nz *= m_rise;
-    }
+    // Noise floor: minimum of the smoothed level over the recent
+    // sub-windows, corrected for the bias of taking a minimum.
+    constexpr float bias = 2.5f;
+    // Digital silence (the start of a clip, a gap) says nothing about the
+    // noise: such frames do not update the floor. Neither do frames whose
+    // window still reaches back before the reset.
+    float total = 0.0f;
+    for (float p : power)
+        total += p;
     ++m_frames;
+    // The first frames after a reset are only partly filled.
+    const bool informative = total >= 1e-14f * bins && m_frames > m_n / m_hop;
+    // The smoothed level needs a few frames to settle before its minimum
+    // means anything.
+    const bool settled = informative && ++m_settle > 16;
+    for (int k = 0; informative && k < bins; ++k) {
+        m_smooth[k] = m_smooth[k] <= 0.0f ? power[k] : 0.9f * m_smooth[k] + 0.1f * power[k];
+        if (settled)
+            m_curMin[k] = m_subFill == 0 ? m_smooth[k] : std::min(m_curMin[k], m_smooth[k]);
+    }
+    if (settled && ++m_subFill == m_subLength) {
+        m_windowMins.push_back(m_curMin);
+        if (m_windowMins.size() > 6)
+            m_windowMins.erase(m_windowMins.begin());
+        m_subFill = 0;
+    }
+    // Until a minimum is known, nothing is treated as noise.
+    const bool known = !m_windowMins.empty() || m_subFill > 0;
+    for (int k = 0; informative && known && k < bins; ++k) {
+        float mn = m_subFill > 0 ? m_curMin[k] : m_windowMins.back()[k];
+        for (const auto& w : m_windowMins)
+            mn = std::min(mn, w[k]);
+        m_noise[k] = mn * bias;
+    }
 
     // Spectral subtraction gain with a floor, smoothed over frequency and
     // (when closing) over time, which keeps "musical noise" away.
-    const float over = static_cast<float>(1.5 + 2.5 * m_strength);
+    const float over = static_cast<float>(1.0 + 2.0 * m_strength);
     const float floor = static_cast<float>(std::pow(10.0, -24.0 * m_strength / 20.0));
     std::vector<float> gain(bins);
     for (int k = 0; k < bins; ++k) {
-        const float p = std::max(power[k], 1e-20f);
+        // Mostly the smoothed level (steady gains on noise) with some of the
+        // frame's own level (quick on speech onsets).
+        const float sm = informative ? m_smooth[k] : power[k];
+        const float p = std::max(0.3f * power[k] + 0.7f * sm, 1e-20f);
         gain[k] = std::max(floor, std::sqrt(std::max(0.0f, 1.0f - over * m_noise[k] / p)));
     }
     std::vector<float> smooth(bins);
     for (int k = 0; k < bins; ++k) {
         const float a = gain[std::max(0, k - 1)], b = gain[k], c = gain[std::min(bins - 1, k + 1)];
-        float g = 0.25f * a + 0.5f * b + 0.25f * c;
+        float g = 0.15f * a + 0.7f * b + 0.15f * c;
         if (g < m_prevGain[k])
             g = std::max(g, 0.6f * m_prevGain[k] + 0.4f * g);
         smooth[k] = g;

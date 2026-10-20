@@ -2,7 +2,9 @@
 #include <QtTest>
 
 #include "TestMedia.h"
+#include "audio/AudioEffects.h"
 #include "project/Project.h"
+#include "timeline/Subtitles.h"
 
 using namespace lumora;
 
@@ -87,6 +89,30 @@ private slots:
         QVERIFY(missing.isEmpty());
         QVERIFY(q.media()->items()[0]->path.endsWith("b/clip.mp4"));
     }
+
+    void subtitlesAndAudioSurviveSaving() {
+        Project p;
+        Timeline* tl = p.timeline();
+        const int s = tl->addSubtitleTrack({{0, ticksFromSeconds(1), QStringLiteral("Selam\nnasılsın")}}, QStringLiteral("tur"));
+        SubtitleStyle style;
+        style.size = 0.07;
+        style.backgroundOpacity = 0.5;
+        QVERIFY(tl->setSubtitleStyle(s, style));
+        AudioMaster m;
+        m.normalize = true;
+        m.targetLufs = -16;
+        QVERIFY(tl->setAudioMaster(m));
+        const QByteArray json = p.toJson();
+        QVERIFY(json.contains("\"version\": 3"));
+        Project q;
+        QString err;
+        QVERIFY2(q.fromJson(json, {}, &err), qPrintable(err));
+        QCOMPARE(q.timeline()->state(), tl->state());
+        // Without subtitles the file stays readable by 0.3.
+        Project r;
+        QVERIFY(r.toJson().contains("\"version\": 2"));
+    }
+
 };
 
 QTEST_GUILESS_MAIN(ProjectTest)

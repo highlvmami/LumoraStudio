@@ -26,9 +26,10 @@ private:
 };
 
 // Short-time spectral noise reduction. The noise floor of every frequency
-// bin is followed continuously (it falls quickly and rises slowly, so
-// speech and music pass over it), and bins close to the floor are turned
-// down, never by more than the strength allows. All channels share one gain
+// bin is the minimum of its smoothed level over the last ~2 seconds
+// ("minimum statistics": speech and music pause often enough that the
+// minimum is the noise), and bins close to that floor are turned down,
+// never by more than the strength allows. All channels share one gain
 // per bin, which keeps the stereo picture. Output is delayed by latency().
 class SpectralDenoiser {
 public:
@@ -44,12 +45,13 @@ private:
     double m_strength;
     std::vector<float> m_window;
     std::vector<std::vector<float>> m_in, m_out; // per channel, m_n each
-    std::vector<float> m_noise, m_prevGain;
+    std::vector<float> m_smooth, m_curMin, m_noise, m_prevGain;
+    std::vector<std::vector<float>> m_windowMins; // finished sub-windows
+    int m_subLength = 1, m_subFill = 0, m_settle = 0;
     std::vector<std::complex<float>> m_spec;
     std::vector<std::vector<std::complex<float>>> m_chanSpec;
     int m_fill = 0;   // new input samples since the last frame
     int m_frames = 0; // frames processed since reset
-    float m_rise;
 };
 
 // Feed-forward compressor with a soft knee; channels are linked.

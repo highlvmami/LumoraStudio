@@ -5,6 +5,7 @@
 #include "color/ColorProcessor.h"
 #include "color/Lut.h"
 #include "color/Scopes.h"
+#include "image/PhotoAdjustments.h"
 #include "image/PhotoProcessor.h"
 
 using namespace lumora;
@@ -325,6 +326,103 @@ private slots:
         QCOMPARE(b.color.temperature, -10.0);
         QCOMPARE(b.color.tint, 5.0);
     }
+
+    void curvesShapeTones() {
+        ColorGrade g;
+        g.curveMaster.points = {{0, 0}, {0.5, 0.7}, {1, 1}}; // lift the mid tones
+        QVERIFY(!g.isIdentity());
+        ColorProcessor p(g);
+        float mid[3] = {0.5f, 0.5f, 0.5f};
+        p.process(mid);
+        QVERIFY(std::abs(mid[0] - 0.7f) < 1e-3f);
+        float black[3] = {0, 0, 0}, white[3] = {1, 1, 1};
+        p.process(black);
+        p.process(white);
+        QVERIFY(black[0] < 1e-4f && white[0] > 1 - 1e-4f);
+        // Monotone: never overshoots between points.
+        ToneCurve c;
+        c.points = {{0, 0}, {0.2, 0.8}, {0.3, 0.85}, {1, 1}};
+        double prev = -1;
+        for (int i = 0; i <= 100; ++i) {
+            const double v = c.eval(i / 100.0);
+            QVERIFY(v >= prev - 1e-9 && v <= 1.0);
+            prev = v;
+        }
+        // A red-only curve leaves green and blue alone.
+        ColorGrade r;
+        r.curveRed.points = {{0, 0}, {0.5, 0.25}, {1, 1}};
+        float px[3] = {0.5f, 0.5f, 0.5f};
+        ColorProcessor(r).process(px);
+        QVERIFY(std::abs(px[0] - 0.25f) < 1e-3f && std::abs(px[1] - 0.5f) < 1e-4f);
+        // Points on the diagonal are the identity.
+        ColorGrade id;
+        id.curveBlue.points = {{0, 0}, {0.4, 0.4}, {1, 1}};
+        QVERIFY(id.isIdentity());
+    }
+
+    void hslTargetsOneColour() {
+        ColorGrade g;
+        g.hsl[5].saturation = -100; // blue
+        ColorProcessor p(g);
+        float blue[3] = {0.1f, 0.1f, 0.9f}; // hue 240, the band centre
+        p.process(blue);
+        QVERIFY2(std::abs(blue[0] - blue[2]) < 0.02f, "blue becomes grey");
+        float red[3] = {0.9f, 0.1f, 0.1f};
+        p.process(red);
+        QVERIFY(std::abs(red[0] - 0.9f) < 1e-3f && std::abs(red[1] - 0.1f) < 1e-3f); // red untouched
+        float grey[3] = {0.4f, 0.4f, 0.4f};
+        ColorGrade h;
+        h.hsl[0].hue = 100;
+        h.hsl[0].luminance = 100;
+        ColorProcessor ph(h);
+        ph.process(grey);
+        QVERIFY(std::abs(grey[0] - 0.4f) < 1e-4f); // greys never move
+        float red2[3] = {0.8f, 0.1f, 0.1f};
+        ph.process(red2);
+        QVERIFY(red2[1] > 0.15f); // red shifted towards orange
+        // JSON.
+        ColorGrade j;
+        j.hsl[3] = {10, -20, 30};
+        j.curveGreen.points = {{0, 0.1}, {1, 0.9}};
+        QCOMPARE(ColorGrade::fromJson(j.toJson()), j);
+    }
+
+    void brushMaskPaintsAndErases() {
+        const QImage img = solid(200, 100, QColor::fromRgbF(0.5, 0.5, 0.5));
+        PhotoAdjustments adj;
+        PhotoLayer l;
+        l.id = QUuid::createUuid();
+        l.grade.exposure = 1.0;
+        l.mask.shape = MaskShape::Brush;
+        adj.layers.push_back(l);
+        QVERIFY(!adj.hasToneChanges()); // nothing painted yet
+        BrushStroke s;
+        s.points = {{0.1, 0.5}, {0.9, 0.5}};
+        s.radius = 0.1;
+        s.hardness = 0.8;
+        adj.layers[0].mask.strokes.push_back(s);
+        QVERIFY(adj.hasToneChanges());
+        QImage out = PhotoProcessor::apply(img, adj);
+        QVERIFY(out.pixelColor(100, 50).redF() > 0.65);                    // on the stroke
+        QVERIFY(std::abs(out.pixelColor(100, 5).redF() - 0.5) < 0.002);    // away from it
+        // Erase the middle.
+        BrushStroke e = s;
+        e.points = {{0.5, 0.5}};
+        e.radius = 0.2;
+        e.erase = true;
+        e.hardness = 1.0;
+        adj.layers[0].mask.strokes.push_back(e);
+        out = PhotoProcessor::apply(img, adj);
+        QVERIFY(std::abs(out.pixelColor(100, 50).redF() - 0.5) < 0.002);
+        QVERIFY(out.pixelColor(30, 50).redF() > 0.65);
+        // Resolution independent: the same strokes cover the same place at
+        // half size.
+        const auto small = adj.layers[0].mask.render(100, 50);
+        QVERIFY(small[25 * 100 + 15] > 0.9f && small[25 * 100 + 50] < 0.01f);
+        // JSON keeps the strokes.
+        QCOMPARE(LayerMask::fromJson(adj.layers[0].mask.toJson()), adj.layers[0].mask);
+    }
+
 };
 
 QTEST_MAIN(ColorTest)
