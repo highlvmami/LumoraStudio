@@ -3,7 +3,7 @@
 #include <QImage>
 #include <QSize>
 
-#include "Time.h"
+#include "TimeBase.h"
 #include "ffmpeg/FFmpeg.h"
 #include "media/MediaInfo.h"
 

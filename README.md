@@ -134,7 +134,7 @@ Testler kendi deneme videolarını üretir (her kare kendi numarasını taşır)
 
 ```
 src/core/        Arayüzden bağımsız çekirdek (lumora_core kütüphanesi)
-  Time.*           Tamsayı zaman tabanı (1/705 600 000 sn), kare hızı yardımcıları
+  TimeBase.*       Tamsayı zaman tabanı (1/705 600 000 sn), kare hızı yardımcıları
   ffmpeg/          FFmpeg için RAII sarmalayıcılar
   media/           Medya bilgisi, anahtar kare taraması, video/ses çözücüler, medya havuzu
   timeline/        Zaman çizelgesi modeli (izler, klipler, bağlantılar, değişmezler)

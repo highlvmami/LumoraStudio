@@ -3,7 +3,7 @@
 # command line tool, tests or a different front end.
 
 add_library(lumora_core STATIC
-    Time.h Time.cpp
+    TimeBase.h TimeBase.cpp
     ffmpeg/FFmpeg.h ffmpeg/FFmpeg.cpp
     media/MediaInfo.h media/MediaInfo.cpp
     media/MediaPool.h media/MediaPool.cpp
