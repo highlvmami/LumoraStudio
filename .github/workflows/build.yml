@@ -1,0 +1,105 @@
+name: Build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  windows:
+    name: Windows (MSVC, Qt 6.8, FFmpeg 8.1)
+    runs-on: windows-latest
+    env:
+      QT_VERSION: 6.8.3
+      FFMPEG_ZIP: ffmpeg-n8.1-latest-win64-gpl-shared-8.1
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Qt
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: ${{ env.QT_VERSION }}
+          arch: win64_msvc2022_64
+          modules: qtmultimedia qtimageformats
+          cache: true
+
+      - name: Download FFmpeg (BtbN shared build)
+        shell: pwsh
+        run: |
+          $url = "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/$env:FFMPEG_ZIP.zip"
+          Invoke-WebRequest -Uri $url -OutFile ffmpeg.zip
+          Expand-Archive ffmpeg.zip -DestinationPath "$env:RUNNER_TEMP"
+          "FFMPEG_ROOT=$env:RUNNER_TEMP\$env:FFMPEG_ZIP" | Out-File -FilePath $env:GITHUB_ENV -Append
+
+      - name: Set up MSVC
+        uses: ilammy/msvc-dev-cmd@v1
+
+      - name: Configure
+        run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build
+        run: cmake --build build
+
+      - name: Test
+        shell: pwsh
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: |
+          $env:PATH = "$env:FFMPEG_ROOT\bin;$env:PATH"
+          ctest --test-dir build --output-on-failure
+
+      - name: Package
+        shell: pwsh
+        run: |
+          $dist = "dist\LumoraStudio"
+          New-Item -ItemType Directory -Force $dist | Out-Null
+          Copy-Item build\src\app\LumoraStudio.exe $dist
+          windeployqt --release --no-compiler-runtime --dir $dist "$dist\LumoraStudio.exe"
+          Copy-Item "$env:FFMPEG_ROOT\bin\*.dll" $dist
+          Copy-Item README.md, docs\ozellikler.md $dist
+          Copy-Item "$env:FFMPEG_ROOT\LICENSE.txt" "$dist\FFmpeg-LICENSE.txt" -ErrorAction SilentlyContinue
+
+      - name: Smoke test the package
+        shell: pwsh
+        run: |
+          $p = Start-Process -FilePath dist\LumoraStudio\LumoraStudio.exe `
+               -ArgumentList '--screenshot', "$env:RUNNER_TEMP\smoke.png" -PassThru
+          if (-not $p.WaitForExit(60000)) { $p.Kill(); throw "LumoraStudio did not exit" }
+          if ($p.ExitCode -ne 0) { throw "LumoraStudio exited with $($p.ExitCode)" }
+          if (-not (Test-Path "$env:RUNNER_TEMP\smoke.png")) { throw "No screenshot written" }
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: LumoraStudio-windows-x64
+          path: dist/LumoraStudio
+
+  linux:
+    name: Linux (GCC, Qt 6.4, FFmpeg 6.1)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            ninja-build pkg-config \
+            qt6-base-dev qt6-multimedia-dev qt6-tools-dev qt6-tools-dev-tools qt6-l10n-tools \
+            qt6-image-formats-plugins libgl-dev \
+            libavformat-dev libavcodec-dev libavutil-dev libswscale-dev libswresample-dev
+
+      - name: Configure
+        run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build
+        run: cmake --build build
+
+      - name: Test
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: ctest --test-dir build --output-on-failure
