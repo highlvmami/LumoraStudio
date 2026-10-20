@@ -11,6 +11,7 @@
 #include <QVBoxLayout>
 
 #include "Icons.h"
+#include "Theme.h"
 #include "panels/VideoView.h"
 #include "playback/PlaybackEngine.h"
 
@@ -47,21 +48,30 @@ Ticks ScrubBar::posAt(int x) const {
 void ScrubBar::paintEvent(QPaintEvent*) {
     QPainter p(this);
     p.setRenderHint(QPainter::Antialiasing);
-    const QRectF track(6, height() / 2.0 - 3, width() - 12, 6);
-    const QPalette pal = palette();
+    const ThemeColors& c = themeColors();
+    const QRectF track(8, height() / 2.0 - 2, width() - 16, 4);
     p.setPen(Qt::NoPen);
-    p.setBrush(pal.color(QPalette::Mid));
-    p.drawRoundedRect(track, 3, 3);
+    p.setBrush(c.hover);
+    p.drawRoundedRect(track, 2, 2);
     auto xOf = [&](Ticks t) { return track.left() + (m_duration > 0 ? track.width() * t / double(m_duration) : 0); };
+    const double x = xOf(m_pos);
+    // Played part in the brand gradient.
+    QLinearGradient g(track.topLeft(), track.topRight());
+    g.setColorAt(0, c.accent);
+    g.setColorAt(1, c.accentAlt);
+    p.setBrush(g);
+    p.drawRoundedRect(QRectF(track.left(), track.top(), x - track.left(), track.height()), 2, 2);
     if (m_in != kInvalidTicks || m_out != kInvalidTicks) {
         const double a = xOf(m_in == kInvalidTicks ? 0 : m_in);
         const double b = xOf(m_out == kInvalidTicks ? m_duration : m_out);
-        p.setBrush(pal.color(QPalette::Highlight).lighter(110));
-        p.drawRoundedRect(QRectF(a, track.top(), std::max(2.0, b - a), track.height()), 3, 3);
+        QColor range = c.accentCool;
+        range.setAlphaF(0.55);
+        p.setBrush(range);
+        p.drawRoundedRect(QRectF(a, track.top() - 3, std::max(2.0, b - a), track.height() + 6), 3, 3);
     }
-    const double x = xOf(m_pos);
-    p.setBrush(pal.color(QPalette::BrightText));
-    p.drawEllipse(QPointF(x, height() / 2.0), 6, 6);
+    p.setBrush(c.text);
+    p.setPen(QPen(c.accent, 2.5));
+    p.drawEllipse(QPointF(x, height() / 2.0), 6.5, 6.5);
 }
 
 void ScrubBar::mousePressEvent(QMouseEvent* e) { emit seekRequested(posAt(e->position().toPoint().x())); }
@@ -85,6 +95,7 @@ MonitorPanel::MonitorPanel(PlaybackEngine* engine, QWidget* parent) : QWidget(pa
     m_programBtn->setText(tr("Timeline"));
     m_programBtn->setToolTip(tr("Show the edited timeline"));
     for (auto* b : {m_sourceBtn, m_programBtn}) {
+        b->setObjectName(QStringLiteral("monitorMode"));
         b->setCheckable(true);
         b->setAutoRaise(true);
         b->setToolButtonStyle(Qt::ToolButtonTextOnly);
@@ -118,11 +129,14 @@ MonitorPanel::MonitorPanel(PlaybackEngine* engine, QWidget* parent) : QWidget(pa
     };
     auto* toStart = makeBtn(Icons::toStart(), tr("Go to start (Home)"));
     auto* back = makeBtn(Icons::stepBack(), tr("Previous frame (Left)"));
-    m_play = makeBtn(Icons::play(), tr("Play / pause (Space)"));
+    m_play = makeBtn(Icons::play(themeColors().onAccent), tr("Play / pause (Space)"));
+    m_play->setObjectName(QStringLiteral("playButton"));
+    m_play->setFixedSize(34, 34);
     auto* fwd = makeBtn(Icons::stepForward(), tr("Next frame (Right)"));
     auto* toEnd = makeBtn(Icons::toEnd(), tr("Go to end (End)"));
     controls->addSpacing(12);
     m_timecode = new QLabel(QStringLiteral("00:00:00:00 / 00:00:00:00"));
+    m_timecode->setObjectName(QStringLiteral("timecode"));
     QFont mono(QStringLiteral("monospace"));
     mono.setStyleHint(QFont::Monospace);
     m_timecode->setFont(mono);
@@ -180,7 +194,10 @@ MonitorPanel::MonitorPanel(PlaybackEngine* engine, QWidget* parent) : QWidget(pa
         updateTimecode();
     });
     connect(m_engine, &PlaybackEngine::playingChanged, this,
-            [this](bool playing) { m_play->setIcon(playing ? Icons::pause() : Icons::play()); });
+            [this](bool playing) {
+                const QColor c = themeColors().onAccent;
+                m_play->setIcon(playing ? Icons::pause(c) : Icons::play(c));
+            });
     connect(m_view, &VideoView::sizeChanged, m_engine, &PlaybackEngine::setPreviewSize);
     connect(m_view, &VideoView::filesDropped, this, &MonitorPanel::filesDropped);
     connect(m_view, &VideoView::mediaDropped, this, &MonitorPanel::mediaDropped);

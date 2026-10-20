@@ -12,6 +12,10 @@
 |---|---|
 | ![Dışa aktarma penceresi](docs/screenshots/disa-aktar.png) | ![Fotoğraf çalışma alanı](docs/screenshots/fotograf.png) |
 
+Açık tema ("Gündüz", Görünüm → Tema):
+
+![Gündüz teması](docs/screenshots/kurgu-gunduz.png)
+
 Tam yol haritası: [docs/ozellikler.md](docs/ozellikler.md). Mimari: [docs/mimari.md](docs/mimari.md).
 
 ## Sürüm 0.2'de neler var
@@ -58,7 +62,7 @@ Tam yol haritası: [docs/ozellikler.md](docs/ozellikler.md). Mimari: [docs/mimar
 **Genel**
 - Sınırsız geri al / yinele (video ve fotoğraf için ayrı geçmiş).
 - `.lumora` proje dosyası (okunabilir JSON; göreli ve mutlak yollar, eksik medya listesi).
-- Türkçe ve İngilizce arayüz (Görünüm → Dil), koyu ve açık tema, taşınabilir paneller.
+- Türkçe ve İngilizce arayüz (Görünüm → Dil), kendine özgü "Gece" (koyu) ve "Gündüz" (açık) tema, taşınabilir paneller.
 
 Bilinçli olarak sonraki sürümlere bırakılanlar: EXIF meta verisinin fotoğrafa geri yazılması, anahtar karelerle animasyon, dışa aktarma kuyruğu, Renk ve Ses çalışma alanları (0.3 / 0.4).
 
@@ -176,5 +180,7 @@ docs/            Özellik listesi, mimari, ekran görüntüleri
 Çeviriyi güncellemek için: `cmake --build build --target update_translations`, sonra `src/i18n/lumora_tr.ts` dosyasını Qt Linguist ile düzenleyin.
 
 ## Lisans notu
+
+Arayüzde kullanılan Inter yazı tipi programın içine gömülüdür ve SIL Open Font License 1.1 ile dağıtılır (`src/app/resources/fonts/OFL.txt`).
 
 Henüz bir lisans dosyası eklenmedi; projenin lisansına siz karar vermelisiniz. Windows paketi BtbN'in GPL FFmpeg derlemesini kullanır (x264 vb. içerir), bu yüzden dağıtılan paket GPL koşullarına tabidir. LGPL istenirse `lgpl-shared` derlemesi kullanılabilir; o durumda H.264 kodlama için başka bir kodlayıcı gerekir.

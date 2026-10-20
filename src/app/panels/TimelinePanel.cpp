@@ -17,11 +17,11 @@ namespace lumora {
 
 TimelinePanel::TimelinePanel(TimelineView* view, QWidget* parent) : QWidget(parent), m_view(view) {
     auto* layout = new QVBoxLayout(this);
-    layout->setContentsMargins(0, 0, 0, 0);
-    layout->setSpacing(0);
+    layout->setContentsMargins(6, 4, 6, 6);
+    layout->setSpacing(2);
 
     auto* top = new QHBoxLayout;
-    top->setContentsMargins(4, 2, 8, 2);
+    top->setContentsMargins(2, 0, 4, 2);
     m_toolbar = new QToolBar;
     m_toolbar->setIconSize(QSize(18, 18));
     m_toolbar->setToolButtonStyle(Qt::ToolButtonIconOnly);

@@ -6,8 +6,9 @@ namespace lumora::Icons {
 
 // Small vector icons drawn with QPainter in the current palette's text
 // colour, so they follow the dark / light theme without image assets.
-QIcon play();
-QIcon pause();
+// An explicit colour is used for icons drawn on an accent background.
+QIcon play(const QColor& color = {});
+QIcon pause(const QColor& color = {});
 QIcon stepBack();
 QIcon stepForward();
 QIcon toStart();
@@ -21,7 +22,7 @@ QIcon join();
 QIcon undo();
 QIcon redo();
 QIcon import();
-QIcon exportFile();
+QIcon exportFile(const QColor& color = {});
 QIcon crop();
 QIcon magnet();
 QIcon zoomIn();
@@ -31,6 +32,8 @@ QIcon compare();
 QIcon keyframe();
 QIcon title();
 QIcon transition();
+QIcon close();
+QIcon popOut();
 QIcon appIcon();
 
 } // namespace lumora::Icons

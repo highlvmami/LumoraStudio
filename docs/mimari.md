@@ -40,6 +40,8 @@ Bu belge 0.1 ve 0.2'nin nasıl kurulduğunu ve [özellik listesindeki](ozellikle
 
 **Geri al her şeyi kapsar.** Zaman çizelgesi değişiklikleri anlık görüntü (snapshot) komutlarıyla, fotoğraf ayarları birleşebilen komutlarla (`mergeWith`) kaydedilir. Video ve fotoğrafın ayrı geçmişi vardır (`QUndoGroup`).
 
+**Görünüm tek yerden gelir.** `src/app/Theme.*` "Gece" ve "Gündüz" temalarının adlandırılmış renklerini (`themeColors()`), paleti, uygulama genelindeki stil sayfasını ve gömülü Inter yazı tipini tanımlar. Kendini çizen bileşenler (zaman çizelgesi, önizleme, küçük resimler, ileride scope'lar) renklerini buradan alır; panel kartları `makePanelSurface`, ana eylem düğmeleri `markPrimary` ile işaretlenir.
+
 **Proje dosyası okunabilir ve sürümlüdür.** `.lumora` JSON'dur; `version` alanı sayesinde eski projeler ileride dönüştürülerek açılır.
 
 ## Gelecek özellikler nereye oturur

@@ -6,6 +6,8 @@
 #include <QPainter>
 #include <QPainterPath>
 
+#include "Theme.h"
+
 namespace lumora {
 
 PhotoView::PhotoView(QWidget* parent) : QWidget(parent) {
@@ -77,9 +79,13 @@ QRectF PhotoView::cropWidgetRect() const {
 
 void PhotoView::paintEvent(QPaintEvent*) {
     QPainter p(this);
-    p.fillRect(rect(), QColor(24, 24, 27));
+    QPainterPath frame;
+    frame.addRoundedRect(QRectF(rect()), 9, 9);
+    p.setRenderHint(QPainter::Antialiasing);
+    p.setClipPath(frame);
+    p.fillRect(rect(), themeColors().viewer);
     if (m_image.isNull()) {
-        p.setPen(QColor(140, 140, 150));
+        p.setPen(themeColors().textFaint);
         p.drawText(rect().adjusted(24, 24, -24, -24), Qt::AlignCenter | Qt::TextWordWrap, m_placeholder);
         return;
     }
