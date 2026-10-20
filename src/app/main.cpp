@@ -41,8 +41,12 @@ int main(int argc, char* argv[]) {
     if (lang != QLatin1String("en")) {
         if (appTranslator.load(QStringLiteral(":/i18n/lumora_%1.qm").arg(lang)))
             QApplication::installTranslator(&appTranslator);
+        // Qt's own strings (dialog buttons and the like). windeployqt ships
+        // them next to the exe as a combined qt_<lang>.qm.
+        const QString appTranslations = QCoreApplication::applicationDirPath() + QStringLiteral("/translations");
         if (qtTranslator.load(QStringLiteral("qtbase_%1").arg(lang), QLibraryInfo::path(QLibraryInfo::TranslationsPath)) ||
-            qtTranslator.load(QStringLiteral("qtbase_%1").arg(lang), QCoreApplication::applicationDirPath() + QStringLiteral("/translations")))
+            qtTranslator.load(QStringLiteral("qt_%1").arg(lang), appTranslations) ||
+            qtTranslator.load(QStringLiteral("qtbase_%1").arg(lang), appTranslations))
             QApplication::installTranslator(&qtTranslator);
         QLocale::setDefault(QLocale(lang));
     }
