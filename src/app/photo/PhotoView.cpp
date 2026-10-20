@@ -5,6 +5,8 @@
 #include <QMouseEvent>
 #include <QPainter>
 #include <QPainterPath>
+#include <cmath>
+#include <functional>
 
 #include "Theme.h"
 
@@ -52,6 +54,73 @@ void PhotoView::setPlaceholder(const QString& text) {
 void PhotoView::setBadge(const QString& text) {
     m_badge = text;
     update();
+}
+
+void PhotoView::setMaskOverlay(const std::optional<LayerMask>& mask) {
+    if (mask == m_mask)
+        return;
+    m_mask = mask;
+    if (!m_maskDrag)
+        unsetCursor();
+    update();
+}
+
+QRectF PhotoView::maskWidgetRect() const {
+    const QRectF ir = imageRect();
+    const QRectF& m = m_mask->rect;
+    return QRectF(ir.x() + m.x() * ir.width(), ir.y() + m.y() * ir.height(), m.width() * ir.width(),
+                  m.height() * ir.height());
+}
+
+void PhotoView::paintMask(QPainter& p, const QRectF& ir) const {
+    if (!m_mask || m_mask->shape == MaskShape::None || m_cropMode)
+        return;
+    p.save();
+    p.setClipRect(cropWidgetRect());
+    const QRectF r = maskWidgetRect();
+    const QColor accent = themeColors().accent;
+    QPen outline(accent, 1.5, Qt::DashLine);
+    QPen shadow(QColor(0, 0, 0, 140), 3);
+    auto stroke = [&](const std::function<void()>& draw) {
+        p.setPen(shadow);
+        draw();
+        p.setPen(outline);
+        draw();
+    };
+    p.setBrush(Qt::NoBrush);
+    switch (m_mask->shape) {
+    case MaskShape::Rectangle: stroke([&] { p.drawRect(r); }); break;
+    case MaskShape::Ellipse: stroke([&] { p.drawEllipse(r); }); break;
+    case MaskShape::Linear: {
+        // The line through the centre at the mask angle, plus the edges of
+        // the soft band.
+        const double a = m_mask->angle * M_PI / 180.0;
+        const QPointF dir(std::cos(a), std::sin(a));
+        const QPointF normal(-dir.y(), dir.x());
+        const double reach = std::hypot(ir.width(), ir.height());
+        const double band = m_mask->feather * reach / 2;
+        const QPointF c = r.center();
+        stroke([&] { p.drawLine(c - dir * reach, c + dir * reach); });
+        outline.setWidthF(1.0);
+        shadow.setWidthF(2.0);
+        stroke([&] {
+            p.drawLine(c - normal * band - dir * reach, c - normal * band + dir * reach);
+            p.drawLine(c + normal * band - dir * reach, c + normal * band + dir * reach);
+        });
+        break;
+    }
+    case MaskShape::None: break;
+    }
+    // Centre handle.
+    p.setPen(QPen(QColor(0, 0, 0, 160), 3));
+    p.drawEllipse(r.center(), 5, 5);
+    p.setPen(QPen(accent, 2));
+    p.drawEllipse(r.center(), 5, 5);
+    if (m_mask->invert) {
+        p.setPen(accent);
+        p.drawText(r.center() + QPointF(9, -6), tr("inverted"));
+    }
+    p.restore();
 }
 
 QRectF PhotoView::imageRect() const {
@@ -120,6 +189,7 @@ void PhotoView::paintEvent(QPaintEvent*) {
         p.setClipRect(cropWidgetRect());
         p.drawImage(ir, m_image);
         p.restore();
+        paintMask(p, ir);
     }
     if (!m_badge.isEmpty()) {
         QFont f = font();
@@ -179,6 +249,14 @@ void PhotoView::applyAspect(QRectF& r, Handle h) const {
 }
 
 void PhotoView::mousePressEvent(QMouseEvent* e) {
+    if (!m_cropMode && m_mask && m_mask->shape != MaskShape::None && !m_image.isNull() &&
+        e->button() == Qt::LeftButton) {
+        m_maskDrag = true;
+        m_pressPos = e->position();
+        m_pressMask = m_mask->rect;
+        setCursor(Qt::ClosedHandCursor);
+        return;
+    }
     if (!m_cropMode || m_image.isNull())
         return;
     m_drag = handleAt(e->position());
@@ -187,6 +265,20 @@ void PhotoView::mousePressEvent(QMouseEvent* e) {
 }
 
 void PhotoView::mouseMoveEvent(QMouseEvent* e) {
+    if (m_maskDrag && m_mask) {
+        const QRectF ir = imageRect();
+        const QPointF d((e->position().x() - m_pressPos.x()) / ir.width(), (e->position().y() - m_pressPos.y()) / ir.height());
+        QRectF r = m_pressMask.translated(d);
+        // Keep the centre on the picture.
+        r.moveCenter(QPointF(std::clamp(r.center().x(), 0.0, 1.0), std::clamp(r.center().y(), 0.0, 1.0)));
+        m_mask->rect = r;
+        update();
+        return;
+    }
+    if (!m_cropMode && m_mask && m_mask->shape != MaskShape::None) {
+        setCursor(Qt::OpenHandCursor);
+        return;
+    }
     if (!m_cropMode || m_image.isNull()) {
         unsetCursor();
         return;
@@ -228,6 +320,13 @@ void PhotoView::mouseMoveEvent(QMouseEvent* e) {
 }
 
 void PhotoView::mouseReleaseEvent(QMouseEvent*) {
+    if (m_maskDrag) {
+        m_maskDrag = false;
+        setCursor(Qt::OpenHandCursor);
+        if (m_mask && m_mask->rect != m_pressMask)
+            emit maskMoved(m_mask->rect);
+        return;
+    }
     if (m_drag != None && m_crop != m_pressCrop)
         emit cropEdited(m_crop);
     m_drag = None;

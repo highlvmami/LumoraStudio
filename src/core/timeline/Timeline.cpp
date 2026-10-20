@@ -78,7 +78,7 @@ bool TimelineState::hasEffects() const {
         if (ti >= 2 && !t.clips.empty())
             return true;
         for (const auto& c : t.clips) {
-            if (c.kind != ClipKind::Media || !c.transform.isIdentity() || !c.transitionIn.isNone() || c.fadeIn > 0 ||
+            if (c.kind != ClipKind::Media || !c.transform.isIdentity() || !c.color.isIdentity() || !c.transitionIn.isNone() || c.fadeIn > 0 ||
                 c.fadeOut > 0 || c.gainDb != 0.0)
                 return true;
         }
@@ -625,6 +625,15 @@ bool Timeline::setTransform(const QUuid& clipId, const ClipTransform& tr) {
     if (!c || c->transform == tr)
         return false;
     c->transform = tr;
+    emit changed();
+    return true;
+}
+
+bool Timeline::setColor(const QUuid& clipId, const ColorGrade& grade) {
+    Clip* c = mutableClip(clipId);
+    if (!c || c->kind != ClipKind::Media || c->color == grade)
+        return false;
+    c->color = grade;
     emit changed();
     return true;
 }

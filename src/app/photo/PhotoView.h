@@ -2,6 +2,9 @@
 
 #include <QImage>
 #include <QWidget>
+#include <optional>
+
+#include "image/PhotoAdjustments.h"
 
 namespace lumora {
 
@@ -21,9 +24,12 @@ public:
     void setAspect(double aspect);
     void setPlaceholder(const QString& text);
     void setBadge(const QString& text);
+    // Outline of the selected layer's mask; dragging inside it moves it.
+    void setMaskOverlay(const std::optional<LayerMask>& mask);
 
 signals:
     void cropEdited(const QRectF& normalized); // emitted on mouse release
+    void maskMoved(const QRectF& normalized);  // emitted on mouse release
     void filesDropped(const QStringList& paths);
 
 protected:
@@ -40,6 +46,8 @@ private:
     QRectF cropWidgetRect() const;
     Handle handleAt(QPointF p) const;
     void applyAspect(QRectF& r, Handle h) const;
+    void paintMask(QPainter& p, const QRectF& imageRect) const;
+    QRectF maskWidgetRect() const;
 
     QImage m_image;
     QRectF m_crop{0, 0, 1, 1};
@@ -50,6 +58,9 @@ private:
     Handle m_drag = None;
     QPointF m_pressPos;
     QRectF m_pressCrop;
+    std::optional<LayerMask> m_mask;
+    bool m_maskDrag = false;
+    QRectF m_pressMask;
 };
 
 } // namespace lumora

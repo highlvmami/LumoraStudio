@@ -157,6 +157,28 @@ private slots:
         QVERIFY(r.passthroughFrame(sec(1.5)));
     }
 
+    void clipColourIsRenderedInPreviewAndExport() {
+        Timeline tl;
+        tl.insertMedia(m_dark->id, 0, sec(2), true, false);
+        const QUuid id = tl.tracks()[0].clips[0].id;
+        const QRect all(0, 0, 320, 240);
+        const double before = meanLuma(renderAt(tl, sec(1)), all);
+        QVERIFY(!tl.state().hasEffects());
+        ColorGrade g;
+        g.exposure = 1.0;
+        QVERIFY(tl.setColor(id, g));
+        QVERIFY(!tl.setColor(id, g)); // unchanged
+        QVERIFY(tl.state().hasEffects());
+        const double final = meanLuma(renderAt(tl, sec(1)), all);
+        const double preview = meanLuma(renderAt(tl, sec(1), FrameRenderer::Precision::Preview), all);
+        QVERIFY2(final > before + 12, qPrintable(QStringLiteral("%1 -> %2").arg(before).arg(final)));
+        QVERIFY(std::abs(final - preview) < 2);
+        FrameRenderer r(&m_pool);
+        r.setTimeline(tl.state());
+        r.setOutputSize(QSize(320, 240));
+        QVERIFY(!r.passthroughFrame(sec(1)));
+    }
+
     void mixerGainFadesAndMute() {
         Timeline tl;
         tl.insertMedia(m_pattern->id, 0, sec(4), true, true);

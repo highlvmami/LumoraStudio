@@ -13,18 +13,19 @@ class QToolButton;
 class QUndoStack;
 class QLabel;
 class QTimer;
-class QSlider;
-class QDoubleSpinBox;
+class QTabWidget;
 
 namespace lumora {
 
 class PhotoLibrary;
 class PhotoView;
-class SliderRow;
+class ColorPanel;
+class LayersPanel;
+class ScopesWidget;
 
-// The "Photo" workspace: photo list, preview with crop tool and the basic
-// adjustments (exposure, contrast, white balance). Every change is an undo
-// step; the original file is never modified.
+// The "Photo" workspace: photo list, preview with crop tool and mask
+// outline, a scope, the photo's colour settings and its layers. Every change
+// is an undo step; the original file is never modified.
 class PhotoWorkspace : public QWidget {
     Q_OBJECT
 public:
@@ -47,7 +48,8 @@ private:
     void syncControls();
     void scheduleRender();
     void render();
-    void pushChange(const PhotoAdjustments& after, const QString& text, int control);
+    void pushChange(const PhotoAdjustments& after, const QString& text, int control, const QString& key = {});
+    void updateMaskOverlay();
     PhotoAdjustments current() const;
 
     PhotoLibrary* m_lib;
@@ -60,10 +62,10 @@ private:
 
     QListWidget* m_list;
     PhotoView* m_view;
-    SliderRow* m_exposure;
-    SliderRow* m_contrast;
-    SliderRow* m_temperature;
-    SliderRow* m_tint;
+    ScopesWidget* m_scope;
+    QTabWidget* m_tabs;
+    ColorPanel* m_color;
+    LayersPanel* m_layers;
     QToolButton* m_cropBtn;
     QComboBox* m_aspect;
     QPushButton* m_exportBtn;
@@ -71,27 +73,6 @@ private:
     QLabel* m_info;
     QTimer* m_renderTimer;
     bool m_syncing = false;
-};
-
-// Label + slider + spin box with double-click reset.
-class SliderRow : public QWidget {
-    Q_OBJECT
-public:
-    SliderRow(const QString& label, double min, double max, double step, int decimals, QWidget* parent = nullptr);
-    double value() const { return m_value; }
-    void setValue(double v);
-
-signals:
-    void valueChanged(double v);
-
-protected:
-    bool eventFilter(QObject* o, QEvent* e) override;
-
-private:
-    QSlider* m_slider;
-    QDoubleSpinBox* m_spin;
-    double m_step;
-    double m_value = 0;
 };
 
 } // namespace lumora

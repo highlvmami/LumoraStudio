@@ -4,15 +4,17 @@
 #include <QImage>
 #include <QString>
 
+#include "color/ColorProcessor.h"
 #include "image/PhotoAdjustments.h"
 
 namespace lumora {
 
 // CPU implementation of the photo pipeline. Pixels are stored as 16 bits per
-// channel; every operation is computed in 32-bit float in linear light:
+// channel; every operation is computed in 32-bit float:
 //
-//   decode transfer -> white balance -> exposure -> contrast (luminance, log
-//   space around middle grey) -> encode transfer
+//   global colour settings (ColorProcessor, the same code the video clips
+//   use) -> layers bottom to top (adjustment or picture, blend mode,
+//   opacity, mask) -> crop
 //
 // The interface is deliberately small (image in, settings in, image out) so a
 // GPU implementation can replace it later without touching the UI.
@@ -25,8 +27,8 @@ public:
     // working copy is RGBA64.
     static QImage load(const QString& path, QImage* original = nullptr, QString* error = nullptr);
 
-    // Applies tone adjustments (and the crop when `applyCrop`) to an RGBA64
-    // image. Returns an RGBA64 image.
+    // Applies colour settings and layers (and the crop when `applyCrop`) to
+    // an RGBA64 image. Returns an RGBA64 image.
     static QImage apply(const QImage& rgba64, const PhotoAdjustments& adj, bool applyCrop = true);
 
     // Downscaled copy for interactive preview (never used for export).

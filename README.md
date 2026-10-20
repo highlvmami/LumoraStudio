@@ -8,6 +8,10 @@
 
 ![Kurgu çalışma alanı](docs/screenshots/kurgu.png)
 
+| Renk | Fotoğraf katmanları |
+|---|---|
+| ![Renk çalışma alanı](docs/screenshots/renk.png) | ![Fotoğraf katmanları ve maske](docs/screenshots/katmanlar.png) |
+
 | Dışa aktarma | Fotoğraf |
 |---|---|
 | ![Dışa aktarma penceresi](docs/screenshots/disa-aktar.png) | ![Fotoğraf çalışma alanı](docs/screenshots/fotograf.png) |
@@ -17,6 +21,22 @@ Açık tema ("Gündüz", Görünüm → Tema):
 ![Gündüz teması](docs/screenshots/kurgu-gunduz.png)
 
 Tam yol haritası: [docs/ozellikler.md](docs/ozellikler.md). Mimari: [docs/mimari.md](docs/mimari.md).
+
+## Sürüm 0.3'te neler var
+
+**Renk çalışma alanı (video)**
+- Üstteki **Renk** sekmesi: solda kapsamlar, ortada önizleme, sağda seçili klibin renk ayarları, altta zaman çizelgesi. Her çalışma alanı kendi panel düzenini hatırlar.
+- Işık: pozlama, kontrast, vurgular, gölgeler, beyazlar, siyahlar. Beyaz dengesi: sıcaklık ve ton. Renk: doygunluk ve canlılık (zaten güçlü renklere ve ten rengine pek dokunmaz).
+- Renk tekerlekleri: lift (gölgeler), gamma (orta tonlar), gain (parlak alanlar); her birinin altında parlaklık kaydırıcısı. Çift tıklama sıfırlar, Shift ince ayar yapar.
+- LUT: .cube dosyaları (3B ve 1B), miktar kaydırıcısıyla. Son kullanılan LUT'lar listede durur. **Görünümü LUT olarak kaydet** o anki ayarları 33³'lük bir .cube dosyasına yazar; aynı görünüm başka kliplerde, fotoğraflarda ya da başka programlarda kullanılabilir.
+- Kapsamlar: dalga formu, RGB parade, vektörskop (%75 renk hedefleri ve ten çizgisiyle), histogram. Oynatırken canlı güncellenir.
+- Hesap her adımda 32 bit kayan noktada; pozlama, beyaz dengesi ve kontrast doğrusal ışıkta. Önizleme ve dışa aktarma aynı hesabı yapar, dışa aktarma 16 bit kanal başına. Renk ayarı olan klipler kayıpsız kesimle dışa aktarılamaz; bu, nedeniyle birlikte söylenir. Okunamayan bir LUT varsa dışa aktarma başlamadan durur, görünüm sessizce değişmez.
+
+**Fotoğrafta renk, katmanlar ve maskeler**
+- Fotoğraf çalışma alanında videodakiyle aynı renk paneli (**Ayarla** sekmesi) ve canlı histogram/kapsam.
+- **Katmanlar** sekmesi: ayar katmanları (kendi renk ayarları olan, maskenin içinde etki eden katman) ve resim katmanları (üste başka bir resim; konum ve boyut). Her katmanda karışım modu (normal, çarp, ekran, kaplama, yumuşak ışık, koyulaştır, aydınlat, ekle, fark), opaklık, gizle/göster, sıralama.
+- Maskeler: dikdörtgen, elips, degrade; yumuşaklık ve ters çevirme. Maskenin çerçevesi fotoğrafın üzerinde görünür, sürükleyerek taşınır.
+- Orijinal dosya yine hiç değişmez. Katmanlar projede saklanır; 0.1/0.2 projeleri olduğu gibi açılır.
 
 ## Sürüm 0.2'de neler var
 
@@ -156,7 +176,7 @@ cmake --build build
 QT_QPA_PLATFORM=offscreen ctest --test-dir build --output-on-failure
 ```
 
-Testler kendi deneme videolarını üretir (her kare kendi numarasını taşır) ve şunları doğrular: kayıpsız kesimde paketlerin bit bit aynı olması, "kaynakla aynı"da kare hassasiyeti, FFV1'de piksel piksel eşitlik, B-kareli H.264 kesimlerinde hiç çözme hatası olmaması, zaman çizelgesi işlemleri, fotoğraf işleme ve proje dosyasının gidiş-dönüşü. 0.2 ile eklenenler: başlık, geçiş ve karıştırılmış sesli zaman çizelgesinin işlenmesi, özel ayarlarda her karenin korunması, ölçekleme ve kare hızı değişimi, bit hızı modlarının hedefi tutturması, ProRes/DNxHR çıktısı, her hazır ayarın planlanabilmesi ve diğer kodlayıcıların tek ve iki geçişte çalışması.
+Testler kendi deneme videolarını üretir (her kare kendi numarasını taşır) ve şunları doğrular: kayıpsız kesimde paketlerin bit bit aynı olması, "kaynakla aynı"da kare hassasiyeti, FFV1'de piksel piksel eşitlik, B-kareli H.264 kesimlerinde hiç çözme hatası olmaması, zaman çizelgesi işlemleri, fotoğraf işleme ve proje dosyasının gidiş-dönüşü. 0.2 ile eklenenler: başlık, geçiş ve karıştırılmış sesli zaman çizelgesinin işlenmesi, özel ayarlarda her karenin korunması, ölçekleme ve kare hızı değişimi, bit hızı modlarının hedefi tutturması, ProRes/DNxHR çıktısı, her hazır ayarın planlanabilmesi ve diğer kodlayıcıların tek ve iki geçişte çalışması. 0.3 ile eklenenler: renk ayarlarının her birinin doğru aralığa etki etmesi, .cube okuma (3B/1B, hatalı dosyalar) ve yazma, kaydedilen LUT'un aynı görünümü vermesi, kapsamlar, maskeli ayar katmanları ve resim katmanlarında karışım modları, klip renginin önizlemede ve dışa aktarmada aynı işlenmesi.
 
 ## Proje yapısı
 
@@ -167,9 +187,10 @@ src/core/        Arayüzden bağımsız çekirdek (lumora_core kütüphanesi)
   media/           Medya bilgisi, anahtar kare taraması, video/ses çözücüler, medya havuzu
   timeline/        Zaman çizelgesi modeli (izler, klipler, bağlantılar, başlık/geçiş/dönüşüm ayarları)
   render/          Kare birleştirici (FrameRenderer), başlık çizici, ses karıştırıcı
+  color/           Renk ayarları (ColorGrade), renk hattı (ColorProcessor), .cube LUT okuma/yazma, kapsamlar
   undo/            Geri al / yinele komutları
   export/          Dışa aktarma planlayıcı (ne kopyalanır, ne kodlanır), kodlayıcı tablosu ve hazır ayarlar, kopyalayan ve işleyen dışa aktarıcılar
-  image/           Fotoğraf ayarları, işleme hattı, fotoğraf kütüphanesi
+  image/           Fotoğraf ayarları ve katmanları, işleme hattı, fotoğraf kütüphanesi
   project/         .lumora proje dosyası
 src/app/         Qt Widgets arayüzü: ana pencere, paneller, oynatma motoru, pencereler
 src/i18n/        Çeviriler (lumora_tr.ts)

@@ -9,6 +9,7 @@
 #include <vector>
 
 #include "TimeBase.h"
+#include "color/ColorGrade.h"
 #include "timeline/ClipEffects.h"
 
 namespace lumora {
@@ -39,6 +40,7 @@ struct Clip {
     Ticks anchorSource = 0;
 
     ClipTransform transform;     // video and title clips
+    ColorGrade color;            // video clips
     Transition transitionIn;     // primary storyline: transition from the previous clip
     Ticks fadeIn = 0;            // opacity (video) / volume (audio) ramps
     Ticks fadeOut = 0;
@@ -162,6 +164,7 @@ public:
 
     // Per-clip settings.
     bool setTransform(const QUuid& clipId, const ClipTransform& t);
+    bool setColor(const QUuid& clipId, const ColorGrade& grade);
     bool setTransition(const QUuid& clipId, const Transition& t);
     bool setFades(const QUuid& clipId, Ticks fadeIn, Ticks fadeOut);
     bool setGain(const QUuid& clipId, double gainDb);

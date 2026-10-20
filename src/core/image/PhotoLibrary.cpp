@@ -53,8 +53,9 @@ void PhotoLibrary::setAdjustments(const QUuid& id, const PhotoAdjustments& adj) 
 }
 
 PhotoAdjustCommand::PhotoAdjustCommand(PhotoLibrary* lib, QUuid photo, PhotoAdjustments before,
-                                       PhotoAdjustments after, const QString& text, Control control)
-    : QUndoCommand(text), m_lib(lib), m_photo(photo), m_before(before), m_after(after), m_control(control),
+                                       PhotoAdjustments after, const QString& text, Control control,
+                                       const QString& key)
+    : QUndoCommand(text), m_lib(lib), m_photo(photo), m_before(before), m_after(after), m_control(control), m_key(key),
       m_time(QDateTime::currentDateTimeUtc()) {}
 
 void PhotoAdjustCommand::undo() { m_lib->setAdjustments(m_photo, m_before); }
@@ -62,7 +63,8 @@ void PhotoAdjustCommand::redo() { m_lib->setAdjustments(m_photo, m_after); }
 
 bool PhotoAdjustCommand::mergeWith(const QUndoCommand* other) {
     const auto* o = static_cast<const PhotoAdjustCommand*>(other);
-    if (o->m_photo != m_photo || o->m_control != m_control || m_control == Reset || m_control == Other)
+    if (o->m_photo != m_photo || o->m_control != m_control || o->m_key != m_key || m_control == Reset ||
+        m_control == Other)
         return false;
     if (m_time.msecsTo(o->m_time) > 1500)
         return false;

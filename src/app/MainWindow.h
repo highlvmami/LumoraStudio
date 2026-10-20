@@ -1,5 +1,6 @@
 #pragma once
 
+#include <QHash>
 #include <QMainWindow>
 #include <QUuid>
 
@@ -24,6 +25,8 @@ class TimelineView;
 class TimelinePanel;
 class PropertiesPanel;
 class PhotoWorkspace;
+class ClipColorPanel;
+class ScopesWidget;
 
 class MainWindow : public QMainWindow {
     Q_OBJECT
@@ -49,6 +52,8 @@ private:
     void createMenus();
     void createDocks();
     void restoreSettings();
+    void applyDefaultLayout(Workspace w);
+    void selectClipAtPlayhead();
     void updateTitle();
     void markDirty();
     bool maybeSave();
@@ -95,11 +100,15 @@ private:
     TimelinePanel* m_timelinePanel;
     PropertiesPanel* m_properties;
     PhotoWorkspace* m_photo;
+    ClipColorPanel* m_clipColor;
+    ScopesWidget* m_scopes;
     QDockWidget* m_binDock;
     QDockWidget* m_propsDock;
     QDockWidget* m_timelineDock;
+    QDockWidget* m_colorDock;
+    QDockWidget* m_scopesDock;
     QLabel* m_statusRight;
-    QByteArray m_editDockState;
+    QHash<int, QByteArray> m_dockStates; // per workspace
 
     bool m_dirty = false;
     Workspace m_workspace = Workspace::Edit;

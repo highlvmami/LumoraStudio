@@ -76,10 +76,6 @@
         <translation>Yalnızca ses içeren klipler yeniden kodlanmadan birleştirilemez, bu yüzden kayıpsız kesime alınmaz. Onları da eklemek için başka bir mod seçin.</translation>
     </message>
     <message>
-        <source>The timeline has titles, transitions, effects, audio changes or more than one track. These have to be drawn into the picture, which a lossless cut cannot do. Choose &quot;Match source&quot;, &quot;Lossless intermediate&quot; or &quot;Custom&quot;.</source>
-        <translation>Zaman çizelgesinde başlık, geçiş, efekt, ses değişikliği ya da birden fazla iz var. Bunların görüntüye işlenmesi gerekir ve kayıpsız kesim bunu yapamaz. &quot;Kaynakla aynı&quot;, &quot;Kayıpsız ara format&quot; ya da &quot;Özel&quot; seçeneğini seçin.</translation>
-    </message>
-    <message>
         <source>The picture is scaled from %1×%2 to %3×%4%5.</source>
         <translation>Görüntü %1×%2 boyutundan %3×%4 boyutuna ölçeklenir%5.</translation>
     </message>
@@ -118,6 +114,61 @@
     <message>
         <source>The timeline is rendered with its titles, transitions and effects and encoded with the source&apos;s settings. Frames without effects are converted directly from the source.</source>
         <translation>Zaman çizelgesi başlıkları, geçişleri ve efektleriyle işlenir ve kaynağın ayarlarıyla kodlanır. Efekt içermeyen kareler doğrudan kaynaktan dönüştürülür.</translation>
+    </message>
+    <message>
+        <source>The timeline has titles, transitions, colour grading, effects, audio changes or more than one track. These have to be drawn into the picture, which a lossless cut cannot do. Choose &quot;Match source&quot;, &quot;Lossless intermediate&quot; or &quot;Custom&quot;.</source>
+        <translation>Zaman çizelgesinde başlık, geçiş, renk düzenlemesi, efekt, ses değişikliği ya da birden fazla iz var. Bunların görüntüye işlenmesi gerekir; kayıpsız kesim bunu yapamaz. &quot;Kaynakla aynı&quot;, &quot;Kayıpsız ara format&quot; ya da &quot;Özel&quot; seçin.</translation>
+    </message>
+    <message>
+        <source>The LUT %1 cannot be read: %2</source>
+        <translation>%1 LUT dosyası okunamıyor: %2</translation>
+    </message>
+</context>
+<context>
+    <name>Lut</name>
+    <message>
+        <source>Line %1: table data before LUT_3D_SIZE or LUT_1D_SIZE</source>
+        <translation>Satır %1: tablo verisi LUT_3D_SIZE ya da LUT_1D_SIZE satırından önce geliyor</translation>
+    </message>
+    <message>
+        <source>Line %1: expected three numbers</source>
+        <translation>Satır %1: üç sayı bekleniyordu</translation>
+    </message>
+    <message>
+        <source>Line %1: invalid number</source>
+        <translation>Satır %1: geçersiz sayı</translation>
+    </message>
+    <message>
+        <source>Line %1: more table entries than the declared size</source>
+        <translation>Satır %1: tabloda belirtilen boyuttan fazla değer var</translation>
+    </message>
+    <message>
+        <source>The file declares more than one table</source>
+        <translation>Dosyada birden fazla tablo tanımlanmış</translation>
+    </message>
+    <message>
+        <source>Line %1: unsupported table size</source>
+        <translation>Satır %1: desteklenmeyen tablo boyutu</translation>
+    </message>
+    <message>
+        <source>Line %1: expected two numbers</source>
+        <translation>Satır %1: iki sayı bekleniyordu</translation>
+    </message>
+    <message>
+        <source>No LUT_3D_SIZE or LUT_1D_SIZE found</source>
+        <translation>LUT_3D_SIZE ya da LUT_1D_SIZE bulunamadı</translation>
+    </message>
+    <message>
+        <source>The table has %1 entries, %2 expected</source>
+        <translation>Tabloda %1 değer var, %2 bekleniyordu</translation>
+    </message>
+    <message>
+        <source>The file is too large</source>
+        <translation>Dosya çok büyük</translation>
+    </message>
+    <message>
+        <source>Only 3D tables can be saved</source>
+        <translation>Yalnızca 3B tablolar kaydedilebilir</translation>
     </message>
 </context>
 <context>
@@ -201,6 +252,210 @@
     <message>
         <source>No key frame found in %1.</source>
         <translation>%1 içinde anahtar kare bulunamadı.</translation>
+    </message>
+</context>
+<context>
+    <name>lumora::ClipColorPanel</name>
+    <message>
+        <source>Titles have no colour settings; select a video clip.</source>
+        <translation>Başlıkların renk ayarı yok; bir video klibi seçin.</translation>
+    </message>
+    <message>
+        <source>Select a video clip in the timeline to grade it.</source>
+        <translation>Rengini düzenlemek için zaman çizelgesinde bir video klibi seçin.</translation>
+    </message>
+</context>
+<context>
+    <name>lumora::ColorDisc</name>
+    <message>
+        <source>Drag towards a colour; double-click to reset. Hold Shift for fine control.</source>
+        <translation>Bir renge doğru sürükleyin; sıfırlamak için çift tıklayın. İnce ayar için Shift&apos;e basılı tutun.</translation>
+    </message>
+</context>
+<context>
+    <name>lumora::ColorPanel</name>
+    <message>
+        <source>Reset colour</source>
+        <translation>Rengi sıfırla</translation>
+    </message>
+    <message>
+        <source>Reset colour: set every colour setting back to neutral</source>
+        <translation>Rengi sıfırla: bütün renk ayarlarını nötre döndür</translation>
+    </message>
+    <message>
+        <source>Light</source>
+        <translation>Işık</translation>
+    </message>
+    <message>
+        <source>Exposure (EV)</source>
+        <translation>Pozlama (EV)</translation>
+    </message>
+    <message>
+        <source>Contrast</source>
+        <translation>Kontrast</translation>
+    </message>
+    <message>
+        <source>Highlights</source>
+        <translation>Vurgular</translation>
+    </message>
+    <message>
+        <source>Shadows</source>
+        <translation>Gölgeler</translation>
+    </message>
+    <message>
+        <source>Whites</source>
+        <translation>Beyazlar</translation>
+    </message>
+    <message>
+        <source>Blacks</source>
+        <translation>Siyahlar</translation>
+    </message>
+    <message>
+        <source>White balance</source>
+        <translation>Beyaz dengesi</translation>
+    </message>
+    <message>
+        <source>Temperature</source>
+        <translation>Sıcaklık</translation>
+    </message>
+    <message>
+        <source>Tint</source>
+        <translation>Ton</translation>
+    </message>
+    <message>
+        <source>Colour</source>
+        <translation>Renk</translation>
+    </message>
+    <message>
+        <source>Saturation</source>
+        <translation>Doygunluk</translation>
+    </message>
+    <message>
+        <source>Vibrance</source>
+        <translation>Canlılık</translation>
+    </message>
+    <message>
+        <source>Like saturation, but leaves colours that are already strong (and skin tones) mostly alone</source>
+        <translation>Doygunluk gibi, ama zaten güçlü olan renklere (ve ten renklerine) pek dokunmaz</translation>
+    </message>
+    <message>
+        <source>Colour wheels</source>
+        <translation>Renk tekerlekleri</translation>
+    </message>
+    <message>
+        <source>Lift moves the shadows, gamma the mid tones, gain the highlights. Drag a wheel towards a colour; the slider below makes the range brighter or darker.</source>
+        <translation>Lift gölgeleri, gamma orta tonları, gain parlak alanları değiştirir. Tekerleği bir renge doğru sürükleyin; alttaki kaydırıcı o aralığı aydınlatır ya da koyulaştırır.</translation>
+    </message>
+    <message>
+        <source>Lift</source>
+        <translation>Lift</translation>
+    </message>
+    <message>
+        <source>Gamma</source>
+        <translation>Gamma</translation>
+    </message>
+    <message>
+        <source>Gain</source>
+        <translation>Gain</translation>
+    </message>
+    <message>
+        <source>LUT</source>
+        <translation>LUT</translation>
+    </message>
+    <message>
+        <source>A .cube look-up table (3D or 1D), applied after the settings above</source>
+        <translation>Yukarıdaki ayarlardan sonra uygulanan bir .cube renk tablosu (3B ya da 1B)</translation>
+    </message>
+    <message>
+        <source>Amount (%)</source>
+        <translation>Miktar (%)</translation>
+    </message>
+    <message>
+        <source>Save look as LUT…</source>
+        <translation>Görünümü LUT olarak kaydet…</translation>
+    </message>
+    <message>
+        <source>Write these colour settings as a .cube file, to use the same look on other clips, photos or in other programs</source>
+        <translation>Bu renk ayarlarını .cube dosyası olarak yazar; aynı görünümü başka kliplerde, fotoğraflarda ya da başka programlarda kullanabilirsiniz</translation>
+    </message>
+    <message>
+        <source>Exposure</source>
+        <translation>Pozlama</translation>
+    </message>
+    <message>
+        <source>LUT amount</source>
+        <translation>LUT miktarı</translation>
+    </message>
+    <message>
+        <source>Remove LUT</source>
+        <translation>LUT&apos;u kaldır</translation>
+    </message>
+    <message>
+        <source>Apply LUT</source>
+        <translation>LUT uygula</translation>
+    </message>
+    <message>
+        <source>No LUT</source>
+        <translation>LUT yok</translation>
+    </message>
+    <message>
+        <source>Browse…</source>
+        <translation>Gözat…</translation>
+    </message>
+    <message>
+        <source>Cannot read this LUT: %1</source>
+        <translation>Bu LUT okunamıyor: %1</translation>
+    </message>
+    <message>
+        <source>%1 · 3D, %2 points per axis</source>
+        <translation>%1 · 3B, eksen başına %2 nokta</translation>
+    </message>
+    <message>
+        <source>%1 · 1D, %2 points</source>
+        <translation>%1 · 1B, %2 nokta</translation>
+    </message>
+    <message>
+        <source>Choose a LUT</source>
+        <translation>LUT seçin</translation>
+    </message>
+    <message>
+        <source>Cube LUT (*.cube);;All files (*)</source>
+        <translation>Cube LUT (*.cube);;Tüm dosyalar (*)</translation>
+    </message>
+    <message>
+        <source>Cannot read %1:
+%2</source>
+        <translation>%1 okunamıyor:
+%2</translation>
+    </message>
+    <message>
+        <source>Save look as LUT</source>
+        <translation>Görünümü LUT olarak kaydet</translation>
+    </message>
+    <message>
+        <source>My look</source>
+        <translation>Benim görünümüm</translation>
+    </message>
+    <message>
+        <source>Cube LUT (*.cube)</source>
+        <translation>Cube LUT (*.cube)</translation>
+    </message>
+    <message>
+        <source>Cannot write %1:
+%2</source>
+        <translation>%1 yazılamıyor:
+%2</translation>
+    </message>
+</context>
+<context>
+    <name>lumora::ColorWheelWidget</name>
+    <message>
+        <source>Brightness of this range; double-click to reset</source>
+        <translation>Bu aralığın parlaklığı; sıfırlamak için çift tıklayın</translation>
+    </message>
+    <message>
+        <source>R %1 · G %2 · B %3 · brightness %4</source>
+        <translation>K %1 · Y %2 · M %3 · parlaklık %4</translation>
     </message>
 </context>
 <context>
@@ -520,6 +775,249 @@
     </message>
 </context>
 <context>
+    <name>lumora::LayersPanel</name>
+    <message>
+        <source>Normal</source>
+        <translation>Normal</translation>
+    </message>
+    <message>
+        <source>Multiply</source>
+        <translation>Çarp</translation>
+    </message>
+    <message>
+        <source>Screen</source>
+        <translation>Ekran</translation>
+    </message>
+    <message>
+        <source>Overlay</source>
+        <translation>Kaplama</translation>
+    </message>
+    <message>
+        <source>Soft light</source>
+        <translation>Yumuşak ışık</translation>
+    </message>
+    <message>
+        <source>Darken</source>
+        <translation>Koyulaştır</translation>
+    </message>
+    <message>
+        <source>Lighten</source>
+        <translation>Aydınlat</translation>
+    </message>
+    <message>
+        <source>Add</source>
+        <translation>Ekle</translation>
+    </message>
+    <message>
+        <source>Difference</source>
+        <translation>Fark</translation>
+    </message>
+    <message>
+        <source>Adjustment</source>
+        <translation>Ayar</translation>
+    </message>
+    <message>
+        <source>Add an adjustment layer: colour settings applied through a mask</source>
+        <translation>Ayar katmanı ekle: bir maske üzerinden uygulanan renk ayarları</translation>
+    </message>
+    <message>
+        <source>Picture…</source>
+        <translation>Resim…</translation>
+    </message>
+    <message>
+        <source>Add another picture as a layer on top</source>
+        <translation>Üste katman olarak başka bir resim ekle</translation>
+    </message>
+    <message>
+        <source>Move the layer up</source>
+        <translation>Katmanı yukarı taşı</translation>
+    </message>
+    <message>
+        <source>Move the layer down</source>
+        <translation>Katmanı aşağı taşı</translation>
+    </message>
+    <message>
+        <source>Delete the layer</source>
+        <translation>Katmanı sil</translation>
+    </message>
+    <message>
+        <source>Top layer first. The tick shows or hides a layer; the photo&apos;s own settings are below all layers.</source>
+        <translation>En üstteki katman başta. İşaret katmanı gösterir ya da gizler; fotoğrafın kendi ayarları bütün katmanların altındadır.</translation>
+    </message>
+    <message>
+        <source>Name</source>
+        <translation>Ad</translation>
+    </message>
+    <message>
+        <source>Blend</source>
+        <translation>Karışım</translation>
+    </message>
+    <message>
+        <source>Opacity (%)</source>
+        <translation>Opaklık (%)</translation>
+    </message>
+    <message>
+        <source>Placement</source>
+        <translation>Yerleşim</translation>
+    </message>
+    <message>
+        <source>Horizontal (%)</source>
+        <translation>Yatay (%)</translation>
+    </message>
+    <message>
+        <source>Vertical (%)</source>
+        <translation>Dikey (%)</translation>
+    </message>
+    <message>
+        <source>Size (%)</source>
+        <translation>Boyut (%)</translation>
+    </message>
+    <message>
+        <source>Mask</source>
+        <translation>Maske</translation>
+    </message>
+    <message>
+        <source>Whole picture</source>
+        <translation>Bütün resim</translation>
+    </message>
+    <message>
+        <source>Rectangle</source>
+        <translation>Dikdörtgen</translation>
+    </message>
+    <message>
+        <source>Ellipse</source>
+        <translation>Elips</translation>
+    </message>
+    <message>
+        <source>Gradient</source>
+        <translation>Degrade</translation>
+    </message>
+    <message>
+        <source>Drag the outline on the photo to move the mask.</source>
+        <translation>Maskeyi taşımak için fotoğraf üzerindeki çerçeveyi sürükleyin.</translation>
+    </message>
+    <message>
+        <source>Centre X (%)</source>
+        <translation>Merkez X (%)</translation>
+    </message>
+    <message>
+        <source>Centre Y (%)</source>
+        <translation>Merkez Y (%)</translation>
+    </message>
+    <message>
+        <source>Width (%)</source>
+        <translation>Genişlik (%)</translation>
+    </message>
+    <message>
+        <source>Height (%)</source>
+        <translation>Yükseklik (%)</translation>
+    </message>
+    <message>
+        <source>Angle (°)</source>
+        <translation>Açı (°)</translation>
+    </message>
+    <message>
+        <source>Softness (%)</source>
+        <translation>Yumuşaklık (%)</translation>
+    </message>
+    <message>
+        <source>Invert</source>
+        <translation>Ters çevir</translation>
+    </message>
+    <message>
+        <source>Layer colour</source>
+        <translation>Katman rengi</translation>
+    </message>
+    <message>
+        <source>Show layer</source>
+        <translation>Katmanı göster</translation>
+    </message>
+    <message>
+        <source>Hide layer</source>
+        <translation>Katmanı gizle</translation>
+    </message>
+    <message>
+        <source>Rename layer</source>
+        <translation>Katmanı yeniden adlandır</translation>
+    </message>
+    <message>
+        <source>Blend mode</source>
+        <translation>Karışım modu</translation>
+    </message>
+    <message>
+        <source>Layer opacity</source>
+        <translation>Katman opaklığı</translation>
+    </message>
+    <message>
+        <source>Move picture</source>
+        <translation>Resmi taşı</translation>
+    </message>
+    <message>
+        <source>Picture size</source>
+        <translation>Resim boyutu</translation>
+    </message>
+    <message>
+        <source>Move mask</source>
+        <translation>Maskeyi taşı</translation>
+    </message>
+    <message>
+        <source>Mask size</source>
+        <translation>Maske boyutu</translation>
+    </message>
+    <message>
+        <source>Mask angle</source>
+        <translation>Maske açısı</translation>
+    </message>
+    <message>
+        <source>Mask softness</source>
+        <translation>Maske yumuşaklığı</translation>
+    </message>
+    <message>
+        <source>Mask shape</source>
+        <translation>Maske şekli</translation>
+    </message>
+    <message>
+        <source>Invert mask</source>
+        <translation>Maskeyi ters çevir</translation>
+    </message>
+    <message>
+        <source>picture</source>
+        <translation>resim</translation>
+    </message>
+    <message>
+        <source>adjustment</source>
+        <translation>ayar</translation>
+    </message>
+    <message>
+        <source>, masked</source>
+        <translation>, maskeli</translation>
+    </message>
+    <message>
+        <source>Add adjustment layer</source>
+        <translation>Ayar katmanı ekle</translation>
+    </message>
+    <message>
+        <source>Add picture layer</source>
+        <translation>Resim katmanı ekle</translation>
+    </message>
+    <message>
+        <source>Pictures (%1)</source>
+        <translation>Resimler (%1)</translation>
+    </message>
+    <message>
+        <source>Delete layer</source>
+        <translation>Katmanı sil</translation>
+    </message>
+    <message>
+        <source>Move layer up</source>
+        <translation>Katmanı yukarı taşı</translation>
+    </message>
+    <message>
+        <source>Move layer down</source>
+        <translation>Katmanı aşağı taşı</translation>
+    </message>
+</context>
+<context>
     <name>lumora::MainWindow</name>
     <message>
         <source>Edit</source>
@@ -536,10 +1034,6 @@
     <message>
         <source>Photo</source>
         <translation>Fotoğraf</translation>
-    </message>
-    <message>
-        <source>Colour wheels, curves, LUTs and scopes arrive in version 0.3</source>
-        <translation>Renk tekerlekleri, eğriler, LUT ve skoplar 0.3 sürümünde geliyor</translation>
     </message>
     <message>
         <source>Audio tools arrive in version 0.4</source>
@@ -937,6 +1431,14 @@
         <source>&amp;Settings…</source>
         <translation>&amp;Ayarlar…</translation>
     </message>
+    <message>
+        <source>Colour grading: wheels, LUTs and scopes for the selected clip</source>
+        <translation>Renk düzenleme: seçili klip için tekerlekler, LUT&apos;lar ve kapsamlar</translation>
+    </message>
+    <message>
+        <source>Scopes</source>
+        <translation>Kapsamlar</translation>
+    </message>
 </context>
 <context>
     <name>lumora::MediaBinPanel</name>
@@ -1132,6 +1634,13 @@
     </message>
 </context>
 <context>
+    <name>lumora::PhotoView</name>
+    <message>
+        <source>inverted</source>
+        <translation>ters</translation>
+    </message>
+</context>
+<context>
     <name>lumora::PhotoWorkspace</name>
     <message>
         <source>Open photos…</source>
@@ -1144,30 +1653,6 @@ The original file is never changed: edits are stored in the project and applied 
         <translation>&quot;Fotoğraf aç…&quot; ile bir fotoğraf (JPEG, PNG, TIFF, WebP) açın ya da buraya sürükleyin.
 
 Orijinal dosya asla değişmez: düzenlemeler projede saklanır ve dışa aktarırken uygulanır.</translation>
-    </message>
-    <message>
-        <source>Light</source>
-        <translation>Işık</translation>
-    </message>
-    <message>
-        <source>Exposure (EV)</source>
-        <translation>Pozlama (EV)</translation>
-    </message>
-    <message>
-        <source>Contrast</source>
-        <translation>Kontrast</translation>
-    </message>
-    <message>
-        <source>White balance</source>
-        <translation>Beyaz dengesi</translation>
-    </message>
-    <message>
-        <source>Temperature</source>
-        <translation>Sıcaklık</translation>
-    </message>
-    <message>
-        <source>Tint</source>
-        <translation>Ton</translation>
     </message>
     <message>
         <source>Crop</source>
@@ -1200,10 +1685,6 @@ Orijinal dosya asla değişmez: düzenlemeler projede saklanır ve dışa aktar�
     <message>
         <source>Export photo…</source>
         <translation>Fotoğrafı dışa aktar…</translation>
-    </message>
-    <message>
-        <source>Exposure</source>
-        <translation>Pozlama</translation>
     </message>
     <message>
         <source>Remove crop</source>
@@ -1240,6 +1721,18 @@ Orijinal dosya asla değişmez: düzenlemeler projede saklanır ve dışa aktar�
     <message>
         <source>Compare with the original (\)</source>
         <translation>Orijinalle karşılaştır (\)</translation>
+    </message>
+    <message>
+        <source>Adjust</source>
+        <translation>Ayarla</translation>
+    </message>
+    <message>
+        <source>Layers</source>
+        <translation>Katmanlar</translation>
+    </message>
+    <message>
+        <source>Move mask</source>
+        <translation>Maskeyi taşı</translation>
     </message>
 </context>
 <context>
@@ -1635,74 +2128,22 @@ Orijinal dosya asla değişmez: düzenlemeler projede saklanır ve dışa aktar�
     </message>
 </context>
 <context>
-    <name>lumora::RenderSession</name>
+    <name>lumora::ScopesWidget</name>
     <message>
-        <source>Export cancelled.</source>
-        <translation>Dışa aktarma iptal edildi.</translation>
+        <source>Waveform</source>
+        <translation>Dalga formu</translation>
     </message>
     <message>
-        <source>Could not finish the file: %1</source>
-        <translation>Dosya tamamlanamadı: %1</translation>
+        <source>RGB parade</source>
+        <translation>RGB parade</translation>
     </message>
     <message>
-        <source>Encoder %1 is not available.</source>
-        <translation>%1 kodlayıcısı kullanılamıyor.</translation>
+        <source>Vectorscope</source>
+        <translation>Vektörskop</translation>
     </message>
     <message>
-        <source>Cannot start the %1 encoder: %2</source>
-        <translation>%1 kodlayıcısı başlatılamıyor: %2</translation>
-    </message>
-    <message>
-        <source>Out of memory.</source>
-        <translation>Bellek yetersiz.</translation>
-    </message>
-    <message>
-        <source>Cannot create the output file: %1</source>
-        <translation>Çıktı dosyası oluşturulamıyor: %1</translation>
-    </message>
-    <message>
-        <source>Cannot write %1: %2</source>
-        <translation>%1 yazılamıyor: %2</translation>
-    </message>
-    <message>
-        <source>Cannot write the file header: %1</source>
-        <translation>Dosya başlığı yazılamıyor: %1</translation>
-    </message>
-    <message>
-        <source>Cannot open %1: %2</source>
-        <translation>%1 açılamıyor: %2</translation>
-    </message>
-    <message>
-        <source>%1 has no audio stream.</source>
-        <translation>%1 içinde ses akışı yok.</translation>
-    </message>
-    <message>
-        <source>Cannot create the audio converter.</source>
-        <translation>Ses dönüştürücü oluşturulamıyor.</translation>
-    </message>
-    <message>
-        <source>Cannot convert the video frames.</source>
-        <translation>Video kareleri dönüştürülemiyor.</translation>
-    </message>
-    <message>
-        <source>Could not render the frame at %1 s.</source>
-        <translation>%1. saniyedeki kare işlenemedi.</translation>
-    </message>
-    <message>
-        <source>Video encoding failed: %1</source>
-        <translation>Video kodlama başarısız: %1</translation>
-    </message>
-    <message>
-        <source>Write error: %1</source>
-        <translation>Yazma hatası: %1</translation>
-    </message>
-    <message>
-        <source>Out of memory while buffering audio.</source>
-        <translation>Ses arabelleğe alınırken bellek yetmedi.</translation>
-    </message>
-    <message>
-        <source>Audio encoding failed: %1</source>
-        <translation>Ses kodlama başarısız: %1</translation>
+        <source>Histogram</source>
+        <translation>Histogram</translation>
     </message>
 </context>
 <context>
@@ -1922,81 +2363,6 @@ Orijinal dosya asla değişmez: düzenlemeler projede saklanır ve dışa aktar�
     <message>
         <source>LumoraStudio could not be updated, so the current version was kept. Close any other copy of LumoraStudio and try again.</source>
         <translation>LumoraStudio güncellenemedi, mevcut sürüm korundu. Açık başka bir LumoraStudio penceresi varsa kapatıp yeniden deneyin.</translation>
-    </message>
-</context>
-<context>
-    <name>lumora::encoders</name>
-    <message>
-        <source>FFV1 (lossless)</source>
-        <translation>FFV1 (kayıpsız)</translation>
-    </message>
-    <message>
-        <source>x264 (software)</source>
-        <translation>x264 (yazılım)</translation>
-    </message>
-    <message>
-        <source>x265 (software)</source>
-        <translation>x265 (yazılım)</translation>
-    </message>
-    <message>
-        <source>SVT-AV1 (software)</source>
-        <translation>SVT-AV1 (yazılım)</translation>
-    </message>
-    <message>
-        <source>libaom (software, slow)</source>
-        <translation>libaom (yazılım, yavaş)</translation>
-    </message>
-    <message>
-        <source>libvpx (software)</source>
-        <translation>libvpx (yazılım)</translation>
-    </message>
-    <message>
-        <source>%1 (software)</source>
-        <translation>%1 (yazılım)</translation>
-    </message>
-    <message>
-        <source>%1 has no constant bit rate mode; a variable bit rate with the same average is used.</source>
-        <translation>%1 sabit bit hızı modunu desteklemiyor; aynı ortalamaya sahip değişken bit hızı kullanılır.</translation>
-    </message>
-    <message>
-        <source>YouTube 1080p</source>
-        <translation>YouTube 1080p</translation>
-    </message>
-    <message>
-        <source>YouTube 4K</source>
-        <translation>YouTube 4K</translation>
-    </message>
-    <message>
-        <source>Instagram Reels / Stories (9:16)</source>
-        <translation>Instagram Reels / Hikâyeler (9:16)</translation>
-    </message>
-    <message>
-        <source>Instagram feed (4:5)</source>
-        <translation>Instagram akışı (4:5)</translation>
-    </message>
-    <message>
-        <source>TikTok (9:16)</source>
-        <translation>TikTok (9:16)</translation>
-    </message>
-    <message>
-        <source>X (Twitter)</source>
-        <translation>X (Twitter)</translation>
-    </message>
-    <message>
-        <source>Archive (HEVC 10-bit, original size)</source>
-        <translation>Arşiv (HEVC 10 bit, özgün boyut)</translation>
-    </message>
-    <message>
-        <source>Apple ProRes 422 HQ (editing)</source>
-        <translation>Apple ProRes 422 HQ (kurgu için)</translation>
-    </message>
-    <message>
-        <source>Avid DNxHR HQ (editing)</source>
-        <translation>Avid DNxHR HQ (kurgu için)</translation>
-    </message>
-    <message>
-        <source>%1 cannot limit the peak bit rate in this mode; only the average is kept.</source>
-        <translation>%1 bu modda en yüksek bit hızını sınırlayamaz; yalnızca ortalama tutulur.</translation>
     </message>
 </context>
 </TS>
