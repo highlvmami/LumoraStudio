@@ -25,6 +25,18 @@ private slots:
         p.timeline()->setFrameRate({25, 1});
         p.timeline()->insertMedia(item->id, 0, item->info.duration, true, true);
         p.timeline()->splitAt(ticksFromSeconds(1));
+        // Version 2 content: titles on V2, transitions, transforms, fades, gain.
+        Timeline* tl = p.timeline();
+        tl->setTransition(tl->tracks()[0].clips[1].id, {TransitionType::DipToBlack, ticksFromSeconds(0.4)});
+        const int v2 = tl->addTrack(TrackType::Video);
+        TitleData title;
+        title.text = QStringLiteral("Merhaba dünya");
+        title.color = QColor(250, 200, 10);
+        title.animationIn = TitleAnimation::Typewriter;
+        const QUuid titleId = tl->addTitle(title, ticksFromSeconds(1), v2, ticksFromSeconds(0.5));
+        tl->setTransform(titleId, {0.1, -0.2, 1.5, 12, 0.8});
+        tl->setFades(titleId, ticksFromSeconds(0.2), ticksFromSeconds(0.3));
+        tl->setGain(tl->tracks()[1].clips[0].id, -6);
         PhotoAdjustments adj;
         adj.exposure = 1.25;
         adj.crop = QRectF(0.1, 0.2, 0.5, 0.5);

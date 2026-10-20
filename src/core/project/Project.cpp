@@ -81,12 +81,31 @@ QByteArray Project::toJson() const {
         for (const auto& c : t.clips) {
             QJsonObject co;
             co["id"] = c.id.toString(QUuid::WithoutBraces);
-            co["media"] = c.mediaId.toString(QUuid::WithoutBraces);
+            if (c.kind == ClipKind::Title) {
+                co["kind"] = "title";
+                co["title"] = c.title.toJson();
+            } else {
+                co["media"] = c.mediaId.toString(QUuid::WithoutBraces);
+            }
             co["in"] = ticksToJson(c.sourceIn);
             co["out"] = ticksToJson(c.sourceOut);
             co["start"] = ticksToJson(c.timelineStart);
             if (!c.linkId.isNull())
                 co["link"] = c.linkId.toString(QUuid::WithoutBraces);
+            if (!c.anchorId.isNull()) {
+                co["anchor"] = c.anchorId.toString(QUuid::WithoutBraces);
+                co["anchorSource"] = ticksToJson(c.anchorSource);
+            }
+            if (!c.transform.isIdentity())
+                co["transform"] = c.transform.toJson();
+            if (!c.transitionIn.isNone())
+                co["transition"] = c.transitionIn.toJson();
+            if (c.fadeIn > 0)
+                co["fadeIn"] = ticksToJson(c.fadeIn);
+            if (c.fadeOut > 0)
+                co["fadeOut"] = ticksToJson(c.fadeOut);
+            if (c.gainDb != 0.0)
+                co["gainDb"] = c.gainDb;
             clips.append(co);
         }
         to["clips"] = clips;
@@ -203,11 +222,24 @@ bool Project::fromJson(const QByteArray& json, const QString& baseDir, QString* 
             const QJsonObject co = cv.toObject();
             Clip c;
             c.id = QUuid::fromString(co.value("id").toString());
+            if (co.value("kind").toString() == "title") {
+                c.kind = ClipKind::Title;
+                c.title = TitleData::fromJson(co.value("title").toObject());
+            }
             c.mediaId = QUuid::fromString(co.value("media").toString());
             c.sourceIn = ticksFromJson(co.value("in"));
             c.sourceOut = ticksFromJson(co.value("out"));
             c.timelineStart = ticksFromJson(co.value("start"));
             c.linkId = QUuid::fromString(co.value("link").toString());
+            c.anchorId = QUuid::fromString(co.value("anchor").toString());
+            c.anchorSource = ticksFromJson(co.value("anchorSource"));
+            if (co.contains("transform"))
+                c.transform = ClipTransform::fromJson(co.value("transform").toObject());
+            if (co.contains("transition"))
+                c.transitionIn = Transition::fromJson(co.value("transition").toObject());
+            c.fadeIn = ticksFromJson(co.value("fadeIn"));
+            c.fadeOut = ticksFromJson(co.value("fadeOut"));
+            c.gainDb = co.value("gainDb").toDouble(0.0);
             t.clips.push_back(c);
         }
         st.tracks.push_back(t);

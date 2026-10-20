@@ -16,7 +16,8 @@ namespace lumora {
 class Project : public QObject {
     Q_OBJECT
 public:
-    static constexpr int kFormatVersion = 1;
+    // 2: multiple tracks, titles, transitions, transforms, fades, gain.
+    static constexpr int kFormatVersion = 2;
     static constexpr const char* kExtension = "lumora";
 
     explicit Project(QObject* parent = nullptr);

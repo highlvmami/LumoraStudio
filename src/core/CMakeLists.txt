@@ -9,6 +9,7 @@ add_library(lumora_core STATIC
     media/MediaPool.h media/MediaPool.cpp
     media/VideoDecoder.h media/VideoDecoder.cpp
     media/AudioDecoder.h media/AudioDecoder.cpp
+    timeline/ClipEffects.h timeline/ClipEffects.cpp
     timeline/Timeline.h timeline/Timeline.cpp
     undo/TimelineCommands.h undo/TimelineCommands.cpp
     export/ExportSettings.h
