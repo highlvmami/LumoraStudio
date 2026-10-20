@@ -12,6 +12,9 @@ add_library(lumora_core STATIC
     timeline/ClipEffects.h timeline/ClipEffects.cpp
     timeline/Timeline.h timeline/Timeline.cpp
     undo/TimelineCommands.h undo/TimelineCommands.cpp
+    render/TitleRenderer.h render/TitleRenderer.cpp
+    render/FrameRenderer.h render/FrameRenderer.cpp
+    render/AudioMixer.h render/AudioMixer.cpp
     export/ExportSettings.h
     export/ExportPlanner.h export/ExportPlanner.cpp
     export/TimelineExporter.h export/TimelineExporter.cpp

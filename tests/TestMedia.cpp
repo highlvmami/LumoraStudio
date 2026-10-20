@@ -16,6 +16,15 @@ namespace {
 constexpr int kBits = 12;
 constexpr int kBlock = 16;
 
+void drawSolid(AVFrame* f, int luma) {
+    for (int y = 0; y < f->height; ++y)
+        std::fill(f->data[0] + y * f->linesize[0], f->data[0] + y * f->linesize[0] + f->width, static_cast<uint8_t>(luma));
+    for (int y = 0; y < f->height / 2; ++y) {
+        std::fill(f->data[1] + y * f->linesize[1], f->data[1] + y * f->linesize[1] + f->width / 2, uint8_t(128));
+        std::fill(f->data[2] + y * f->linesize[2], f->data[2] + y * f->linesize[2] + f->width / 2, uint8_t(128));
+    }
+}
+
 void drawIndex(AVFrame* f, int index) {
     // Mid-grey background with a gradient so the encoder has something to do.
     for (int y = 0; y < f->height; ++y)
@@ -131,7 +140,10 @@ bool writeTestVideo(const QString& path, const TestVideoSpec& spec, QString* err
     const std::int64_t totalSamples = static_cast<std::int64_t>(spec.seconds) * 48000;
     for (int i = 0; i < frames; ++i) {
         av_frame_make_writable(vf.get());
-        drawIndex(vf.get(), i);
+        if (spec.solidLuma >= 0)
+            drawSolid(vf.get(), spec.solidLuma);
+        else
+            drawIndex(vf.get(), i);
         vf->pts = i;
         if (!encodeAndWrite(vc.get(), vf.get(), oc.get(), vs))
             return false;
@@ -183,6 +195,33 @@ int frameIndexOf(const AVFrame* frame) {
             index |= 1 << b;
     }
     return index;
+}
+
+int frameIndexOf(const QImage& image) {
+    const QImage gray = image.convertToFormat(QImage::Format_Grayscale8);
+    int index = 0;
+    for (int b = 0; b < kBits; ++b) {
+        const int x0 = 8 + b * (kBlock + 4);
+        int sum = 0;
+        for (int y = 12; y < 8 + kBlock - 4; ++y)
+            for (int x = x0 + 4; x < x0 + kBlock - 4; ++x)
+                sum += gray.constScanLine(y)[x];
+        if (sum / ((kBlock - 8) * (kBlock - 8)) > 128)
+            index |= 1 << b;
+    }
+    return index;
+}
+
+double meanLuma(const QImage& image, const QRect& rect) {
+    const QImage gray = image.convertToFormat(QImage::Format_Grayscale8);
+    const QRect r = rect.intersected(gray.rect());
+    if (r.isEmpty())
+        return 0;
+    double sum = 0;
+    for (int y = r.top(); y <= r.bottom(); ++y)
+        for (int x = r.left(); x <= r.right(); ++x)
+            sum += gray.constScanLine(y)[x];
+    return sum / (static_cast<double>(r.width()) * r.height());
 }
 
 DecodedSummary decodeAll(const QString& path) {
