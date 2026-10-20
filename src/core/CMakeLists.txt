@@ -24,3 +24,10 @@ target_include_directories(lumora_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 target_link_libraries(lumora_core
     PUBLIC Qt6::Core Qt6::Gui Qt6::Concurrent
            FFmpeg::avformat FFmpeg::avcodec FFmpeg::avutil FFmpeg::swscale FFmpeg::swresample)
+
+# Core sources with user-visible strings, picked up by lupdate.
+set(CORE_TRANSLATABLE_SOURCES
+    ${CMAKE_CURRENT_SOURCE_DIR}/export/ExportPlanner.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/export/TimelineExporter.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/project/Project.cpp
+    PARENT_SCOPE)
