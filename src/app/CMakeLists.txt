@@ -2,6 +2,7 @@ set(APP_SOURCES
     main.cpp
     MainWindow.h MainWindow.cpp
     Theme.h Theme.cpp
+    DockTitleBar.h DockTitleBar.cpp
     Icons.h Icons.cpp
     MediaCache.h MediaCache.cpp
     Updater.h Updater.cpp
@@ -22,6 +23,25 @@ set(APP_SOURCES
 )
 
 qt_add_executable(LumoraStudio WIN32 MACOSX_BUNDLE ${APP_SOURCES})
+
+# Bundled look: the Inter typeface (SIL Open Font License, see resources/fonts/OFL.txt)
+# and the small arrow images used by the style sheet.
+qt_add_resources(LumoraStudio theme
+    PREFIX /
+    BASE resources
+    FILES
+        resources/fonts/Inter-Regular.ttf
+        resources/fonts/Inter-Medium.ttf
+        resources/fonts/Inter-SemiBold.ttf
+        resources/fonts/Inter-Bold.ttf
+        resources/theme/up-dark.png
+        resources/theme/down-dark.png
+        resources/theme/up-light.png
+        resources/theme/down-light.png
+        resources/theme/up-off.png
+        resources/theme/down-off.png
+        resources/theme/check-dark.png
+        resources/theme/check-light.png)
 
 target_include_directories(LumoraStudio PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 target_link_libraries(LumoraStudio PRIVATE lumora_core Qt6::Widgets Qt6::Multimedia Qt6::Concurrent Qt6::Network)

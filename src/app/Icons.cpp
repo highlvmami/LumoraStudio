@@ -6,11 +6,13 @@
 #include <QPalette>
 #include <functional>
 
+#include "Theme.h"
+
 namespace lumora::Icons {
 
 namespace {
 
-QIcon draw(const std::function<void(QPainter&, QColor)>& fn) {
+QIcon draw(const std::function<void(QPainter&, QColor)>& fn, const QColor& color = {}) {
     QIcon icon;
     for (int size : {16, 24, 32, 48, 64}) {
         for (auto mode : {QIcon::Normal, QIcon::Disabled}) {
@@ -21,6 +23,8 @@ QIcon draw(const std::function<void(QPainter&, QColor)>& fn) {
             p.scale(size / 24.0, size / 24.0);
             QColor c = QApplication::palette().color(mode == QIcon::Disabled ? QPalette::Disabled : QPalette::Active,
                                                      QPalette::ButtonText);
+            if (color.isValid() && mode == QIcon::Normal)
+                c = color;
             fn(p, c);
             icon.addPixmap(pm, mode);
         }
@@ -28,7 +32,7 @@ QIcon draw(const std::function<void(QPainter&, QColor)>& fn) {
     return icon;
 }
 
-QPen pen(QColor c, double w = 2.0) { return QPen(c, w, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin); }
+QPen pen(QColor c, double w = 1.8) { return QPen(c, w, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin); }
 
 void triangle(QPainter& p, QColor c, QPointF a, QPointF b, QPointF d) {
     QPainterPath path;
@@ -41,13 +45,25 @@ void triangle(QPainter& p, QColor c, QPointF a, QPointF b, QPointF d) {
 
 } // namespace
 
-QIcon play() { return draw([](QPainter& p, QColor c) { triangle(p, c, {7, 4}, {20, 12}, {7, 20}); }); }
+QIcon play(const QColor& color) {
+    return draw(
+        [](QPainter& p, QColor c) {
+            p.setPen(QPen(c, 1.5, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
+            p.setBrush(c);
+            p.drawPolygon(QPolygonF{QPointF(8, 5), QPointF(19, 12), QPointF(8, 19)});
+        },
+        color);
+}
 
-QIcon pause() {
-    return draw([](QPainter& p, QColor c) {
-        p.fillRect(QRectF(6, 5, 4, 14), c);
-        p.fillRect(QRectF(14, 5, 4, 14), c);
-    });
+QIcon pause(const QColor& color) {
+    return draw(
+        [](QPainter& p, QColor c) {
+            p.setPen(Qt::NoPen);
+            p.setBrush(c);
+            p.drawRoundedRect(QRectF(6.5, 5, 4, 14), 1.2, 1.2);
+            p.drawRoundedRect(QRectF(13.5, 5, 4, 14), 1.2, 1.2);
+        },
+        color);
 }
 
 QIcon stepBack() {
@@ -111,7 +127,7 @@ QIcon split() {
         p.setPen(pen(c));
         p.drawRoundedRect(QRectF(3, 8, 7, 8), 1.5, 1.5);
         p.drawRoundedRect(QRectF(14, 8, 7, 8), 1.5, 1.5);
-        p.setPen(pen(QColor(230, 80, 80), 2));
+        p.setPen(pen(themeColors().accent, 2));
         p.drawLine(QPointF(12, 3), QPointF(12, 21));
     });
 }
@@ -174,16 +190,18 @@ QIcon import() {
     });
 }
 
-QIcon exportFile() {
-    return draw([](QPainter& p, QColor c) {
-        p.setPen(pen(c));
-        p.drawLine(QPointF(12, 14), QPointF(12, 3));
-        p.drawLine(QPointF(8, 7), QPointF(12, 3));
-        p.drawLine(QPointF(16, 7), QPointF(12, 3));
-        p.drawLine(QPointF(4, 15), QPointF(4, 20));
-        p.drawLine(QPointF(4, 20), QPointF(20, 20));
-        p.drawLine(QPointF(20, 20), QPointF(20, 15));
-    });
+QIcon exportFile(const QColor& color) {
+    return draw(
+        [](QPainter& p, QColor c) {
+            p.setPen(pen(c));
+            p.drawLine(QPointF(12, 14), QPointF(12, 3));
+            p.drawLine(QPointF(8, 7), QPointF(12, 3));
+            p.drawLine(QPointF(16, 7), QPointF(12, 3));
+            p.drawLine(QPointF(4, 15), QPointF(4, 20));
+            p.drawLine(QPointF(4, 20), QPointF(20, 20));
+            p.drawLine(QPointF(20, 20), QPointF(20, 15));
+        },
+        color);
 }
 
 QIcon crop() {
@@ -205,7 +223,7 @@ QIcon magnet() {
         path.arcTo(QRectF(6, 7, 12, 12), 180, 180);
         path.lineTo(18, 4);
         p.drawPath(path);
-        p.setPen(pen(QColor(230, 80, 80), 3));
+        p.setPen(pen(themeColors().accentAlt, 3));
         p.drawLine(QPointF(6, 4), QPointF(6, 7));
         p.drawLine(QPointF(18, 4), QPointF(18, 7));
     });
@@ -283,6 +301,24 @@ QIcon transition() {
     });
 }
 
+QIcon close() {
+    return draw([](QPainter& p, QColor c) {
+        p.setPen(pen(c, 2.2));
+        p.drawLine(QPointF(6, 6), QPointF(18, 18));
+        p.drawLine(QPointF(18, 6), QPointF(6, 18));
+    });
+}
+
+QIcon popOut() {
+    return draw([](QPainter& p, QColor c) {
+        p.setPen(pen(c, 2.2));
+        p.drawRoundedRect(QRectF(4, 7, 13, 13), 2.5, 2.5);
+        p.drawLine(QPointF(12, 12), QPointF(20, 4));
+        p.drawLine(QPointF(14, 4), QPointF(20, 4));
+        p.drawLine(QPointF(20, 4), QPointF(20, 10));
+    });
+}
+
 QIcon appIcon() {
     QIcon icon;
     for (int size : {16, 32, 48, 64, 128, 256}) {
@@ -292,9 +328,9 @@ QIcon appIcon() {
         p.setRenderHint(QPainter::Antialiasing);
         p.scale(size / 64.0, size / 64.0);
         QLinearGradient g(0, 0, 64, 64);
-        g.setColorAt(0, QColor(255, 179, 71));
-        g.setColorAt(0.55, QColor(236, 72, 153));
-        g.setColorAt(1, QColor(99, 102, 241));
+        g.setColorAt(0, QColor(255, 180, 84));
+        g.setColorAt(0.55, QColor(240, 86, 140));
+        g.setColorAt(1, QColor(124, 126, 246));
         p.setBrush(g);
         p.setPen(Qt::NoPen);
         p.drawRoundedRect(QRectF(2, 2, 60, 60), 14, 14);

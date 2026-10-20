@@ -20,6 +20,7 @@
 #include <QVBoxLayout>
 #include <cmath>
 
+#include "Theme.h"
 #include "export/ExportPlanner.h"
 #include "project/Project.h"
 #include "undo/TimelineCommands.h"
@@ -496,7 +497,7 @@ void PropertiesPanel::refreshEditors(const Clip* clip) {
         else if (!t.isNone() && effective < t.duration)
             note = tr("Shortened to %1 s by the footage available around the cut.").arg(ticksToSeconds(effective), 0, 'f', 2);
         m_transitionNote->setText(note.isEmpty() ? QString()
-                                                 : QStringLiteral("<span style='color:#d29922'>%1</span>").arg(note.toHtmlEscaped()));
+                                                 : QStringLiteral("<span style='color:%1'>%2</span>").arg(themeColors().warning.name(), note.toHtmlEscaped()));
         m_transitionNote->setVisible(!note.isEmpty());
     }
 
@@ -542,9 +543,11 @@ void PropertiesPanel::refreshInfo(const Clip* clip) {
             const Ticks k = previousKeyframe(kf, clip->sourceIn, fd / 2);
             const int frames = static_cast<int>((clip->sourceIn - k + fd / 2) / fd);
             html += row(tr("Lossless cut"),
-                        frames <= 0 ? QStringLiteral("<span style='color:#3fb950'>✔ %1</span>").arg(tr("starts on a key frame"))
-                                    : QStringLiteral("<span style='color:#d29922'>%1</span>")
-                                          .arg(tr("starts %n frame(s) after a key frame", nullptr, frames)));
+                        frames <= 0 ? QStringLiteral("<span style='color:%1'>✔ %2</span>")
+                                          .arg(themeColors().success.name(), tr("starts on a key frame"))
+                                    : QStringLiteral("<span style='color:%1'>%2</span>")
+                                          .arg(themeColors().warning.name(),
+                                               tr("starts %n frame(s) after a key frame", nullptr, frames)));
         }
     }
 

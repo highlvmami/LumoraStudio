@@ -16,6 +16,7 @@
 #include <QSlider>
 #include <QVBoxLayout>
 
+#include "Theme.h"
 #include "image/PhotoProcessor.h"
 
 namespace lumora {
@@ -62,6 +63,7 @@ PhotoExportDialog::PhotoExportDialog(const QString& sourcePath, const QImage& or
     auto* buttons = new QDialogButtonBox(QDialogButtonBox::Cancel);
     auto* saveBtn = buttons->addButton(tr("Save"), QDialogButtonBox::AcceptRole);
     saveBtn->setDefault(true);
+    markPrimary(saveBtn);
     layout->addWidget(buttons);
 
     const QFileInfo fi(sourcePath);

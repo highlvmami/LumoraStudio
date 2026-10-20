@@ -13,6 +13,8 @@
 #include <QDockWidget>
 #include <QFileDialog>
 #include <QFileInfo>
+#include <QFrame>
+#include <QHBoxLayout>
 #include <QLabel>
 #include <QMenu>
 #include <QMenuBar>
@@ -23,12 +25,15 @@
 #include <QTabBar>
 #include <QTextBrowser>
 #include <QToolBar>
+#include <QToolButton>
 #include <QUndoGroup>
 #include <QUndoStack>
 #include <QUrl>
 #include <QVBoxLayout>
 
+#include "DockTitleBar.h"
 #include "Icons.h"
+#include "Theme.h"
 #include "MediaCache.h"
 #include "dialogs/ExportDialog.h"
 #include "ffmpeg/FFmpeg.h"
@@ -75,6 +80,7 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
     m_stack = new QStackedWidget;
     m_monitor = new MonitorPanel(m_engine);
     m_photo = new PhotoWorkspace(m_project->photos(), m_photoUndo);
+    makePanelSurface(m_monitor);
     m_stack->addWidget(m_monitor);
     m_stack->addWidget(m_photo);
     setCentralWidget(m_stack);
@@ -88,20 +94,71 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
     createDocks();
     createMenus();
 
-    auto* tabBarHost = new QToolBar(tr("Workspaces"));
-    tabBarHost->setObjectName(QStringLiteral("workspaceBar"));
-    tabBarHost->setMovable(false);
-    tabBarHost->addWidget(m_tabs);
-    auto* spacer = new QWidget;
-    spacer->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
-    tabBarHost->addWidget(spacer);
-    tabBarHost->addAction(m_actImport);
-    tabBarHost->addAction(m_actUndo);
-    tabBarHost->addAction(m_actRedo);
-    tabBarHost->addAction(m_actExport);
-    tabBarHost->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
-    tabBarHost->setIconSize(QSize(18, 18));
-    addToolBar(Qt::TopToolBarArea, tabBarHost);
+    // Top bar: the brand, the menus, the workspace switcher and the main
+    // actions share one row as corner widgets of the menu bar.
+    auto* brand = new QWidget;
+    auto* brandLayout = new QHBoxLayout(brand);
+    brandLayout->setContentsMargins(6, 0, 10, 0);
+    brandLayout->setSpacing(8);
+    auto* logo = new QLabel;
+    logo->setPixmap(Icons::appIcon().pixmap(QSize(22, 22)));
+    auto* wordmark = new QLabel(QStringLiteral("<span style='font-weight:700'>Lumora</span>"
+                                               "<span style='font-weight:400'>Studio</span>"));
+    wordmark->setObjectName(QStringLiteral("brandMark"));
+    brandLayout->addWidget(logo);
+    brandLayout->addWidget(wordmark);
+
+    auto* bar = new QWidget;
+    bar->setObjectName(QStringLiteral("workspaceBar"));
+    auto* barLayout = new QHBoxLayout(bar);
+    barLayout->setContentsMargins(0, 0, 4, 0);
+    barLayout->setSpacing(4);
+    auto* switcher = new QFrame;
+    switcher->setObjectName(QStringLiteral("workspaceSwitcher"));
+    auto* switcherLayout = new QHBoxLayout(switcher);
+    switcherLayout->setContentsMargins(2, 0, 2, 0);
+    switcherLayout->addWidget(m_tabs);
+    barLayout->addWidget(switcher);
+    barLayout->addSpacing(14);
+    for (QAction* a : {m_actImport, m_actUndo, m_actRedo}) {
+        auto* b = new QToolButton;
+        b->setDefaultAction(a);
+        b->setIconSize(QSize(18, 18));
+        b->setToolButtonStyle(Qt::ToolButtonIconOnly);
+        barLayout->addWidget(b);
+    }
+    barLayout->addSpacing(8);
+    // Export is the main call to action: a brand-gradient button.
+    auto* exportButton = new QToolButton;
+    exportButton->setObjectName(QStringLiteral("primaryAction"));
+    exportButton->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
+    exportButton->setIconSize(QSize(16, 16));
+    exportButton->setIcon(Icons::exportFile(themeColors().onAccent));
+    exportButton->setText(m_actExport->iconText());
+    exportButton->setToolTip(m_actExport->toolTip());
+    exportButton->setEnabled(m_actExport->isEnabled());
+    connect(exportButton, &QToolButton::clicked, m_actExport, &QAction::trigger);
+    connect(m_actExport, &QAction::changed, exportButton, [this, exportButton] {
+        exportButton->setEnabled(m_actExport->isEnabled());
+        exportButton->setText(m_actExport->iconText());
+    });
+    barLayout->addWidget(exportButton);
+    if (menuBar()->isNativeMenuBar()) {
+        // macOS keeps menus at the top of the screen: use a tool bar instead.
+        auto* host = new QToolBar(tr("Workspaces"));
+        host->setObjectName(QStringLiteral("workspaceToolBar"));
+        host->setMovable(false);
+        host->addWidget(brand);
+        auto* spacer = new QWidget;
+        spacer->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
+        host->addWidget(spacer);
+        host->addWidget(bar);
+        addToolBar(Qt::TopToolBarArea, host);
+    } else {
+        menuBar()->setCornerWidget(brand, Qt::TopLeftCorner);
+        menuBar()->setCornerWidget(bar, Qt::TopRightCorner);
+    }
+    setContentsMargins(8, 0, 8, 4);
 
     m_statusRight = new QLabel(tr("FFmpeg %1 · Qt %2").arg(av::versionString(), QString::fromLatin1(qVersion())));
     statusBar()->addPermanentWidget(m_statusRight);
@@ -412,8 +469,10 @@ void MainWindow::createDocks() {
     auto makeDock = [this](const QString& title, const QString& name, QWidget* w) {
         auto* d = new QDockWidget(title, this);
         d->setObjectName(name);
+        makePanelSurface(w);
         d->setWidget(w);
         d->setFeatures(QDockWidget::DockWidgetMovable | QDockWidget::DockWidgetFloatable | QDockWidget::DockWidgetClosable);
+        d->setTitleBarWidget(new DockTitleBar(d));
         return d;
     };
     m_binDock = makeDock(tr("Files"), QStringLiteral("filesDock"), m_bin);

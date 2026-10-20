@@ -2,6 +2,7 @@
 
 #include <cmath>
 
+#include <QApplication>
 #include <QDragEnterEvent>
 #include <QDir>
 #include <QFileInfo>
@@ -10,11 +11,13 @@
 #include <QMenu>
 #include <QMimeData>
 #include <QPainter>
+#include <QPainterPath>
 #include <QToolButton>
 #include <QVBoxLayout>
 
 #include "Icons.h"
 #include "MediaCache.h"
+#include "Theme.h"
 #include "media/MediaPool.h"
 #include "panels/MimeTypes.h"
 
@@ -25,18 +28,24 @@ constexpr int kIdRole = Qt::UserRole + 1;
 const QSize kThumb(160, 90);
 
 QPixmap decorate(const QImage& thumb, const MediaInfo& info) {
+    const ThemeColors& c = themeColors();
     QPixmap pm(kThumb);
-    pm.fill(QColor(30, 30, 34));
+    pm.fill(Qt::transparent);
     QPainter p(&pm);
     p.setRenderHint(QPainter::SmoothPixmapTransform);
     p.setRenderHint(QPainter::Antialiasing);
+    // Rounded card: everything below is clipped to it.
+    QPainterPath card;
+    card.addRoundedRect(QRectF(0, 0, kThumb.width(), kThumb.height()), 9, 9);
+    p.setClipPath(card);
+    p.fillRect(pm.rect(), c.viewer);
     if (!thumb.isNull()) {
         const QSize s = thumb.size().scaled(kThumb, Qt::KeepAspectRatio);
         p.drawImage(QRect(QPoint((kThumb.width() - s.width()) / 2, (kThumb.height() - s.height()) / 2), s), thumb);
     } else if (info.kind == MediaKind::Audio) {
         // Sound files have no picture: a stylised waveform instead.
         p.setPen(Qt::NoPen);
-        p.setBrush(QColor(70, 200, 150));
+        p.setBrush(c.audioClip);
         const int mid = kThumb.height() / 2, bars = 28, w = kThumb.width() - 32;
         for (int i = 0; i < bars; ++i) {
             const double v = 0.25 + 0.75 * std::abs(std::sin(i * 0.7) * std::cos(i * 0.23));
@@ -49,27 +58,30 @@ QPixmap decorate(const QImage& thumb, const MediaInfo& info) {
         badge = QStringLiteral("%1×%2").arg(info.imageWidth).arg(info.imageHeight);
     else
         badge = formatSeconds(info.duration).section(QLatin1Char('.'), 0, 0);
-    QFont f;
-    f.setPointSize(8);
-    f.setBold(true);
+    QFont f = QApplication::font();
+    f.setPointSizeF(7.5);
+    f.setWeight(QFont::DemiBold);
     p.setFont(f);
-    const QRect tr = p.fontMetrics().boundingRect(badge).adjusted(-4, -2, 4, 2);
-    const QRect box(QPoint(kThumb.width() - tr.width() - 4, kThumb.height() - tr.height() - 4), tr.size());
+    const QRect tr = p.fontMetrics().boundingRect(badge).adjusted(-6, -2, 6, 2);
+    const QRect box(QPoint(kThumb.width() - tr.width() - 5, kThumb.height() - tr.height() - 5), tr.size());
     p.setPen(Qt::NoPen);
-    p.setBrush(QColor(0, 0, 0, 170));
-    p.drawRoundedRect(box, 3, 3);
+    p.setBrush(QColor(0, 0, 0, 165));
+    p.drawRoundedRect(box, box.height() / 2.0, box.height() / 2.0);
     p.setPen(Qt::white);
     p.drawText(box, Qt::AlignCenter, badge);
     const QString kind = info.kind == MediaKind::Image ? QStringLiteral("IMG")
                          : info.kind == MediaKind::Audio ? QStringLiteral("♪")
                                                          : (info.video && info.video->isHdr() ? QStringLiteral("HDR") : QString());
     if (!kind.isEmpty()) {
-        const QRect kr = p.fontMetrics().boundingRect(kind).adjusted(-4, -2, 4, 2);
-        const QRect kbox(QPoint(4, 4), kr.size());
+        const QRect kr = p.fontMetrics().boundingRect(kind).adjusted(-6, -2, 6, 2);
+        const QRect kbox(QPoint(5, 5), kr.size());
+        QLinearGradient g(kbox.topLeft(), kbox.topRight());
+        g.setColorAt(0, c.accent);
+        g.setColorAt(1, c.accentAlt);
         p.setPen(Qt::NoPen);
-        p.setBrush(QColor(236, 72, 153, 200));
-        p.drawRoundedRect(kbox, 3, 3);
-        p.setPen(Qt::white);
+        p.setBrush(g);
+        p.drawRoundedRect(kbox, kbox.height() / 2.0, kbox.height() / 2.0);
+        p.setPen(c.onAccent);
         p.drawText(kbox, Qt::AlignCenter, kind);
     }
     return pm;

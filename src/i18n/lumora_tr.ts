@@ -204,6 +204,17 @@
     </message>
 </context>
 <context>
+    <name>lumora::DockTitleBar</name>
+    <message>
+        <source>Detach or attach the panel</source>
+        <translation>Paneli ayır ya da yerine tak</translation>
+    </message>
+    <message>
+        <source>Close the panel</source>
+        <translation>Paneli kapat</translation>
+    </message>
+</context>
+<context>
     <name>lumora::ExportDialog</name>
     <message>
         <source>Export video</source>

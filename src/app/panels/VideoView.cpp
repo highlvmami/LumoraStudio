@@ -3,8 +3,10 @@
 #include <QDragEnterEvent>
 #include <QMimeData>
 #include <QPainter>
+#include <QPainterPath>
 #include <QUuid>
 
+#include "Theme.h"
 #include "panels/MimeTypes.h"
 
 namespace lumora {
@@ -32,14 +34,18 @@ void VideoView::setPlaceholder(const QString& text) {
 
 void VideoView::paintEvent(QPaintEvent*) {
     QPainter p(this);
-    p.fillRect(rect(), QColor(12, 12, 14));
+    QPainterPath frame;
+    frame.addRoundedRect(QRectF(rect()), 9, 9);
+    p.setRenderHint(QPainter::Antialiasing);
+    p.setClipPath(frame);
+    p.fillRect(rect(), themeColors().viewer);
     if (!m_image.isNull()) {
         const QSize s = m_image.size().scaled(size(), Qt::KeepAspectRatio);
         const QRect target(QPoint((width() - s.width()) / 2, (height() - s.height()) / 2), s);
         p.setRenderHint(QPainter::SmoothPixmapTransform);
         p.drawImage(target, m_image);
     } else if (!m_placeholder.isEmpty()) {
-        p.setPen(QColor(140, 140, 150));
+        p.setPen(themeColors().textFaint);
         p.drawText(rect().adjusted(24, 24, -24, -24), Qt::AlignCenter | Qt::TextWordWrap, m_placeholder);
     }
     if (!m_overlay.isEmpty()) {

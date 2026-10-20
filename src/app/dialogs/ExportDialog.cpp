@@ -32,6 +32,7 @@
 #include <QtConcurrent/QtConcurrentRun>
 #include <atomic>
 
+#include "Theme.h"
 #include "export/Encoders.h"
 #include "export/ExportPlanner.h"
 #include "export/TimelineExporter.h"
@@ -116,6 +117,7 @@ ExportDialog::ExportDialog(Project* project, QUndoStack* undo, QWidget* parent)
     auto* buttons = new QDialogButtonBox(QDialogButtonBox::Cancel);
     m_exportBtn = buttons->addButton(tr("Export"), QDialogButtonBox::AcceptRole);
     m_exportBtn->setDefault(true);
+    markPrimary(m_exportBtn);
     layout->addWidget(buttons);
 
     // Default output name next to the first source.
@@ -539,52 +541,52 @@ void ExportDialog::replan() {
     if (m_plan.video == VideoStrategy::Render && m_plan.blockers.isEmpty()) {
         const QString enc = m_plan.videoEncoder + (m_plan.hardwareEncoder ? tr(" (graphics card)") : QString());
         if (m_plan.mode == ExportMode::LosslessIntermediate)
-            line(QStringLiteral("#3fb950"), tr("Video: rendered and encoded losslessly with %1").arg(enc));
+            line(themeColors().success.name(), tr("Video: rendered and encoded losslessly with %1").arg(enc));
         else if (m_plan.mode == ExportMode::MatchSource)
-            line(QStringLiteral("#d29922"), tr("Video: rendered and encoded with %1 using the source settings").arg(enc));
+            line(themeColors().warning.name(), tr("Video: rendered and encoded with %1 using the source settings").arg(enc));
         else
-            line(QStringLiteral("#d29922"), tr("Video: rendered and encoded with %1").arg(enc));
+            line(themeColors().warning.name(), tr("Video: rendered and encoded with %1").arg(enc));
         QString format = QStringLiteral("%1 × %2 · %3").arg(m_plan.outputSize.width()).arg(m_plan.outputSize.height())
                              .arg(formatFrameRate(m_plan.outputRate));
         if (m_plan.videoBitrate > 0 && m_plan.mode == ExportMode::Custom)
             format += QStringLiteral(" · %1 Mbit/s").arg(m_plan.videoBitrate / 1e6, 0, 'f', 1);
         if (m_plan.twoPass)
             format += tr(" · two passes");
-        line(QStringLiteral("#8b8b95"), format);
+        line(themeColors().textDim.name(), format);
         switch (m_plan.audio) {
-        case AudioStrategy::Copy: line(QStringLiteral("#3fb950"), tr("Audio: copied unchanged")); break;
+        case AudioStrategy::Copy: line(themeColors().success.name(), tr("Audio: copied unchanged")); break;
         case AudioStrategy::Encode:
             line(m_plan.audioEncoder == QLatin1String("flac") || m_plan.audioEncoder.startsWith(QLatin1String("pcm"))
-                     ? QStringLiteral("#3fb950")
-                     : QStringLiteral("#d29922"),
+                     ? themeColors().success.name()
+                     : themeColors().warning.name(),
                  tr("Audio: mixed and encoded with %1").arg(m_plan.audioEncoder));
             break;
-        case AudioStrategy::None: line(QStringLiteral("#8b8b95"), tr("Audio: none")); break;
+        case AudioStrategy::None: line(themeColors().textDim.name(), tr("Audio: none")); break;
         }
-        line(QStringLiteral("#8b8b95"), tr("Container: %1 · about %2").arg(m_plan.containerName, formatSeconds(m_plan.expectedDuration)));
+        line(themeColors().textDim.name(), tr("Container: %1 · about %2").arg(m_plan.containerName, formatSeconds(m_plan.expectedDuration)));
     } else if (!m_plan.segments.empty()) {
         if (m_plan.video == VideoStrategy::Copy)
-            line(QStringLiteral("#3fb950"), tr("Video: copied unchanged (no quality loss)"));
+            line(themeColors().success.name(), tr("Video: copied unchanged (no quality loss)"));
         else if (m_plan.mode == ExportMode::LosslessIntermediate)
-            line(QStringLiteral("#3fb950"), tr("Video: encoded losslessly with %1").arg(m_plan.videoEncoder));
+            line(themeColors().success.name(), tr("Video: encoded losslessly with %1").arg(m_plan.videoEncoder));
         else if (!m_plan.videoEncoder.isEmpty())
-            line(QStringLiteral("#d29922"), tr("Video: re-encoded with %1 using the source settings").arg(m_plan.videoEncoder));
+            line(themeColors().warning.name(), tr("Video: re-encoded with %1 using the source settings").arg(m_plan.videoEncoder));
         switch (m_plan.audio) {
-        case AudioStrategy::Copy: line(QStringLiteral("#3fb950"), tr("Audio: copied unchanged")); break;
+        case AudioStrategy::Copy: line(themeColors().success.name(), tr("Audio: copied unchanged")); break;
         case AudioStrategy::Encode:
-            line(m_plan.audioEncoder == QLatin1String("flac") ? QStringLiteral("#3fb950") : QStringLiteral("#d29922"),
+            line(m_plan.audioEncoder == QLatin1String("flac") ? themeColors().success.name() : themeColors().warning.name(),
                  tr("Audio: encoded with %1").arg(m_plan.audioEncoder));
             break;
-        case AudioStrategy::None: line(QStringLiteral("#8b8b95"), tr("Audio: none")); break;
+        case AudioStrategy::None: line(themeColors().textDim.name(), tr("Audio: none")); break;
         }
-        line(QStringLiteral("#8b8b95"), tr("Container: %1 · %n clip(s) · about %2", nullptr,
+        line(themeColors().textDim.name(), tr("Container: %1 · %n clip(s) · about %2", nullptr,
                                            static_cast<int>(m_plan.segments.size()))
                                             .arg(m_plan.containerName, formatSeconds(m_plan.expectedDuration)));
     }
     for (const auto& n : m_plan.notes)
-        line(QStringLiteral("#d29922"), n.toHtmlEscaped());
+        line(themeColors().warning.name(), n.toHtmlEscaped());
     for (const auto& b : m_plan.blockers)
-        line(QStringLiteral("#f85149"), b.toHtmlEscaped());
+        line(themeColors().danger.name(), b.toHtmlEscaped());
     m_planLabel->setText(html);
 
     bool shifted = false;

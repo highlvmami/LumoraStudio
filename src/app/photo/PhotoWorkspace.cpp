@@ -24,6 +24,7 @@
 
 #include "Icons.h"
 #include "MediaCache.h"
+#include "Theme.h"
 #include "dialogs/PhotoExportDialog.h"
 #include "image/PhotoLibrary.h"
 #include "image/PhotoProcessor.h"
@@ -105,6 +106,7 @@ PhotoWorkspace::PhotoWorkspace(PhotoLibrary* library, QUndoStack* undo, QWidget*
     m_list->setIconSize(QSize(96, 64));
     m_list->setSpacing(2);
     ll->addWidget(m_list, 1);
+    makePanelSurface(left);
     split->addWidget(left);
 
     // Center: view.
@@ -183,7 +185,9 @@ PhotoWorkspace::PhotoWorkspace(PhotoLibrary* library, QUndoStack* undo, QWidget*
     rl->addLayout(bottom);
     m_exportBtn = new QPushButton(Icons::exportFile(), tr("Export photo…"));
     m_exportBtn->setDefault(true);
+    markPrimary(m_exportBtn);
     rl->addWidget(m_exportBtn);
+    makePanelSurface(right);
     split->addWidget(right);
     split->setStretchFactor(1, 1);
     split->setSizes({180, 800, 280});
