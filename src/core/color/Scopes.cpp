@@ -135,11 +135,18 @@ QImage render(const QImage& image, Kind kind, QSize size) {
     }
 
     const QImage img = sampled(image);
+    // Waveforms are accumulated with at most 256 rows (one per 8-bit level)
+    // and stretched to the requested height, so tall scopes show a
+    // continuous trace instead of separated lines.
+    const int rows = std::min(h, 256);
+    auto stretch = [h](QImage trace) {
+        return trace.height() == h ? trace : trace.scaled(trace.width(), h, Qt::IgnoreAspectRatio, Qt::SmoothTransformation);
+    };
     if (kind == Kind::Waveform) {
-        std::vector<quint32> counts(static_cast<size_t>(w) * h, 0);
-        accumulateWaveform(img, 3, counts, w, h);
+        std::vector<quint32> counts(static_cast<size_t>(w) * rows, 0);
+        accumulateWaveform(img, 3, counts, w, rows);
         const double reference = static_cast<double>(img.height()) * img.width() / w;
-        return traceImage(counts, w, h, QColor(170, 245, 180), reference);
+        return stretch(traceImage(counts, w, rows, QColor(170, 245, 180), reference));
     }
 
     if (kind == Kind::Parade) {
@@ -147,10 +154,10 @@ QImage render(const QImage& image, Kind kind, QSize size) {
         QPainter p(&out);
         const QColor tints[3] = {QColor(255, 110, 110), QColor(110, 240, 130), QColor(120, 160, 255)};
         for (int c = 0; c < 3; ++c) {
-            std::vector<quint32> counts(static_cast<size_t>(third) * h, 0);
-            accumulateWaveform(img, c, counts, third, h);
+            std::vector<quint32> counts(static_cast<size_t>(third) * rows, 0);
+            accumulateWaveform(img, c, counts, third, rows);
             const double reference = static_cast<double>(img.height()) * img.width() / third;
-            p.drawImage(c * third + (w - 3 * third) / 2, 0, traceImage(counts, third, h, tints[c], reference));
+            p.drawImage(c * third + (w - 3 * third) / 2, 0, stretch(traceImage(counts, third, rows, tints[c], reference)));
         }
         return out;
     }

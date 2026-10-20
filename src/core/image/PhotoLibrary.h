@@ -44,10 +44,12 @@ private:
 // same control (a slider drag) merge into one step.
 class PhotoAdjustCommand : public QUndoCommand {
 public:
-    enum Control { Exposure = 1, Contrast, Temperature, Tint, Crop, Reset, Other };
+    enum Control { Exposure = 1, Contrast, Temperature, Tint, Crop, Reset, Other, Color, Layer };
 
+    // Commands merge when control and key match (e.g. Color + "shadows",
+    // or Layer + "<layer id>:opacity").
     PhotoAdjustCommand(PhotoLibrary* lib, QUuid photo, PhotoAdjustments before, PhotoAdjustments after,
-                       const QString& text, Control control);
+                       const QString& text, Control control, const QString& key = {});
 
     void undo() override;
     void redo() override;
@@ -59,6 +61,7 @@ private:
     QUuid m_photo;
     PhotoAdjustments m_before, m_after;
     Control m_control;
+    QString m_key;
     QDateTime m_time;
 };
 

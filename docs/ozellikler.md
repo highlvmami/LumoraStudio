@@ -1,6 +1,6 @@
 # LumoraStudio — Tam özellik listesi
 
-Bu liste projenin yol haritasıdır. Sürümlerde neyin hazır olduğu [README](../README.md#sürüm-02de-neler-var) içinde; hazır olanlar aşağıda ✅ ile işaretli, mimarinin bu özellikleri nasıl taşıyacağı [mimari.md](mimari.md) içinde anlatılıyor.
+Bu liste projenin yol haritasıdır. Sürümlerde neyin hazır olduğu [README](../README.md#sürüm-03te-neler-var) içinde; hazır olanlar aşağıda ✅ ile işaretli, mimarinin bu özellikleri nasıl taşıyacağı [mimari.md](mimari.md) içinde anlatılıyor.
 
 ## 1. Kalite ilkesi (projenin kalbi)
 
@@ -62,11 +62,12 @@ Hedef: kullanıcı istemedikçe hiçbir aşamada kalite düşmez.
 
 ### 2.5 Renk
 
-- Temel düzeltme: pozlama, kontrast, beyaz dengesi, doygunluk
-- Renk tekerlekleri (lift / gamma / gain), eğriler (RGB, ton, doygunluk)
+- ✅ Temel düzeltme: pozlama, kontrast, vurgular, gölgeler, beyazlar, siyahlar, beyaz dengesi, doygunluk, canlılık
+- ✅ Renk tekerlekleri (lift / gamma / gain)
+- Eğriler (RGB, ton, doygunluk)
 - HSL ile tek renk ayarı
-- LUT içe aktarma (.cube), kendi LUT'unu kaydetme
-- Kapsamlar: histogram, dalga formu, vektörskop, parade
+- ✅ LUT içe aktarma (.cube), kendi LUT'unu kaydetme
+- ✅ Kapsamlar: histogram, dalga formu, vektörskop, parade
 - Renk eşleştirme (bir klibi diğerine benzetme)
 - Düğüm tabanlı renk düzeni (ileri seviye)
 
@@ -119,9 +120,11 @@ Hedef: kullanıcı istemedikçe hiçbir aşamada kalite düşmez.
 
 ### 3.2 Temel ayarlar (Lightroom tarzı)
 
-- Pozlama, kontrast, vurgular, gölgeler, beyazlar, siyahlar
-- Beyaz dengesi (sıcaklık, ton), damlalık ile seçme
-- Netlik, doku, pus giderme, canlılık, doygunluk
+- ✅ Pozlama, kontrast, vurgular, gölgeler, beyazlar, siyahlar
+- ✅ Beyaz dengesi (sıcaklık, ton)
+- Beyaz dengesini damlalık ile seçme
+- ✅ Canlılık, doygunluk, renk tekerlekleri, LUT
+- Netlik, doku, pus giderme
 - Ton eğrisi, HSL / renk karıştırıcı, renk derecelendirme
 - Keskinleştirme, gürültü azaltma
 - Lens düzeltme (bozulma, vinyet, kromatik sapma), perspektif düzeltme
@@ -129,8 +132,10 @@ Hedef: kullanıcı istemedikçe hiçbir aşamada kalite düşmez.
 
 ### 3.3 Katmanlı düzenleme (Photoshop tarzı)
 
-- Katmanlar, gruplar, karışım modları, opaklık
-- Katman maskeleri, ayar katmanları
+- ✅ Katmanlar (ayar ve resim katmanları), karışım modları, opaklık
+- Katman grupları
+- ✅ Katman maskeleri: dikdörtgen, elips, degrade; yumuşak kenar, ters çevirme
+- Fırçayla maske boyama
 - Seçim araçları: dikdörtgen, kement, sihirli değnek, renk aralığı
 - Otomatik konu seçimi ve arka plan kaldırma (yerel model)
 - Fırça, silgi, damga (klonlama), iyileştirme fırçası
@@ -157,7 +162,7 @@ Hedef: kullanıcı istemedikçe hiçbir aşamada kalite düşmez.
 ## 4. Ortak özellikler
 
 - Fotoğrafı videoya, videodan kareyi fotoğrafa aktarma
-- Ortak renk ön ayarları (bir LUT hem fotoğrafta hem videoda kullanılır)
+- ✅ Ortak renk ön ayarları (bir LUT hem fotoğrafta hem videoda kullanılır; her görünüm .cube olarak kaydedilebilir)
 - Koyu / açık tema, özelleştirilebilir panel düzeni
 - Türkçe ve İngilizce arayüz
 - Tamamen yerel çalışma: hesap yok, bulut yok, yapay zeka modelleri de bilgisayarda çalışır
@@ -186,6 +191,6 @@ Hedef: kullanıcı istemedikçe hiçbir aşamada kalite düşmez.
 
 1. ✅ **Sürüm 0.1:** Video aç, kes, birleştir, kayıpsız dışa aktar (yeniden kodlamasız). Fotoğraf aç, kırp, temel ayarlar, kayıpsız kaydet.
 2. ✅ **Sürüm 0.2:** Çok izli zaman çizelgesi, yazı, geçişler, dışa aktarma ayarları, donanım hızlandırma.
-3. **Sürüm 0.3:** Renk paneli, kapsamlar, LUT; fotoğrafta katmanlar ve maskeler.
+3. ✅ **Sürüm 0.3:** Renk paneli, kapsamlar, LUT; fotoğrafta katmanlar ve maskeler.
 4. **Sürüm 0.4:** Ses araçları, altyazı, RAW desteği.
 5. **Sonrası:** Yapay zeka araçları, takip, çoklu kamera, eklentiler, HDR.

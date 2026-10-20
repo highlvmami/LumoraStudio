@@ -35,6 +35,8 @@
 #include "Icons.h"
 #include "Theme.h"
 #include "MediaCache.h"
+#include "color/ClipColorPanel.h"
+#include "color/ScopesWidget.h"
 #include "dialogs/ExportDialog.h"
 #include "ffmpeg/FFmpeg.h"
 #include "panels/MediaBinPanel.h"
@@ -72,8 +74,7 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
     m_tabs->addTab(tr("Color"));
     m_tabs->addTab(tr("Audio"));
     m_tabs->addTab(tr("Photo"));
-    m_tabs->setTabEnabled(1, false);
-    m_tabs->setTabToolTip(1, tr("Colour wheels, curves, LUTs and scopes arrive in version 0.3"));
+    m_tabs->setTabToolTip(1, tr("Colour grading: wheels, LUTs and scopes for the selected clip"));
     m_tabs->setTabEnabled(2, false);
     m_tabs->setTabToolTip(2, tr("Audio tools arrive in version 0.4"));
 
@@ -89,6 +90,8 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
     m_timelineView = new TimelineView(m_project->timeline(), m_project->media(), m_cache, m_videoUndo);
     m_timelinePanel = new TimelinePanel(m_timelineView);
     m_properties = new PropertiesPanel(m_project, m_videoUndo);
+    m_clipColor = new ClipColorPanel(m_project, m_videoUndo);
+    m_scopes = new ScopesWidget;
 
     createActions();
     createDocks();
@@ -182,6 +185,7 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
                 m_timelineView->ensurePlayheadVisible();
         }
     });
+    connect(m_engine, &PlaybackEngine::frameReady, m_scopes, [this](const QImage& img) { m_scopes->setImage(img); });
     connect(m_engine, &PlaybackEngine::playingChanged, this,
             [this](bool playing) { m_actPlay->setIcon(playing ? Icons::pause() : Icons::play()); });
     connect(m_timelineView, &TimelineView::seekRequested, this, [this](Ticks t) {
@@ -198,6 +202,7 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
             m_properties->showNothing();
         else
             m_properties->showClip(sel.front());
+        m_clipColor->showClip(sel.isEmpty() ? QUuid() : sel.front());
         const bool has = !sel.isEmpty();
         m_actDelete->setEnabled(has);
         m_actJoin->setEnabled(has && m_project->timeline()->canJoinWithNext(sel.front()));
@@ -330,15 +335,8 @@ void MainWindow::createActions() {
     m_actZoomOut = make(tr("Zoom out"), QKeySequence(Qt::Key_Minus),
                         [this] { m_timelineView->setPixelsPerSecond(m_timelineView->pixelsPerSecond() / 1.5); });
     m_actResetLayout = make(tr("Reset panel layout"), {}, [this] {
-        for (QDockWidget* d : {m_binDock, m_propsDock, m_timelineDock}) {
-            d->setFloating(false);
-            d->show();
-        }
-        addDockWidget(Qt::LeftDockWidgetArea, m_binDock);
-        addDockWidget(Qt::RightDockWidgetArea, m_propsDock);
-        addDockWidget(Qt::BottomDockWidgetArea, m_timelineDock);
-        resizeDocks({m_timelineDock}, {280}, Qt::Vertical);
-        resizeDocks({m_binDock, m_propsDock}, {300, 280}, Qt::Horizontal);
+        if (m_workspace != Workspace::Photo)
+            applyDefaultLayout(m_workspace);
     });
 
     m_actAddTitle = make(tr("Add &title"), QKeySequence(Qt::Key_T), [this] { addTitle(); }, Icons::title());
@@ -450,6 +448,8 @@ void MainWindow::createMenus() {
     panels->addAction(m_binDock->toggleViewAction());
     panels->addAction(m_propsDock->toggleViewAction());
     panels->addAction(m_timelineDock->toggleViewAction());
+    panels->addAction(m_colorDock->toggleViewAction());
+    panels->addAction(m_scopesDock->toggleViewAction());
     view->addAction(m_actResetLayout);
 
     QMenu* help = menuBar()->addMenu(tr("&Help"));
@@ -478,6 +478,8 @@ void MainWindow::createDocks() {
     m_binDock = makeDock(tr("Files"), QStringLiteral("filesDock"), m_bin);
     m_propsDock = makeDock(tr("Properties"), QStringLiteral("propertiesDock"), m_properties);
     m_timelineDock = makeDock(tr("Timeline"), QStringLiteral("timelineDock"), m_timelinePanel);
+    m_colorDock = makeDock(tr("Color"), QStringLiteral("colorDock"), m_clipColor);
+    m_scopesDock = makeDock(tr("Scopes"), QStringLiteral("scopesDock"), m_scopes);
     setCorner(Qt::BottomLeftCorner, Qt::BottomDockWidgetArea);
     setCorner(Qt::BottomRightCorner, Qt::BottomDockWidgetArea);
     addDockWidget(Qt::LeftDockWidgetArea, m_binDock);
@@ -485,6 +487,30 @@ void MainWindow::createDocks() {
     addDockWidget(Qt::BottomDockWidgetArea, m_timelineDock);
     resizeDocks({m_timelineDock}, {280}, Qt::Vertical);
     resizeDocks({m_binDock, m_propsDock}, {300, 280}, Qt::Horizontal);
+    // Colour docks belong to the Color workspace.
+    addDockWidget(Qt::RightDockWidgetArea, m_colorDock);
+    addDockWidget(Qt::LeftDockWidgetArea, m_scopesDock);
+    m_colorDock->hide();
+    m_scopesDock->hide();
+}
+
+void MainWindow::applyDefaultLayout(Workspace w) {
+    const bool color = w == Workspace::Color;
+    for (QDockWidget* d : {m_binDock, m_propsDock, m_timelineDock, m_colorDock, m_scopesDock})
+        d->setFloating(false);
+    addDockWidget(Qt::LeftDockWidgetArea, color ? m_scopesDock : m_binDock);
+    addDockWidget(Qt::RightDockWidgetArea, color ? m_colorDock : m_propsDock);
+    addDockWidget(Qt::BottomDockWidgetArea, m_timelineDock);
+    m_binDock->setVisible(!color);
+    m_propsDock->setVisible(!color);
+    m_scopesDock->setVisible(color);
+    m_colorDock->setVisible(color);
+    m_timelineDock->show();
+    resizeDocks({m_timelineDock}, {color ? 230 : 280}, Qt::Vertical);
+    if (color)
+        resizeDocks({m_scopesDock, m_colorDock}, {380, 360}, Qt::Horizontal);
+    else
+        resizeDocks({m_binDock, m_propsDock}, {300, 280}, Qt::Horizontal);
 }
 
 void MainWindow::restoreSettings() {
@@ -495,12 +521,16 @@ void MainWindow::restoreSettings() {
 }
 
 void MainWindow::setWorkspace(Workspace w) {
-    if (w == Workspace::Color || w == Workspace::Audio)
+    if (w == Workspace::Audio)
         w = Workspace::Edit;
     const bool photo = w == Workspace::Photo;
-    if (photo && m_workspace != Workspace::Photo) {
-        m_engine->pause();
-        m_editDockState = saveState();
+    const Workspace previous = m_workspace;
+    if (w != previous) {
+        // Each workspace keeps its own panel arrangement.
+        if (previous != Workspace::Photo)
+            m_dockStates[static_cast<int>(previous)] = saveState();
+        if (photo)
+            m_engine->pause();
     }
     m_workspace = w;
     {
@@ -509,12 +539,15 @@ void MainWindow::setWorkspace(Workspace w) {
     }
     m_stack->setCurrentIndex(photo ? 1 : 0);
     if (photo) {
-        for (QDockWidget* d : {m_binDock, m_propsDock, m_timelineDock})
+        for (QDockWidget* d : {m_binDock, m_propsDock, m_timelineDock, m_colorDock, m_scopesDock})
             d->hide();
-    } else if (!m_editDockState.isEmpty()) {
-        restoreState(m_editDockState);
-        m_editDockState.clear();
+    } else if (w != previous) {
+        const QByteArray state = m_dockStates.value(static_cast<int>(w));
+        if (state.isEmpty() || !restoreState(state))
+            applyDefaultLayout(w);
     }
+    if (w == Workspace::Color && m_timelineView->selection().isEmpty())
+        selectClipAtPlayhead();
     m_undoGroup->setActiveStack(photo ? m_photoUndo : m_videoUndo);
     for (QAction* a : {m_actSplit, m_actDelete, m_actJoin, m_actPlay, m_actPrevFrame, m_actNextFrame, m_actHome, m_actEnd,
                        m_actMarkIn, m_actMarkOut, m_actAddSource, m_actZoomIn, m_actZoomOut, m_actExport, m_actAddTitle,
@@ -556,8 +589,9 @@ void MainWindow::closeEvent(QCloseEvent* e) {
         return;
     }
     m_engine->pause();
-    if (m_workspace == Workspace::Photo && !m_editDockState.isEmpty())
-        restoreState(m_editDockState);
+    // The saved layout is the Edit workspace's.
+    if (m_workspace != Workspace::Edit && m_dockStates.contains(static_cast<int>(Workspace::Edit)))
+        restoreState(m_dockStates.value(static_cast<int>(Workspace::Edit)));
     QSettings s;
     s.setValue(QStringLiteral("window/geometry"), saveGeometry());
     s.setValue(QStringLiteral("window/state"), saveState());
@@ -919,6 +953,18 @@ void MainWindow::openExportDialog(bool modal) {
 void MainWindow::seekSeconds(double s) {
     m_engine->seek(ticksFromSeconds(s));
     m_timelineView->setPlayhead(m_engine->position());
+}
+
+void MainWindow::selectClipAtPlayhead() {
+    const Ticks t = m_engine->position();
+    const auto& tracks = m_project->timeline()->tracks();
+    if (tracks.empty())
+        return;
+    for (const auto& c : tracks[0].clips)
+        if (c.contains(t)) {
+            m_timelineView->selectOnly(c.id);
+            return;
+        }
 }
 
 void MainWindow::selectFirstClip(int track, int index) {

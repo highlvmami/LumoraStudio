@@ -18,6 +18,12 @@ set(APP_SOURCES
     dialogs/ExportDialog.h dialogs/ExportDialog.cpp
     dialogs/PhotoExportDialog.h dialogs/PhotoExportDialog.cpp
     dialogs/SettingsDialog.h dialogs/SettingsDialog.cpp
+    color/SliderRow.h color/SliderRow.cpp
+    color/ColorWheelWidget.h color/ColorWheelWidget.cpp
+    color/ColorPanel.h color/ColorPanel.cpp
+    color/ClipColorPanel.h color/ClipColorPanel.cpp
+    color/ScopesWidget.h color/ScopesWidget.cpp
+    photo/LayersPanel.h photo/LayersPanel.cpp
     photo/PhotoView.h photo/PhotoView.cpp
     photo/PhotoWorkspace.h photo/PhotoWorkspace.cpp
 )

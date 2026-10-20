@@ -12,11 +12,13 @@
 #include <QListWidget>
 #include <QMessageBox>
 #include <QPushButton>
+#include <QScrollArea>
 #include <QSettings>
 #include <QShortcut>
 #include <QSignalBlocker>
 #include <QSlider>
 #include <QSplitter>
+#include <QTabWidget>
 #include <QTimer>
 #include <QToolButton>
 #include <QUndoStack>
@@ -25,66 +27,19 @@
 #include "Icons.h"
 #include "MediaCache.h"
 #include "Theme.h"
+#include "color/ColorPanel.h"
+#include "color/ScopesWidget.h"
 #include "dialogs/PhotoExportDialog.h"
 #include "image/PhotoLibrary.h"
 #include "image/PhotoProcessor.h"
 #include "media/MediaInfo.h"
+#include "photo/LayersPanel.h"
 #include "photo/PhotoView.h"
 
 namespace lumora {
 
 namespace {
 constexpr int kIdRole = Qt::UserRole + 1;
-}
-
-// ---------------------------------------------------------------- SliderRow
-
-SliderRow::SliderRow(const QString& label, double min, double max, double step, int decimals, QWidget* parent)
-    : QWidget(parent), m_step(step) {
-    auto* grid = new QGridLayout(this);
-    grid->setContentsMargins(0, 2, 0, 2);
-    auto* l = new QLabel(label);
-    m_spin = new QDoubleSpinBox;
-    m_spin->setRange(min, max);
-    m_spin->setDecimals(decimals);
-    m_spin->setSingleStep(step);
-    m_spin->setButtonSymbols(QAbstractSpinBox::NoButtons);
-    m_spin->setAlignment(Qt::AlignRight);
-    m_spin->setFixedWidth(64);
-    m_slider = new QSlider(Qt::Horizontal);
-    m_slider->setRange(static_cast<int>(std::lround(min / step)), static_cast<int>(std::lround(max / step)));
-    m_slider->installEventFilter(this);
-    m_slider->setToolTip(tr("Double-click to reset"));
-    grid->addWidget(l, 0, 0);
-    grid->addWidget(m_spin, 0, 1);
-    grid->addWidget(m_slider, 1, 0, 1, 2);
-    connect(m_slider, &QSlider::valueChanged, this, [this](int v) {
-        m_value = v * m_step;
-        const QSignalBlocker b(m_spin);
-        m_spin->setValue(m_value);
-        emit valueChanged(m_value);
-    });
-    connect(m_spin, &QDoubleSpinBox::editingFinished, this, [this] {
-        m_value = m_spin->value();
-        const QSignalBlocker b(m_slider);
-        m_slider->setValue(static_cast<int>(std::lround(m_value / m_step)));
-        emit valueChanged(m_value);
-    });
-}
-
-void SliderRow::setValue(double v) {
-    m_value = v;
-    const QSignalBlocker b1(m_slider), b2(m_spin);
-    m_slider->setValue(static_cast<int>(std::lround(v / m_step)));
-    m_spin->setValue(v);
-}
-
-bool SliderRow::eventFilter(QObject* o, QEvent* e) {
-    if (o == m_slider && e->type() == QEvent::MouseButtonDblClick) {
-        m_slider->setValue(0);
-        return true;
-    }
-    return QWidget::eventFilter(o, e);
 }
 
 // ----------------------------------------------------------- PhotoWorkspace
@@ -116,27 +71,33 @@ PhotoWorkspace::PhotoWorkspace(PhotoLibrary* library, QUndoStack* undo, QWidget*
                               "when you export."));
     split->addWidget(m_view);
 
-    // Right: adjustments.
+    // Right: scope, then the photo's colour settings and its layers in tabs,
+    // then crop and export.
     auto* right = new QWidget;
-    right->setMinimumWidth(260);
+    right->setMinimumWidth(350);
     auto* rl = new QVBoxLayout(right);
     rl->setContentsMargins(8, 8, 8, 8);
 
-    auto* light = new QGroupBox(tr("Light"));
-    auto* lightL = new QVBoxLayout(light);
-    m_exposure = new SliderRow(tr("Exposure (EV)"), -5, 5, 0.01, 2);
-    m_contrast = new SliderRow(tr("Contrast"), -100, 100, 1, 0);
-    lightL->addWidget(m_exposure);
-    lightL->addWidget(m_contrast);
-    rl->addWidget(light);
+    m_scope = new ScopesWidget(nullptr, scopes::Kind::Histogram, QStringLiteral("photo/scopeKind"));
+    m_scope->setMinimumHeight(150);
+    m_scope->setMaximumHeight(190);
+    rl->addWidget(m_scope);
 
-    auto* wb = new QGroupBox(tr("White balance"));
-    auto* wbL = new QVBoxLayout(wb);
-    m_temperature = new SliderRow(tr("Temperature"), -100, 100, 1, 0);
-    m_tint = new SliderRow(tr("Tint"), -100, 100, 1, 0);
-    wbL->addWidget(m_temperature);
-    wbL->addWidget(m_tint);
-    rl->addWidget(wb);
+    m_tabs = new QTabWidget;
+    m_tabs->setDocumentMode(true);
+    auto scrolled = [](QWidget* w) {
+        auto* sa = new QScrollArea;
+        sa->setWidgetResizable(true);
+        sa->setFrameShape(QFrame::NoFrame);
+        sa->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+        sa->setWidget(w);
+        return sa;
+    };
+    m_color = new ColorPanel;
+    m_layers = new LayersPanel;
+    m_tabs->addTab(scrolled(m_color), tr("Adjust"));
+    m_tabs->addTab(scrolled(m_layers), tr("Layers"));
+    rl->addWidget(m_tabs, 1);
 
     auto* cropBox = new QGroupBox(tr("Crop"));
     auto* cropL = new QGridLayout(cropBox);
@@ -163,7 +124,6 @@ PhotoWorkspace::PhotoWorkspace(PhotoLibrary* library, QUndoStack* undo, QWidget*
     cropL->addWidget(resetCrop, 0, 2);
     rl->addWidget(cropBox);
 
-    rl->addStretch();
     m_info = new QLabel;
     m_info->setWordWrap(true);
     m_info->setStyleSheet(QStringLiteral("color: palette(placeholder-text);"));
@@ -190,7 +150,7 @@ PhotoWorkspace::PhotoWorkspace(PhotoLibrary* library, QUndoStack* undo, QWidget*
     makePanelSurface(right);
     split->addWidget(right);
     split->setStretchFactor(1, 1);
-    split->setSizes({180, 800, 280});
+    split->setSizes({180, 800, 370});
 
     m_renderTimer = new QTimer(this);
     m_renderTimer->setSingleShot(true);
@@ -203,19 +163,34 @@ PhotoWorkspace::PhotoWorkspace(PhotoLibrary* library, QUndoStack* undo, QWidget*
         if (it)
             showPhoto(it->data(kIdRole).toUuid());
     });
-    auto bindSlider = [this](SliderRow* s, double PhotoAdjustments::*field, const QString& text, int control) {
-        connect(s, &SliderRow::valueChanged, this, [this, field, text, control](double v) {
-            if (m_syncing || m_current.isNull())
-                return;
-            PhotoAdjustments a = current();
-            a.*field = v;
-            pushChange(a, text, control);
-        });
-    };
-    bindSlider(m_exposure, &PhotoAdjustments::exposure, tr("Exposure"), PhotoAdjustCommand::Exposure);
-    bindSlider(m_contrast, &PhotoAdjustments::contrast, tr("Contrast"), PhotoAdjustCommand::Contrast);
-    bindSlider(m_temperature, &PhotoAdjustments::temperature, tr("Temperature"), PhotoAdjustCommand::Temperature);
-    bindSlider(m_tint, &PhotoAdjustments::tint, tr("Tint"), PhotoAdjustCommand::Tint);
+    connect(m_color, &ColorPanel::gradeEdited, this, [this](const ColorGrade& g, const QString& text, const QString& field) {
+        if (m_syncing || m_current.isNull())
+            return;
+        PhotoAdjustments a = current();
+        a.color = g;
+        pushChange(a, text, field.isEmpty() ? PhotoAdjustCommand::Other : PhotoAdjustCommand::Color, field);
+    });
+    connect(m_layers, &LayersPanel::layersEdited, this,
+            [this](const std::vector<PhotoLayer>& layers, const QString& text, const QString& field) {
+                if (m_syncing || m_current.isNull())
+                    return;
+                PhotoAdjustments a = current();
+                a.layers = layers;
+                pushChange(a, text, field.isEmpty() ? PhotoAdjustCommand::Other : PhotoAdjustCommand::Layer, field);
+            });
+    connect(m_layers, &LayersPanel::currentLayerChanged, this, &PhotoWorkspace::updateMaskOverlay);
+    m_tabs->setCurrentIndex(QSettings().value(QStringLiteral("photo/tab"), 0).toInt());
+    connect(m_tabs, &QTabWidget::currentChanged, this, [this](int i) {
+        QSettings().setValue(QStringLiteral("photo/tab"), i);
+        updateMaskOverlay();
+    });
+    connect(m_view, &PhotoView::maskMoved, this, [this](const QRectF& r) {
+        PhotoAdjustments a = current();
+        for (auto& l : a.layers)
+            if (l.id == m_layers->currentLayer())
+                l.mask.rect = r;
+        pushChange(a, tr("Move mask"), PhotoAdjustCommand::Other);
+    });
 
     connect(m_cropBtn, &QToolButton::toggled, this, [this](bool on) {
         m_view->setCropMode(on);
@@ -246,6 +221,7 @@ PhotoWorkspace::PhotoWorkspace(PhotoLibrary* library, QUndoStack* undo, QWidget*
     connect(resetBtn, &QToolButton::clicked, this, &PhotoWorkspace::resetAll);
     connect(m_compareBtn, &QToolButton::toggled, this, [this](bool on) {
         m_compare = on;
+        updateMaskOverlay();
         scheduleRender();
     });
     connect(m_exportBtn, &QPushButton::clicked, this, &PhotoWorkspace::exportCurrent);
@@ -344,14 +320,12 @@ void PhotoWorkspace::loadCurrent() {
 void PhotoWorkspace::syncControls() {
     m_syncing = true;
     const PhotoAdjustments a = current();
-    m_exposure->setValue(a.exposure);
-    m_contrast->setValue(a.contrast);
-    m_temperature->setValue(a.temperature);
-    m_tint->setValue(a.tint);
-    m_view->setCrop(a.crop);
     const bool has = !m_working.isNull();
-    for (QWidget* w : std::initializer_list<QWidget*>{m_exposure, m_contrast, m_temperature, m_tint, m_cropBtn, m_aspect,
-                                                      m_exportBtn, m_compareBtn})
+    m_color->setGrade(a.color);
+    m_color->setEditable(has);
+    m_layers->setLayers(a.layers, has);
+    m_view->setCrop(a.crop);
+    for (QWidget* w : std::initializer_list<QWidget*>{m_cropBtn, m_aspect, m_exportBtn, m_compareBtn})
         w->setEnabled(has);
     if (has) {
         const QRect cr = a.cropRect(m_working.size());
@@ -365,14 +339,21 @@ void PhotoWorkspace::syncControls() {
         m_info->clear();
     }
     m_syncing = false;
+    updateMaskOverlay();
 }
 
-void PhotoWorkspace::pushChange(const PhotoAdjustments& after, const QString& text, int control) {
+void PhotoWorkspace::updateMaskOverlay() {
+    const PhotoLayer* l = m_layers->current();
+    const bool show = l && m_tabs->currentIndex() == 1 && l->mask.shape != MaskShape::None && !m_compare;
+    m_view->setMaskOverlay(show ? std::optional<LayerMask>(l->mask) : std::nullopt);
+}
+
+void PhotoWorkspace::pushChange(const PhotoAdjustments& after, const QString& text, int control, const QString& key) {
     const PhotoAdjustments before = current();
     if (before == after)
         return;
     m_undo->push(new PhotoAdjustCommand(m_lib, m_current, before, after, text,
-                                        static_cast<PhotoAdjustCommand::Control>(control)));
+                                        static_cast<PhotoAdjustCommand::Control>(control), key));
 }
 
 void PhotoWorkspace::resetAll() {
@@ -390,9 +371,13 @@ void PhotoWorkspace::render() {
     }
     PhotoAdjustments a = current();
     if (m_compare)
-        a = PhotoAdjustments{.crop = a.crop};
+        a = PhotoAdjustments{.color = {}, .crop = a.crop, .layers = {}};
     const QImage processed = PhotoProcessor::apply(m_proxy, a, false); // crop is drawn by the view
-    m_view->setImage(processed.convertToFormat(QImage::Format_RGBX8888));
+    const QImage shown = processed.convertToFormat(QImage::Format_RGBX8888);
+    m_view->setImage(shown);
+    // The scope shows the result that will be exported, i.e. the cropped part.
+    const QRect crop = a.cropRect(shown.size());
+    m_scope->setImage(crop == shown.rect() ? shown : shown.copy(crop));
     m_view->setBadge(m_compare ? tr("Before") : QString());
 }
 

@@ -1,13 +1,13 @@
 # Mimari
 
-Bu belge 0.1 ve 0.2'nin nasıl kurulduğunu ve [özellik listesindeki](ozellikler.md) her şeyin ileride nereye oturacağını anlatır.
+Bu belge 0.1, 0.2 ve 0.3'ün nasıl kurulduğunu ve [özellik listesindeki](ozellikler.md) her şeyin ileride nereye oturacağını anlatır.
 
 ## Katmanlar
 
 ```
 ┌──────────────────────────── src/app (Qt Widgets) ────────────────────────────┐
 │ MainWindow · çalışma alanları (Kurgu / Renk / Ses / Fotoğraf)                │
-│ Paneller: Dosyalar, Önizleme, Özellikler, Zaman çizelgesi · Pencereler       │
+│ Paneller: Dosyalar, Önizleme, Özellikler, Zaman çizelgesi, Renk, Kapsamlar   │
 │ PlaybackEngine (video iş parçacığı + ses iş parçacığı) · MediaCache          │
 └───────────────┬──────────────────────────────────────────────────────────────┘
                 │ yalnızca çekirdeğin genel API'si
@@ -16,7 +16,8 @@ Bu belge 0.1 ve 0.2'nin nasıl kurulduğunu ve [özellik listesindeki](ozellikle
 │ undo/     komutlar (QUndoCommand)                                            │
 │ export/   ExportPlanner (karar) → TimelineExporter / RenderExport (uygulama) │
 │ render/   FrameRenderer · TitleRenderer · AudioMixer                         │
-│ image/    PhotoProcessor (32-bit float hattı) · PhotoExporter                │
+│ color/    ColorGrade · ColorProcessor (32-bit float) · Lut (.cube) · Scopes  │
+│ image/    PhotoProcessor (renk + katmanlar + maskeler) · PhotoExporter       │
 │ media/    MediaInfo · VideoDecoder · AudioDecoder                            │
 │ ffmpeg/   RAII sarmalayıcılar, sürüm uyumluluğu (FFmpeg 6.1 – 8.x)           │
 └──────────────────────────────────────────────────────────────────────────────┘
@@ -38,9 +39,13 @@ Bu belge 0.1 ve 0.2'nin nasıl kurulduğunu ve [özellik listesindeki](ozellikle
 
 **Üç video stratejisi.** Planlayıcı her dışa aktarma için `Copy` (paket kopyalama), `Encode` (bölüm bölüm yeniden kodlama) ya da `Render` (birleştirici üzerinden sabit kare hızında kodlama) seçer. Başlık, geçiş, birden çok iz ya da dönüşüm varsa kayıpsız kesim engellenir ve neden yazılır. Kodlayıcı ayarları (`encoders::configure`) her kodlayıcının kendi kalite ölçeğine, bit hızı modlarına ve iki geçiş yöntemine çevrilir; donanım kodlayıcıları bir kez gerçekten açılarak denenir.
 
+**Renk tek bir hattan geçer.** `ColorGrade` birkaç sayıdan (ışık, beyaz dengesi, doygunluk, lift/gamma/gain, LUT yolu ve miktarı) ibarettir ve video klipte (`Clip::color`), fotoğrafta (`PhotoAdjustments::color`) ve fotoğrafın ayar katmanlarında aynıdır. `ColorProcessor` bunu her piksel için 32-bit float'ta uygular: beyaz dengesi, pozlama ve kontrast doğrusal ışıkta; ton aralıkları algısal parlaklıkta; tekerlekler ve LUT ekran kodlu değerlerde (.cube dosyalarının neredeyse hepsi bunu bekler). Üs eğrileri yoğun tablolardan okunur (hata 1e-6'nın altında), böylece önizleme de tam hesabı yapar, ayrı bir "hızlı" yol yoktur. `FrameRenderer` klip karesini çıktı boyutuna dönüştürdükten hemen sonra, birleştirmeden önce rengi uygular; renk ayarı olan kare `passthroughFrame` yolundan geçmez, planlayıcı da kayıpsız kesimi engeller. Okunamayan bir LUT dışa aktarmayı başlamadan durdurur. Görünüm `Lut::sample` ile 3B tabloya çevrilip .cube olarak kaydedilebilir.
+
+**Fotoğraf katmanları.** `PhotoAdjustments` = genel renk + kırpma + katman listesi (alttan üste). Ayar katmanı, alttaki her şeyin renk ayarlı kopyasını maske ve opaklıkla karıştırır; resim katmanı başka bir resmi konum/boyutla yerleştirir. İkisi de karışım modunu (W3C tanımları) ekran kodlu değerlerde uygular. Maskeler (dikdörtgen, elips, degrade; yumuşak kenar, ters) kırpılmamış fotoğrafın normalize koordinatlarındadır, böylece önizleme vekilinde ve tam çözünürlükte aynı yere düşer. Kırpma en son yapılır. Katmanı olmayan ve rengi değişmeyen fotoğraf yine bit bit aynı kaydedilir.
+
 **Geri al her şeyi kapsar.** Zaman çizelgesi değişiklikleri anlık görüntü (snapshot) komutlarıyla, fotoğraf ayarları birleşebilen komutlarla (`mergeWith`) kaydedilir. Video ve fotoğrafın ayrı geçmişi vardır (`QUndoGroup`).
 
-**Görünüm tek yerden gelir.** `src/app/Theme.*` "Gece" ve "Gündüz" temalarının adlandırılmış renklerini (`themeColors()`), paleti, uygulama genelindeki stil sayfasını ve gömülü Inter yazı tipini tanımlar. Kendini çizen bileşenler (zaman çizelgesi, önizleme, küçük resimler, ileride scope'lar) renklerini buradan alır; panel kartları `makePanelSurface`, ana eylem düğmeleri `markPrimary` ile işaretlenir.
+**Görünüm tek yerden gelir.** `src/app/Theme.*` "Gece" ve "Gündüz" temalarının adlandırılmış renklerini (`themeColors()`), paleti, uygulama genelindeki stil sayfasını ve gömülü Inter yazı tipini tanımlar. Kendini çizen bileşenler (zaman çizelgesi, önizleme, küçük resimler, kapsamlar, renk tekerlekleri) renklerini buradan alır; panel kartları `makePanelSurface`, ana eylem düğmeleri `markPrimary` ile işaretlenir.
 
 **Proje dosyası okunabilir ve sürümlüdür.** `.lumora` JSON'dur; `version` alanı sayesinde eski projeler ileride dönüştürülerek açılır.
 
@@ -51,11 +56,11 @@ Bu belge 0.1 ve 0.2'nin nasıl kurulduğunu ve [özellik listesindeki](ozellikle
 | Akıllı render (yalnızca efektli kısmı kodla) | `SegmentPlan` bölüm bölümdür; efektli bölümler `Render`, diğerleri `Copy` olabilir. GOP sınırında yeniden kodlama `TimelineExporter`'a eklenir. |
 | Ripple/roll/slip/slide, iç içe zaman çizelgesi | Yeni düzenleme işlemleri `Timeline` metotları + snapshot geri alma olarak eklenir. |
 | PNG/TIFF dizisi, GIF/WebP | `encoders` tablosuna yeni çıktı türü; `RenderExport` kare kare yazar. |
-| Efektler, renk, anahtar kareler | `ClipEffects` (başlık, dönüşüm, geçiş, ses) bir efekt yığınına ve anahtar karelere genişler; `FrameRenderer` GPU üzerinde 32-bit float işleyen bir render grafiğine dönüşür. Fotoğraf hattı (`PhotoProcessor`) aynı doğrusal ışık / float modelini kullanır, böylece LUT ve renk ayarları ortak olur. |
+| Efektler, eğriler, anahtar kareler | `ClipEffects` (başlık, dönüşüm, geçiş, ses, renk) bir efekt yığınına ve anahtar karelere genişler; `FrameRenderer` GPU üzerinde 32-bit float işleyen bir render grafiğine dönüşür. Eğriler ve HSL, `ColorProcessor` zincirine yeni adımlar olarak eklenir ve video ile fotoğrafta aynı anda çalışır. |
 | Renk yönetimi, HDR, OCIO/ACES | `VideoStreamInfo` renk alanı, aktarım ve HDR bilgisini zaten taşır; dışa aktarma bunları korur. Dönüşümler render grafiğine düğüm olarak gelir. |
 | Ses araçları, LUFS, ducking | `AudioDecoder` + ayrı bir ses grafiği; A izleri zaten var. |
 | Proxy düzenleme | `MediaItem`'a proxy yolu; oynatma proxy'yi, dışa aktarma asıl dosyayı okur (önizleme/çıktı ayrımı zaten var). |
-| Fotoğraf: katmanlar, maskeler, RAW, HEIC/AVIF | `PhotoAdjustments` bir katman yığınına dönüşür; okuyucular (LibRaw vb.) `PhotoProcessor::load` arkasına eklenir. |
+| Fotoğraf: fırça maskesi, seçim araçları, RAW, HEIC/AVIF | `LayerMask`'a bitmap maske türü eklenir (fırça, sihirli değnek, konu seçimi aynı maskeyi üretir); okuyucular (LibRaw vb.) `PhotoProcessor::load` arkasına eklenir. |
 | EXIF / meta veri koruma | Video meta verisi ve yan veriler (HDR, döndürme) şimdiden kopyalanıyor; fotoğraf EXIF'i 0.2'de `PhotoExporter`'a eklenecek. |
 | Otomatik kayıt, kurtarma | `Project::toJson` hazır; zamanlayıcı ile ayrı bir dosyaya yazılır. |
 | Yapay zeka araçları | Ayrı bir `src/ai` modülü (ONNX Runtime); çekirdekle yalnızca kare/ses arabellekleri üzerinden konuşur. |
