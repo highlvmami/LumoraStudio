@@ -76,7 +76,7 @@ void TimelinePanel::setInfoText(const QString& text) { m_info->setText(text); }
 
 void TimelinePanel::syncScrollBar() {
     const QSignalBlocker b(m_scroll);
-    const int visible = std::max(1, m_view->width() - 70);
+    const int visible = std::max(1, m_view->width() - TimelineView::kHeader);
     m_scroll->setRange(0, std::max(0, m_view->contentWidth() - visible));
     m_scroll->setPageStep(visible);
     m_scroll->setValue(m_view->scrollX());

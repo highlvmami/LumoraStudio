@@ -37,7 +37,7 @@ public:
     void setWorkspace(Workspace w);
 
     // Used by --screenshot for the documentation.
-    void selectFirstClip();
+    void selectFirstClip(int track = 0, int index = 0);
     void openExportDialog(bool modal);
     void seekSeconds(double s);
 
@@ -59,9 +59,14 @@ private:
     bool saveProject();
     bool saveProjectAs();
     void importMedia();
-    void importFiles(const QStringList& paths, Ticks at = kInvalidTicks, bool toTimeline = false);
-    void addMediaToTimeline(const QList<QUuid>& ids, Ticks at = kInvalidTicks);
-    void addRangeToTimeline(const QUuid& media, Ticks in, Ticks out, Ticks at = kInvalidTicks);
+    void importFiles(const QStringList& paths, Ticks at = kInvalidTicks, bool toTimeline = false, int track = -1);
+    // track < 0: insert into the storyline; otherwise place on that track at `at`.
+    void addMediaToTimeline(const QList<QUuid>& ids, Ticks at = kInvalidTicks, int track = -1);
+    Ticks addRangeToTimeline(const QUuid& media, Ticks in, Ticks out, Ticks at = kInvalidTicks, int track = -1);
+    void addTitle(int track = -1, Ticks at = kInvalidTicks);
+    void addTransition();
+    void removeTransition();
+    void exportFrame();
     void removeMedia(const QList<QUuid>& ids);
     void exportVideo();
     void splitAtPlayhead();
@@ -121,6 +126,11 @@ private:
     QAction* m_actZoomIn;
     QAction* m_actZoomOut;
     QAction* m_actResetLayout;
+    QAction* m_actAddTitle;
+    QAction* m_actAddTransition;
+    QAction* m_actAddVideoTrack;
+    QAction* m_actAddAudioTrack;
+    QAction* m_actExportFrame;
 };
 
 } // namespace lumora

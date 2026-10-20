@@ -29,6 +29,8 @@ QIcon zoomOut();
 QIcon reset();
 QIcon compare();
 QIcon keyframe();
+QIcon title();
+QIcon transition();
 QIcon appIcon();
 
 } // namespace lumora::Icons

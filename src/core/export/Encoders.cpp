@@ -8,6 +8,7 @@
 #include "ffmpeg/FFmpeg.h"
 
 extern "C" {
+#include <libavutil/log.h>
 #include <libavutil/opt.h>
 #include <libavutil/pixdesc.h>
 }
@@ -165,7 +166,11 @@ bool works(const QString& encoder) {
         ctx->time_base = AVRational{1, 25};
         ctx->framerate = AVRational{25, 1};
         ctx->bit_rate = 1000000;
+        // A missing driver is the expected answer here, not an error worth logging.
+        const int level = av_log_get_level();
+        av_log_set_level(AV_LOG_QUIET);
         ok = fmt != AV_PIX_FMT_NONE && avcodec_open2(ctx.get(), codec, nullptr) >= 0;
+        av_log_set_level(level);
     }
     cache.insert(encoder, ok);
     return ok;
