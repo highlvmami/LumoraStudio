@@ -75,6 +75,12 @@ jobs:
           Copy-Item build\src\app\LumoraStudio.exe $dist
           windeployqt --release --no-compiler-runtime --dir $dist "$dist\LumoraStudio.exe"
           Copy-Item "$env:FFMPEG_ROOT\bin\*.dll" $dist
+          # The Visual C++ runtime goes in the folder too, so the app starts on
+          # a PC without the redistributable installed.
+          Copy-Item "$env:VCToolsRedistDir\x64\Microsoft.VC*.CRT\*.dll" $dist
+          foreach ($dll in 'msvcp140.dll', 'msvcp140_1.dll', 'vcruntime140.dll', 'vcruntime140_1.dll', 'avcodec-62.dll') {
+            if (-not (Test-Path "$dist\$dll")) { throw "$dll is missing from the package" }
+          }
           Copy-Item README.md, docs\ozellikler.md $dist
           Copy-Item "$env:FFMPEG_ROOT\LICENSE.txt" "$dist\FFmpeg-LICENSE.txt" -ErrorAction SilentlyContinue
 
