@@ -425,8 +425,14 @@ QStringList configure(AVCodecContext* c, AVDictionary** opts, const QString& e, 
                 set("rc", QStringLiteral("cbr"));
         } else {
             const std::int64_t peak = o.maxBitrate > 0 ? std::max(o.maxBitrate, b) : b * 3 / 2;
-            c->rc_max_rate = peak;
-            c->rc_buffer_size = static_cast<int>(std::min<std::int64_t>(peak * 2, INT_MAX));
+            // SVT-AV1 accepts a peak only in constant quality mode and refuses to start otherwise.
+            if (e == QLatin1String("libsvtav1")) {
+                if (o.maxBitrate > 0)
+                    notes << tr("%1 cannot limit the peak bit rate in this mode; only the average is kept.").arg(e);
+            } else {
+                c->rc_max_rate = peak;
+                c->rc_buffer_size = static_cast<int>(std::min<std::int64_t>(peak * 2, INT_MAX));
+            }
             if (isNvenc(e))
                 set("rc", QStringLiteral("vbr"));
             else if (isAmf(e))

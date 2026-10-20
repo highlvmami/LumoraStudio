@@ -1865,5 +1865,9 @@ Orijinal dosya asla değişmez: düzenlemeler projede saklanır ve dışa aktar�
         <source>Avid DNxHR HQ (editing)</source>
         <translation>Avid DNxHR HQ (kurgu için)</translation>
     </message>
+    <message>
+        <source>%1 cannot limit the peak bit rate in this mode; only the average is kept.</source>
+        <translation>%1 bu modda en yüksek bit hızını sınırlayamaz; yalnızca ortalama tutulur.</translation>
+    </message>
 </context>
 </TS>
