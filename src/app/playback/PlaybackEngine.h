@@ -18,13 +18,13 @@ class QAudioSink;
 
 namespace lumora {
 
-class VideoDecoder;
 class AudioRingDevice;
 
-// Preview playback. A video thread pulls the frame that belongs to the
-// current clock position (dropping frames when decoding falls behind) and an
-// audio thread decodes ahead into a ring buffer consumed by QAudioSink.
-// Frames are scaled to the preview size; this path is display only.
+// Preview playback. A video thread composites the frame that belongs to the
+// current clock position with FrameRenderer at preview size (dropping frames
+// when it falls behind) and an audio thread mixes ahead with AudioMixer into
+// a ring buffer consumed by QAudioSink. It uses the same compositor and mixer
+// as the export, so the preview shows what will be written.
 class PlaybackEngine : public QObject {
     Q_OBJECT
 public:
@@ -63,7 +63,6 @@ private:
     void post(Command::Type type, Ticks t);
     void startAudio(Ticks from);
     void stopAudio();
-    VideoDecoder* decoderFor(const QString& path);
 
     PlaybackSequence m_sequence; // GUI thread copy
     Ticks m_position = 0;
@@ -81,9 +80,7 @@ private:
     std::atomic_bool m_audioRun{false};
     Ticks m_audioFrom = 0;
 
-    // Video thread only.
-    std::map<QString, std::unique_ptr<VideoDecoder>> m_decoders;
-    std::deque<QString> m_decoderOrder;
+    quint64 m_sequenceVersion = 0; // bumped on every setSequence (guarded by m_mutex)
 
     QAudioFormat m_format;
     QAudioSink* m_sink = nullptr;

@@ -204,7 +204,7 @@ void MonitorPanel::showSource(const MediaItemPtr& item) {
     if (m_mode == Mode::Program)
         m_programPosition = m_engine->position();
     m_source = item;
-    m_engine->setSequence(PlaybackSequence::fromMedia(*item), false);
+    m_engine->setSequence(PlaybackSequence::fromMedia(item), false);
     const Marks mk = m_marks.value(item->id);
     m_engine->seek(mk.in != kInvalidTicks ? mk.in : 0);
     m_scrub->setDuration(m_engine->duration());
@@ -224,10 +224,10 @@ void MonitorPanel::showProgram(const PlaybackSequence& seq, bool switchMode) {
     if (wasSource)
         m_engine->seek(m_programPosition);
     m_scrub->setDuration(seq.duration);
-    m_view->setPlaceholder(seq.segments.empty()
+    m_view->setPlaceholder(seq.isEmpty()
                                ? tr("Import videos with File → Import media, or drag them here.")
                                : QString());
-    if (seq.segments.empty())
+    if (seq.isEmpty())
         m_view->setImage({});
     if (m_mode != Mode::Program)
         setMode(Mode::Program);
