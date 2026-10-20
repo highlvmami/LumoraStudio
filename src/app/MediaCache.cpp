@@ -6,6 +6,7 @@
 #include <QtConcurrent/QtConcurrentRun>
 #include <cmath>
 
+#include "image/RawDecoder.h"
 #include "media/AudioDecoder.h"
 #include "media/VideoDecoder.h"
 
@@ -34,6 +35,8 @@ QImage MediaCache::makeVideoThumbnail(const QString& path, Ticks at, QSize size)
 }
 
 QImage MediaCache::makeImageThumbnail(const QString& path, QSize size) {
+    if (raw::isRawFile(path))
+        return raw::thumbnail(path, size);
     QImageReader reader(path);
     reader.setAutoTransform(true);
     const QSize full = reader.size();

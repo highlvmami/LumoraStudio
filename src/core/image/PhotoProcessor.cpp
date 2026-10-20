@@ -12,6 +12,8 @@
 #include <numeric>
 #include <vector>
 
+#include "RawDecoder.h"
+
 namespace lumora {
 
 namespace {
@@ -124,14 +126,21 @@ void compositeLayer(QImage& base, const PhotoLayer& layer) {
 } // namespace
 
 QImage PhotoProcessor::load(const QString& path, QImage* original, QString* error) {
-    QImageReader reader(path);
-    reader.setAutoTransform(true);
-    reader.setAllocationLimit(2048); // MB; large photos are welcome
-    QImage img = reader.read();
-    if (img.isNull()) {
-        if (error)
-            *error = reader.errorString();
-        return {};
+    QImage img;
+    if (raw::isRawFile(path)) {
+        img = raw::decode(path, error);
+        if (img.isNull())
+            return {};
+    } else {
+        QImageReader reader(path);
+        reader.setAutoTransform(true);
+        reader.setAllocationLimit(2048); // MB; large photos are welcome
+        img = reader.read();
+        if (img.isNull()) {
+            if (error)
+                *error = reader.errorString();
+            return {};
+        }
     }
     if (original)
         *original = img;

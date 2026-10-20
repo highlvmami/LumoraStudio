@@ -42,11 +42,27 @@ jobs:
           Expand-Archive ffmpeg.zip -DestinationPath "$env:RUNNER_TEMP"
           "FFMPEG_ROOT=$env:RUNNER_TEMP\$env:FFMPEG_ZIP" | Out-File -FilePath $env:GITHUB_ENV -Append
 
+      - name: Cache LibRaw (vcpkg)
+        id: libraw-cache
+        uses: actions/cache@v4
+        with:
+          path: C:\vcpkg\installed
+          key: vcpkg-libraw-x64-windows-v1
+
+      - name: Install LibRaw (camera RAW photos)
+        if: steps.libraw-cache.outputs.cache-hit != 'true'
+        run: vcpkg install libraw:x64-windows
+
       - name: Set up MSVC
         uses: ilammy/msvc-dev-cmd@v1
 
       - name: Configure
-        run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+        shell: pwsh
+        run: |
+          # The vcpkg DLLs are on PATH while configuring, so the tests find them.
+          $env:PATH = "C:\vcpkg\installed\x64-windows\bin;$env:PATH"
+          cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release `
+            -DCMAKE_TOOLCHAIN_FILE=C:/vcpkg/scripts/buildsystems/vcpkg.cmake -DVCPKG_TARGET_TRIPLET=x64-windows -DLUMORA_REQUIRE_LIBRAW=ON
 
       - name: Build
         run: cmake --build build
@@ -56,7 +72,7 @@ jobs:
         env:
           QT_QPA_PLATFORM: offscreen
         run: |
-          $env:PATH = "$env:FFMPEG_ROOT\bin;$env:PATH"
+          $env:PATH = "$env:FFMPEG_ROOT\bin;C:\vcpkg\installed\x64-windows\bin;$env:PATH"
           ctest --test-dir build --output-on-failure
           if ($LASTEXITCODE -ne 0) {
             # The test log can drown in encoder output; rerun the failures with Qt Test's own log.
@@ -80,12 +96,14 @@ jobs:
           Copy-Item build\src\app\LumoraStudio.exe $dist
           windeployqt --release --no-compiler-runtime --dir $dist "$dist\LumoraStudio.exe"
           Copy-Item "$env:FFMPEG_ROOT\bin\*.dll" $dist
+          Copy-Item C:\vcpkg\installed\x64-windows\bin\*.dll $dist
           # The Visual C++ runtime goes in the folder too, so the app starts on
           # a PC without the redistributable installed.
           Copy-Item "$env:VCToolsRedistDir\x64\Microsoft.VC*.CRT\*.dll" $dist
           foreach ($dll in 'msvcp140.dll', 'msvcp140_1.dll', 'vcruntime140.dll', 'vcruntime140_1.dll', 'avcodec-62.dll') {
             if (-not (Test-Path "$dist\$dll")) { throw "$dll is missing from the package" }
           }
+          if (-not (Test-Path "$dist\raw*.dll")) { throw "LibRaw is missing from the package" }
           Copy-Item README.md, docs\ozellikler.md $dist
           Copy-Item "$env:FFMPEG_ROOT\LICENSE.txt" "$dist\FFmpeg-LICENSE.txt" -ErrorAction SilentlyContinue
 
@@ -116,10 +134,11 @@ jobs:
             ninja-build pkg-config \
             qt6-base-dev qt6-multimedia-dev qt6-tools-dev qt6-tools-dev-tools qt6-l10n-tools \
             qt6-image-formats-plugins libgl-dev \
-            libavformat-dev libavcodec-dev libavutil-dev libswscale-dev libswresample-dev
+            libavformat-dev libavcodec-dev libavutil-dev libswscale-dev libswresample-dev \
+            libraw-dev
 
       - name: Configure
-        run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+        run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DLUMORA_REQUIRE_LIBRAW=ON
 
       - name: Build
         run: cmake --build build

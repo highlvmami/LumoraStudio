@@ -33,6 +33,7 @@ add_library(lumora_core STATIC
     image/PhotoAdjustments.h image/PhotoAdjustments.cpp
     image/PhotoProcessor.h image/PhotoProcessor.cpp
     image/PhotoLibrary.h image/PhotoLibrary.cpp
+    image/RawDecoder.h image/RawDecoder.cpp
     project/Project.h project/Project.cpp
 )
 
@@ -40,6 +41,10 @@ target_include_directories(lumora_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 target_link_libraries(lumora_core
     PUBLIC Qt6::Core Qt6::Gui Qt6::Concurrent
            FFmpeg::avformat FFmpeg::avcodec FFmpeg::avutil FFmpeg::swscale FFmpeg::swresample)
+if(TARGET LibRaw::LibRaw)
+    target_link_libraries(lumora_core PRIVATE LibRaw::LibRaw)
+    target_compile_definitions(lumora_core PRIVATE LUMORA_HAVE_LIBRAW)
+endif()
 
 # Core sources with user-visible strings, picked up by lupdate.
 set(CORE_TRANSLATABLE_SOURCES
