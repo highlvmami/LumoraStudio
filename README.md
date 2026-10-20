@@ -12,6 +12,10 @@
 |---|---|
 | ![Dışa aktarma penceresi](docs/screenshots/disa-aktar.png) | ![Fotoğraf çalışma alanı](docs/screenshots/fotograf.png) |
 
+Açık tema ("Gündüz", Görünüm → Tema):
+
+![Gündüz teması](docs/screenshots/kurgu-gunduz.png)
+
 Tam yol haritası: [docs/ozellikler.md](docs/ozellikler.md). Mimari: [docs/mimari.md](docs/mimari.md).
 
 ## Sürüm 0.2'de neler var
