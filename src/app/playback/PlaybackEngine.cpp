@@ -9,8 +9,9 @@
 #include <cstring>
 #include <vector>
 
-#include "media/AudioDecoder.h"
-#include "media/VideoDecoder.h"
+#include "media/MediaPool.h"
+#include "render/AudioMixer.h"
+#include "render/FrameRenderer.h"
 
 namespace lumora {
 
@@ -124,6 +125,7 @@ void PlaybackEngine::setSequence(const PlaybackSequence& seq, bool keepPosition)
     {
         std::lock_guard lock(m_mutex);
         m_threadSequence = seq;
+        ++m_sequenceVersion;
     }
     if (!keepPosition)
         m_position = 0;
@@ -143,7 +145,7 @@ void PlaybackEngine::setPreviewSize(QSize size) {
 }
 
 void PlaybackEngine::play() {
-    if (m_playing || m_sequence.segments.empty())
+    if (m_playing || m_sequence.isEmpty())
         return;
     if (m_position >= m_sequence.duration - frameDuration(m_sequence.frameRate))
         m_position = 0;
@@ -191,69 +193,20 @@ void PlaybackEngine::startAudio(Ticks from) {
     m_audioRun = true;
     m_audioThread = std::thread([this, seq, from, gen] {
         (void)gen;
-        std::map<QString, std::unique_ptr<AudioDecoder>> decoders;
-        std::vector<float> silence(4096 * kAudioChannels, 0.0f);
-        std::int64_t written = 0; // frames written since `from`
-        auto targetFrames = [&](Ticks t) { return av_rescale(t - from, kAudioRate, kTicksPerSecond); };
-        auto writeSilenceUntil = [&](std::int64_t frame) {
-            while (written < frame && m_audioRun) {
-                const std::int64_t n = std::min<std::int64_t>(4096, frame - written);
-                if (!m_ring->writeSamples(silence.data(), static_cast<size_t>(n) * kAudioChannels))
-                    return false;
-                written += n;
-            }
-            return m_audioRun.load();
-        };
-        for (const auto& seg : seq.segments) {
-            if (!m_audioRun)
+        if (!seq.media)
+            return;
+        AudioMixer mixer(seq.media.get(), kAudioRate, kAudioChannels);
+        mixer.setTimeline(seq.timeline);
+        constexpr int chunk = 1024;
+        std::vector<float> buf(chunk * kAudioChannels);
+        std::int64_t sample = av_rescale(from, kAudioRate, kTicksPerSecond);
+        const std::int64_t end = av_rescale(seq.duration, kAudioRate, kTicksPerSecond);
+        while (m_audioRun && sample < end) {
+            const int n = static_cast<int>(std::min<std::int64_t>(chunk, end - sample));
+            mixer.mix(sample, n, buf.data());
+            if (!m_ring->writeSamples(buf.data(), static_cast<size_t>(n) * kAudioChannels))
                 return;
-            if (seg.end() <= from)
-                continue;
-            if (!writeSilenceUntil(targetFrames(std::max(seg.start, from))))
-                return;
-            const std::int64_t segEndFrame = targetFrames(seg.end());
-            if (!seg.audio) {
-                if (!writeSilenceUntil(segEndFrame))
-                    return;
-                continue;
-            }
-            auto& dec = decoders[seg.path];
-            if (!dec) {
-                dec = std::make_unique<AudioDecoder>();
-                if (!dec->open(seg.path, kAudioRate, kAudioChannels))
-                    dec.reset();
-            }
-            if (!dec) {
-                if (!writeSilenceUntil(segEndFrame))
-                    return;
-                continue;
-            }
-            const Ticks segFrom = std::max(seg.start, from);
-            dec->seek(seg.sourceIn + (segFrom - seg.start));
-            std::vector<float> samples;
-            Ticks chunkStart = 0;
-            while (m_audioRun && written < segEndFrame && dec->next(samples, chunkStart)) {
-                // Map the chunk's source time to output frames.
-                const Ticks seqTime = seg.start + (chunkStart - seg.sourceIn);
-                std::int64_t pos = targetFrames(seqTime);
-                std::int64_t count = static_cast<std::int64_t>(samples.size()) / kAudioChannels;
-                std::int64_t skip = 0;
-                if (pos < written) {
-                    skip = std::min(count, written - pos);
-                } else if (pos > written) {
-                    if (!writeSilenceUntil(std::min(pos, segEndFrame)))
-                        return;
-                }
-                count = std::min(count - skip, segEndFrame - written);
-                if (count > 0) {
-                    if (!m_ring->writeSamples(samples.data() + skip * kAudioChannels,
-                                              static_cast<size_t>(count) * kAudioChannels))
-                        return;
-                    written += count;
-                }
-            }
-            if (!writeSilenceUntil(segEndFrame))
-                return;
+            sample += n;
         }
     });
     m_sink->start(m_ring);
@@ -269,28 +222,15 @@ void PlaybackEngine::stopAudio() {
     m_sink->stop();
 }
 
-VideoDecoder* PlaybackEngine::decoderFor(const QString& path) {
-    auto it = m_decoders.find(path);
-    if (it != m_decoders.end())
-        return it->second.get();
-    auto dec = std::make_unique<VideoDecoder>();
-    if (!dec->open(path))
-        return nullptr;
-    if (m_decoderOrder.size() >= 6) {
-        m_decoders.erase(m_decoderOrder.front());
-        m_decoderOrder.pop_front();
-    }
-    m_decoderOrder.push_back(path);
-    return (m_decoders[path] = std::move(dec)).get();
-}
-
 void PlaybackEngine::videoLoop() {
     using Clock = std::chrono::steady_clock;
-    FrameConverter converter;
     bool playing = false;
     Ticks playOrigin = 0;
     Clock::time_point wallOrigin;
-    QString lastKey;
+    std::unique_ptr<FrameRenderer> renderer;
+    std::shared_ptr<MediaPool> media; // keeps the renderer's media alive
+    quint64 version = ~quint64(0);
+    QSize outputSize;
 
     auto toWall = [&](Ticks t) {
         return wallOrigin + std::chrono::nanoseconds(av_rescale(t - playOrigin, 1'000'000'000, kTicksPerSecond));
@@ -300,17 +240,39 @@ void PlaybackEngine::videoLoop() {
         Command cmd;
         PlaybackSequence seq;
         QSize size;
+        bool changed = false;
         {
             std::unique_lock lock(m_mutex);
             if (!playing)
                 m_cv.wait(lock, [&] { return m_pending.type != Command::None; });
             cmd = m_pending;
             m_pending = {};
+            if (version != m_sequenceVersion) {
+                version = m_sequenceVersion;
+                changed = true;
+            }
             seq = m_threadSequence;
             size = m_previewSize;
         }
         if (cmd.type == Command::Quit)
             return;
+
+        // Preview resolution: the composition scaled to fit the view.
+        QSize target = seq.canvas.scaled(size, Qt::KeepAspectRatio);
+        if (target.width() > seq.canvas.width())
+            target = seq.canvas;
+        target = target.expandedTo(QSize(16, 9));
+        if (changed || !renderer || media != seq.media) {
+            if (!renderer || media != seq.media) {
+                renderer = std::make_unique<FrameRenderer>(seq.media.get());
+                media = seq.media;
+            }
+            renderer->setTimeline(seq.timeline);
+        }
+        if (target != outputSize) {
+            outputSize = target;
+            renderer->setOutputSize(target);
+        }
 
         Ticks renderAt = kInvalidTicks;
         switch (cmd.type) {
@@ -349,48 +311,14 @@ void PlaybackEngine::videoLoop() {
                 }, Qt::QueuedConnection);
                 continue;
             }
+            pos = snapToFrame(pos, seq.frameRate);
         }
         if (pos == kInvalidTicks)
             continue;
 
-        Ticks next = pos + frameDuration(seq.frameRate);
-        const PlaybackSegment* seg = seq.segmentAt(pos);
-        QString key;
-        QImage image;
-        if (seg && seg->video) {
-            if (VideoDecoder* dec = decoderFor(seg->path)) {
-                Ticks fpts = 0, fdur = 0;
-                const AVFrame* f = dec->frameAt(seg->sourceIn + (pos - seg->start), &fpts, &fdur);
-                key = seg->path + QLatin1Char('@') + QString::number(fpts);
-                const Ticks frameEnd = seg->start + (fpts + std::max<Ticks>(fdur, 1) - seg->sourceIn);
-                next = std::clamp(frameEnd, pos + 1, seg->end());
-                if (f && (key != lastKey || !playing)) {
-                    QSize max = size;
-                    if (seg->rotation == 90 || seg->rotation == 270)
-                        max.transpose();
-                    image = converter.convert(f, max);
-                    if (seg->rotation != 0)
-                        image = image.transformed(QTransform().rotate(seg->rotation));
-                }
-            }
-        } else {
-            key = QStringLiteral("black");
-            if (const PlaybackSegment* nextSeg = [&]() -> const PlaybackSegment* {
-                    for (const auto& s : seq.segments)
-                        if (s.start > pos)
-                            return &s;
-                    return nullptr;
-                }())
-                next = nextSeg->start;
-            if (key != lastKey || !playing) {
-                image = QImage(16, 9, QImage::Format_RGBX8888);
-                image.fill(Qt::black);
-            }
-        }
-        if (!image.isNull()) {
-            lastKey = key;
+        const QImage image = seq.media ? renderer->render(pos) : QImage();
+        if (!image.isNull())
             QMetaObject::invokeMethod(this, [this, image, pos] { emit frameReady(image, pos); }, Qt::QueuedConnection);
-        }
         if (playing) {
             QMetaObject::invokeMethod(this, [this, pos] {
                 if (!m_playing)
@@ -399,7 +327,8 @@ void PlaybackEngine::videoLoop() {
                 emit positionChanged(pos);
             }, Qt::QueuedConnection);
             std::unique_lock lock(m_mutex);
-            m_cv.wait_until(lock, toWall(next), [&] { return m_pending.type != Command::None; });
+            m_cv.wait_until(lock, toWall(pos + frameDuration(seq.frameRate)),
+                            [&] { return m_pending.type != Command::None; });
         }
     }
 }

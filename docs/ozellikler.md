@@ -1,6 +1,6 @@
 # LumoraStudio — Tam özellik listesi
 
-Bu liste projenin yol haritasıdır. Sürüm 0.1'de neyin hazır olduğu [README](../README.md#sürüm-01de-neler-var) içinde, mimarinin bu özellikleri nasıl taşıyacağı [mimari.md](mimari.md) içinde anlatılıyor.
+Bu liste projenin yol haritasıdır. Sürümlerde neyin hazır olduğu [README](../README.md#sürüm-02de-neler-var) içinde; hazır olanlar aşağıda ✅ ile işaretli, mimarinin bu özellikleri nasıl taşıyacağı [mimari.md](mimari.md) içinde anlatılıyor.
 
 ## 1. Kalite ilkesi (projenin kalbi)
 
@@ -8,13 +8,13 @@ Hedef: kullanıcı istemedikçe hiçbir aşamada kalite düşmez.
 
 - **Kayıpsız kesme (yeniden kodlamadan):** Sadece kesip birleştirme yapıldıysa video yeniden sıkıştırılmaz, akış olduğu gibi kopyalanır. Kalite birebir aynı kalır, dışa aktarma saniyeler sürer.
 - **Akıllı render:** Efekt uygulanan kısımlar yeniden kodlanır, dokunulmayan kısımlar olduğu gibi kopyalanır.
-- **Kaynağa göre dışa aktarma:** "Kaynakla aynı" seçeneği; çözünürlük, kare hızı, bit derinliği, renk alanı ve bit hızı kaynaktan otomatik alınır.
-- **Bit hızı kontrolü:** Sabit kalite (CRF/CQ), sabit bit hızı (CBR), değişken bit hızı (VBR), iki geçişli kodlama, hedef dosya boyutu ("en fazla 50 MB olsun").
+- ✅ **Kaynağa göre dışa aktarma:** "Kaynakla aynı" seçeneği; çözünürlük, kare hızı, bit derinliği, renk alanı ve bit hızı kaynaktan otomatik alınır.
+- ✅ **Bit hızı kontrolü:** Sabit kalite (CRF/CQ), sabit bit hızı (CBR), değişken bit hızı (VBR), iki geçişli kodlama, hedef dosya boyutu ("en fazla 50 MB olsun").
 - **Kayıpsız ve ara kodekler:** FFV1, ProRes, DNxHR, PNG/TIFF dizisi; düzenleme ortasında kayıpsız ara dosya.
 - **Yüksek bit derinliği:** İç işlem 32-bit kayan nokta; 10-bit / 12-bit video, 16-bit fotoğraf.
 - **HDR:** HDR10, HLG; HDR'yi SDR'a doğru dönüştürme (ton eşleme).
 - **Renk yönetimi:** Rec.709, Rec.2020, sRGB, Display P3; renk profili (ICC) okuma/yazma; OpenColorIO / ACES desteği.
-- **Önizleme ile çıktı ayrı:** Önizleme düşük çözünürlüklü olabilir (akıcılık için) ama dışa aktarma her zaman tam kalitede yapılır.
+- ✅ **Önizleme ile çıktı ayrı:** Önizleme düşük çözünürlüklü olabilir (akıcılık için) ama dışa aktarma her zaman tam kalitede yapılır.
 - **Proxy düzenleme:** 4K/8K dosyalar için hafif kopya üretip onunla düzenleme, çıktıda asıl dosyaya dönme.
 - **Kalite karşılaştırma:** Kaynak ve çıktıyı yan yana / bölünmüş ekranda karşılaştırma, PSNR/SSIM/VMAF skoru.
 - **Meta veri koruma:** EXIF, tarih, konum, kamera bilgisi, HDR meta verisi korunur (isteğe bağlı silme ile).
@@ -31,14 +31,14 @@ Hedef: kullanıcı istemedikçe hiçbir aşamada kalite düşmez.
 
 ### 2.2 Zaman çizelgesi
 
-- Sınırsız video, ses ve başlık izi
-- Kesme, bölme, kırpma, ripple / roll / slip / slide düzenleme
+- ✅ Sınırsız video, ses ve başlık izi
+- ✅ Kesme, bölme, kırpma, ripple / roll / slip / slide düzenleme
 - Mıknatıs (snap), işaretçiler, bölüm işaretleri
 - Grup / iç içe zaman çizelgesi (compound clip)
-- Bağlantılı ses-video, ayırma
+- ✅ Bağlantılı ses-video, ayırma
 - Çoklu kamera düzenleme (sese göre otomatik eşitleme)
-- İz kilitleme, gizleme, sessize alma, tekleme
-- Geri al / yinele (sınırsız), geçmiş paneli
+- ✅ İz kilitleme, gizleme, sessize alma, tekleme
+- ✅ Geri al / yinele (sınırsız), geçmiş paneli
 - Klavye kısayolları (özelleştirilebilir, Premiere / DaVinci düzenleri)
 
 ### 2.3 Hız ve zaman
@@ -52,10 +52,10 @@ Hedef: kullanıcı istemedikçe hiçbir aşamada kalite düşmez.
 
 - Konum, ölçek, döndürme, kırpma, anahtar karelerle animasyon
 - Eğri editörü (bezier ile yumuşatma)
-- Karışım modları, opaklık
+- ✅ Karışım modları, opaklık
 - Maskeler (dikdörtgen, elips, serbest çizim), maske takibi
 - Yeşil perde (chroma key), luma key
-- Resim içinde resim, bölünmüş ekran şablonları
+- ✅ Resim içinde resim, bölünmüş ekran şablonları
 - Sabitleme (stabilizasyon)
 - Hareket takibi (nesneye yazı/efekt yapıştırma)
 - Dikey / kare / yatay formata otomatik yeniden çerçeveleme
@@ -72,7 +72,7 @@ Hedef: kullanıcı istemedikçe hiçbir aşamada kalite düşmez.
 
 ### 2.6 Efektler ve geçişler
 
-- Geçişler: yumuşak geçiş, kaydırma, yakınlaştırma, bulanık, özel
+- ✅ Geçişler: yumuşak geçiş, kaydırma, yakınlaştırma, bulanık, özel
 - Bulanıklaştırma, keskinleştirme, gürültü azaltma (zamansal + uzamsal)
 - Vinyet, film grenı, kromatik sapma, glitch
 - Yüz / plaka bulanıklaştırma (otomatik takip ile)
@@ -81,7 +81,7 @@ Hedef: kullanıcı istemedikçe hiçbir aşamada kalite düşmez.
 
 ### 2.7 Yazı ve grafik
 
-- Başlık editörü: font, kontur, gölge, arka plan, animasyonlu giriş/çıkış
+- ✅ Başlık editörü: font, kontur, gölge, arka plan, animasyonlu giriş/çıkış
 - Hazır başlık şablonları, alt bilgi bantları
 - Şekiller, oklar, vurgular
 - Altyazı: SRT/VTT içe-dışa aktarma, videoya gömme veya ayrı iz
@@ -89,8 +89,8 @@ Hedef: kullanıcı istemedikçe hiçbir aşamada kalite düşmez.
 
 ### 2.8 Ses
 
-- Ses izleri, dalga formu, ses seviyesi anahtar kareleri
-- Geçişte ses yumuşatma (fade)
+- ✅ Ses izleri, dalga formu, ses seviyesi anahtar kareleri
+- ✅ Geçişte ses yumuşatma (fade)
 - Gürültü giderme, eko azaltma, ses normalleştirme (LUFS hedefi)
 - Ekolayzer, kompresör, limitör
 - Konuşma algılandığında müziği otomatik kısma (ducking)
@@ -100,11 +100,11 @@ Hedef: kullanıcı istemedikçe hiçbir aşamada kalite düşmez.
 
 ### 2.9 Dışa aktarma
 
-- Ön ayarlar: YouTube, Instagram Reels, TikTok, X, arşiv (kayıpsız), "kaynakla aynı"
-- Özel ayar: kodek, kapsayıcı, çözünürlük, kare hızı, bit hızı modu, renk alanı, ses biçimi
-- Donanım hızlandırma: NVIDIA NVENC, AMD AMF, Intel Quick Sync (kalite ayarı açık şekilde)
+- ✅ Ön ayarlar: YouTube, Instagram Reels, TikTok, X, arşiv (kayıpsız), "kaynakla aynı"
+- ✅ Özel ayar: kodek, kapsayıcı, çözünürlük, kare hızı, bit hızı modu, renk alanı, ses biçimi
+- ✅ Donanım hızlandırma: NVIDIA NVENC, AMD AMF, Intel Quick Sync (kalite ayarı açık şekilde)
 - Dışa aktarma kuyruğu, arka planda render
-- Sadece seçili aralığı veya tek kareyi dışa aktarma
+- ✅ Sadece seçili aralığı veya tek kareyi dışa aktarma
 - GIF / animasyonlu WebP çıktısı
 
 ## 3. Fotoğraf editörü
@@ -184,8 +184,8 @@ Hedef: kullanıcı istemedikçe hiçbir aşamada kalite düşmez.
 
 ## 6. Önerilen aşamalar
 
-1. **Sürüm 0.1:** Video aç, kes, birleştir, kayıpsız dışa aktar (yeniden kodlamasız). Fotoğraf aç, kırp, temel ayarlar, kayıpsız kaydet.
-2. **Sürüm 0.2:** Çok izli zaman çizelgesi, yazı, geçişler, dışa aktarma ayarları, donanım hızlandırma.
+1. ✅ **Sürüm 0.1:** Video aç, kes, birleştir, kayıpsız dışa aktar (yeniden kodlamasız). Fotoğraf aç, kırp, temel ayarlar, kayıpsız kaydet.
+2. ✅ **Sürüm 0.2:** Çok izli zaman çizelgesi, yazı, geçişler, dışa aktarma ayarları, donanım hızlandırma.
 3. **Sürüm 0.3:** Renk paneli, kapsamlar, LUT; fotoğrafta katmanlar ve maskeler.
 4. **Sürüm 0.4:** Ses araçları, altyazı, RAW desteği.
 5. **Sonrası:** Yapay zeka araçları, takip, çoklu kamera, eklentiler, HDR.

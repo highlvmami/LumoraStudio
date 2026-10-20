@@ -1,0 +1,209 @@
+#include <QTemporaryDir>
+#include <QtTest>
+#include <cmath>
+
+#include "TestMedia.h"
+#include "media/MediaPool.h"
+#include "render/AudioMixer.h"
+#include "render/FrameRenderer.h"
+#include "timeline/Timeline.h"
+
+using namespace lumora;
+using namespace lumora::test;
+
+namespace {
+constexpr int kFps = 25;
+Ticks frames(int n) { return n * frameDuration(AVRational{kFps, 1}); }
+Ticks sec(double s) { return ticksFromSeconds(s); }
+
+double rms(const std::vector<float>& s, size_t from, size_t to) {
+    double sum = 0;
+    for (size_t i = from; i < to; ++i)
+        sum += static_cast<double>(s[i]) * s[i];
+    return to > from ? std::sqrt(sum / (to - from)) : 0.0;
+}
+} // namespace
+
+class RenderTest : public QObject {
+    Q_OBJECT
+
+private:
+    QTemporaryDir m_dir;
+    MediaPool m_pool;
+    MediaItemPtr m_pattern, m_bright, m_dark;
+
+    QImage renderAt(const Timeline& tl, Ticks t, FrameRenderer::Precision p = FrameRenderer::Precision::Final) {
+        FrameRenderer r(&m_pool);
+        r.setTimeline(tl.state());
+        r.setOutputSize(QSize(320, 240));
+        r.setPrecision(p);
+        return r.render(t);
+    }
+
+private slots:
+    void initTestCase() {
+        QVERIFY(m_dir.isValid());
+        TestVideoSpec spec;
+        QString err;
+        QVERIFY2(writeTestVideo(m_dir.filePath("pattern.mp4"), spec, &err), qPrintable(err));
+        spec.solidLuma = 200;
+        QVERIFY(writeTestVideo(m_dir.filePath("bright.mp4"), spec, &err));
+        spec.solidLuma = 50;
+        QVERIFY(writeTestVideo(m_dir.filePath("dark.mp4"), spec, &err));
+        m_pattern = m_pool.import(m_dir.filePath("pattern.mp4"));
+        m_bright = m_pool.import(m_dir.filePath("bright.mp4"));
+        m_dark = m_pool.import(m_dir.filePath("dark.mp4"));
+        QVERIFY(m_pattern && m_bright && m_dark);
+    }
+
+    void showsTheRightSourceFrame() {
+        Timeline tl;
+        tl.insertMedia(m_pattern->id, frames(10), frames(60), true, true);
+        QCOMPARE(frameIndexOf(renderAt(tl, frames(5))), 15);
+        QCOMPARE(frameIndexOf(renderAt(tl, frames(5), FrameRenderer::Precision::Preview)), 15);
+        QCOMPARE(frameIndexOf(renderAt(tl, frames(49))), 59);
+        // Outside the timeline: black.
+        QVERIFY(meanLuma(renderAt(tl, frames(80)), QRect(0, 0, 320, 240)) < 1.0);
+    }
+
+    void crossDissolveBlendsBothClips() {
+        Timeline tl;
+        tl.insertMedia(m_bright->id, 0, sec(2), true, false);        // 2 s of media after the out point
+        tl.insertMedia(m_dark->id, sec(1), sec(3), true, false);     // 1 s before the in point
+        const QUuid second = tl.tracks()[0].clips[1].id;
+        QVERIFY(tl.setTransition(second, {TransitionType::CrossDissolve, sec(1)}));
+        const QRect all(0, 0, 320, 240);
+        const double bright = meanLuma(renderAt(tl, sec(1)), all);
+        const double dark = meanLuma(renderAt(tl, sec(3)), all);
+        const double mid = meanLuma(renderAt(tl, sec(2)), all);
+        QVERIFY2(bright > 200 && dark < 50, qPrintable(QStringLiteral("%1 %2").arg(bright).arg(dark)));
+        QVERIFY2(std::abs(mid - (bright + dark) / 2) < 6, qPrintable(QString::number(mid)));
+        // A quarter into the transition the outgoing clip dominates.
+        const double quarter = meanLuma(renderAt(tl, sec(1.75)), all);
+        QVERIFY(quarter > mid + 20);
+
+        QVERIFY(tl.setTransition(second, {TransitionType::DipToBlack, sec(1)}));
+        QVERIFY(meanLuma(renderAt(tl, sec(2)), all) < 3);
+        QVERIFY(tl.setTransition(second, {TransitionType::WipeRight, sec(1)}));
+        const QImage wipe = renderAt(tl, sec(2));
+        QVERIFY(meanLuma(wipe, QRect(0, 0, 100, 240)) < 50);    // left: new (dark) clip
+        QVERIFY(meanLuma(wipe, QRect(220, 0, 100, 240)) > 200); // right: old (bright) clip
+    }
+
+    void upperTracksAreCompositedWithTransform() {
+        Timeline tl;
+        tl.insertMedia(m_dark->id, 0, sec(4), true, false);
+        const int v2 = tl.addTrack(TrackType::Video);
+        const QUuid id = tl.placeMedia(m_bright->id, 0, sec(2), true, false, v2, sec(1));
+        QVERIFY(tl.setTransform(id, {0.25, 0.0, 0.5, 0.0, 1.0})); // half size, right half of the frame
+        const QImage img = renderAt(tl, sec(1.5));
+        QVERIFY(meanLuma(img, QRect(10, 10, 100, 220)) < 50);    // storyline shows on the left
+        QVERIFY(meanLuma(img, QRect(180, 80, 100, 80)) > 200);   // the inset on the right
+        // Outside the V2 clip only the storyline is visible.
+        QVERIFY(meanLuma(renderAt(tl, sec(3.5)), QRect(180, 80, 100, 80)) < 50);
+        // Opacity 50 % blends with the storyline.
+        QVERIFY(tl.setTransform(id, {0.0, 0.0, 1.0, 0.0, 0.5}));
+        const double half = meanLuma(renderAt(tl, sec(1.5)), QRect(0, 0, 320, 240));
+        QVERIFY2(half > 110 && half < 140, qPrintable(QString::number(half)));
+        // Hidden tracks are not drawn.
+        QVERIFY(tl.setTrackFlags(v2, false, false, true));
+        QVERIFY(meanLuma(renderAt(tl, sec(1.5)), QRect(0, 0, 320, 240)) < 50);
+    }
+
+    void fadesAndTitles() {
+        Timeline tl;
+        tl.insertMedia(m_bright->id, 0, sec(2), true, false);
+        const QUuid clip = tl.tracks()[0].clips[0].id;
+        QVERIFY(tl.setFades(clip, sec(1), 0));
+        const QRect all(0, 0, 320, 240);
+        QVERIFY(meanLuma(renderAt(tl, 0), all) < 3);
+        const double half = meanLuma(renderAt(tl, sec(0.5)), all);
+        QVERIFY2(half > 90 && half < 130, qPrintable(QString::number(half)));
+
+        const int v2 = tl.addTrack(TrackType::Video);
+        TitleData title;
+        title.text = QStringLiteral("LUMORA");
+        title.size = 0.2;
+        title.y = 0.5;
+        title.color = QColor(255, 0, 0);
+        title.shadow = false;
+        title.animationIn = TitleAnimation::None;
+        tl.addTitle(title, sec(1), v2, sec(1));
+        const QImage img = renderAt(tl, sec(1.5));
+        int red = 0;
+        for (int y = 0; y < img.height(); ++y)
+            for (int x = 0; x < img.width(); ++x) {
+                const QColor c = img.pixelColor(x, y);
+                red += c.red() > 200 && c.green() < 60 ? 1 : 0;
+            }
+        QVERIFY2(red > 500, qPrintable(QString::number(red)));
+    }
+
+    void passthroughOnlyForPlainFrames() {
+        Timeline tl;
+        tl.insertMedia(m_pattern->id, 0, sec(2), true, false);
+        FrameRenderer r(&m_pool);
+        r.setTimeline(tl.state());
+        r.setOutputSize(QSize(320, 240));
+        const AVFrame* f = r.passthroughFrame(frames(7));
+        QVERIFY(f);
+        QCOMPARE(frameIndexOf(f), 7);
+        r.setOutputSize(QSize(640, 480));
+        QVERIFY(!r.passthroughFrame(frames(7)));
+        r.setOutputSize(QSize(320, 240));
+        tl.setFades(tl.tracks()[0].clips[0].id, sec(1), 0);
+        r.setTimeline(tl.state());
+        QVERIFY(!r.passthroughFrame(frames(7)));
+        QVERIFY(r.passthroughFrame(sec(1.5)));
+    }
+
+    void mixerGainFadesAndMute() {
+        Timeline tl;
+        tl.insertMedia(m_pattern->id, 0, sec(4), true, true);
+        AudioMixer mixer(&m_pool, 48000, 2);
+        mixer.setTimeline(tl.state());
+        std::vector<float> buf(48000 * 2);
+        mixer.mix(48000, 48000, buf.data());
+        const double full = rms(buf, 0, buf.size());
+        QVERIFY2(std::abs(full - 0.2 / std::sqrt(2.0)) < 0.01, qPrintable(QString::number(full)));
+
+        tl.setGain(tl.tracks()[1].clips[0].id, -6.0206);
+        mixer.setTimeline(tl.state());
+        mixer.mix(48000, 48000, buf.data());
+        QVERIFY(std::abs(rms(buf, 0, buf.size()) - full / 2) < 0.01);
+
+        tl.setTrackFlags(1, false, true, false);
+        mixer.setTimeline(tl.state());
+        mixer.mix(48000, 48000, buf.data());
+        QCOMPARE(rms(buf, 0, buf.size()), 0.0);
+    }
+
+    void mixerPlacesAudioAtTheRightTime() {
+        Timeline tl;
+        const int a2 = tl.addTrack(TrackType::Audio);
+        tl.placeMedia(m_pattern->id, 0, sec(1), false, true, a2, sec(1));
+        AudioMixer mixer(&m_pool, 48000, 2);
+        mixer.setTimeline(tl.state());
+        std::vector<float> buf(96000 * 2);
+        mixer.mix(0, 96000, buf.data());
+        QCOMPARE(rms(buf, 0, 47000 * 2), 0.0);                  // silence before 1 s
+        QVERIFY(rms(buf, 49000 * 2, 95000 * 2) > 0.1);          // the clip after
+    }
+
+    void mixerCrossfadesUnderTransitions() {
+        Timeline tl;
+        tl.insertMedia(m_pattern->id, 0, sec(2), true, true);
+        tl.insertMedia(m_pattern->id, sec(2), sec(4), true, true);
+        QVERIFY(tl.setTransition(tl.tracks()[0].clips[1].id, {TransitionType::CrossDissolve, sec(1)}));
+        AudioMixer mixer(&m_pool, 48000, 2);
+        mixer.setTimeline(tl.state());
+        std::vector<float> buf(48000 * 2);
+        mixer.mix(72000, 48000, buf.data()); // 1.5 s .. 2.5 s: the whole transition
+        // Equal-power crossfade of two copies of the same tone: never silent.
+        for (int part = 0; part < 10; ++part)
+            QVERIFY(rms(buf, part * 9600, (part + 1) * 9600) > 0.05);
+    }
+};
+
+QTEST_MAIN(RenderTest)
+#include "tst_render.moc"

@@ -1,5 +1,7 @@
 #pragma once
 
+#include <QImage>
+#include <QRect>
 #include <QString>
 #include <vector>
 
@@ -18,6 +20,7 @@ struct TestVideoSpec {
     int bFrames = 2;      // 0 = no B-frames
     bool audio = true;
     const char* encoder = "mpeg4";
+    int solidLuma = -1;   // >= 0: plain grey frames of this luma (no index pattern)
 };
 
 // Writes a synthetic MP4 whose frames carry their own index as a binary
@@ -27,6 +30,10 @@ bool writeTestVideo(const QString& path, const TestVideoSpec& spec, QString* err
 
 // Reads the index pattern back from a decoded frame (any pixel format).
 int frameIndexOf(const AVFrame* frame);
+// Same for a rendered image (the pattern must be at its original size).
+int frameIndexOf(const QImage& image);
+// Average luma (0..255) of a rectangle of an image.
+double meanLuma(const QImage& image, const QRect& rect);
 
 struct DecodedSummary {
     std::vector<int> frameIndices; // pattern index of every decoded frame, in display order

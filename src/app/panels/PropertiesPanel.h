@@ -2,20 +2,35 @@
 
 #include <QUuid>
 #include <QWidget>
+#include <functional>
+
+#include "timeline/ClipEffects.h"
 
 class QLabel;
+class QUndoStack;
+class QDoubleSpinBox;
+class QSpinBox;
+class QComboBox;
+class QCheckBox;
+class QPlainTextEdit;
+class QFontComboBox;
+class QToolButton;
+class QPushButton;
+class QFormLayout;
 
 namespace lumora {
 
 class Project;
+struct Clip;
 
-// Right-hand panel: technical details of the selected clip or file. In 0.1
-// it is read-only; transform / colour / audio / speed controls arrive in
-// later versions and slot in here as sections.
+// Right-hand panel: the editable settings of the selected clip (title text
+// and style, position / scale / rotation / opacity, transition, fades, audio
+// gain) followed by the technical details of its file. Every change is one
+// undo step; dragging a value merges into a single step.
 class PropertiesPanel : public QWidget {
     Q_OBJECT
 public:
-    explicit PropertiesPanel(Project* project, QWidget* parent = nullptr);
+    PropertiesPanel(Project* project, QUndoStack* undo, QWidget* parent = nullptr);
 
     void showClip(const QUuid& clipId);
     void showMedia(const QUuid& mediaId);
@@ -23,10 +38,66 @@ public:
     void refresh();
 
 private:
+    QWidget* makeSection(const QString& title, QFormLayout** form);
+    QToolButton* makeColorButton();
+    void setButtonColor(QToolButton* b, const QColor& c);
+    // Applies `op` to the selected clip as an undoable, mergeable edit.
+    void edit(const QString& text, const QString& field, const std::function<bool(const Clip&)>& op);
+    void applyTitle();
+    void applyTransform();
+    void applyTransition();
+    void applyFades();
+    void refreshEditors(const Clip* clip);
+    void refreshInfo(const Clip* clip);
+
     Project* m_project;
-    QLabel* m_label;
+    QUndoStack* m_undo;
     QUuid m_clip;
     QUuid m_media;
+    int m_session = 0; // bumps on every selection change so merges stay per selection
+    bool m_updating = false;
+
+    QLabel* m_info;
+    QLabel* m_header;
+
+    QWidget* m_titleSection;
+    QPlainTextEdit* m_titleText;
+    QFontComboBox* m_titleFont;
+    QDoubleSpinBox* m_titleSize;
+    QToolButton* m_titleBold;
+    QToolButton* m_titleItalic;
+    QComboBox* m_titleAlign;
+    QToolButton* m_titleColor;
+    QToolButton* m_titleOutlineColor;
+    QDoubleSpinBox* m_titleOutline;
+    QCheckBox* m_titleShadow;
+    QToolButton* m_titleBackColor;
+    QSpinBox* m_titleBackOpacity;
+    QDoubleSpinBox* m_titleX;
+    QDoubleSpinBox* m_titleY;
+    QComboBox* m_titleAnimIn;
+    QComboBox* m_titleAnimOut;
+    QDoubleSpinBox* m_titleAnimDuration;
+    QDoubleSpinBox* m_titleDuration;
+
+    QWidget* m_transformSection;
+    QDoubleSpinBox* m_posX;
+    QDoubleSpinBox* m_posY;
+    QDoubleSpinBox* m_scale;
+    QDoubleSpinBox* m_rotation;
+    QSpinBox* m_opacity;
+
+    QWidget* m_transitionSection;
+    QComboBox* m_transitionType;
+    QDoubleSpinBox* m_transitionDuration;
+    QLabel* m_transitionNote;
+
+    QWidget* m_fadeSection;
+    QDoubleSpinBox* m_fadeIn;
+    QDoubleSpinBox* m_fadeOut;
+
+    QWidget* m_audioSection;
+    QDoubleSpinBox* m_gain;
 };
 
 } // namespace lumora

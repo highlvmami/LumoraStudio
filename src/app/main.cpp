@@ -5,11 +5,13 @@
 #include <QLocale>
 #include <QScreen>
 #include <QSettings>
+#include <QRadioButton>
 #include <QTimer>
 #include <QTranslator>
 #include <QWindow>
 
 #include "MainWindow.h"
+#include "Updater.h"
 #include "Theme.h"
 #include "media/MediaPool.h"
 
@@ -54,10 +56,12 @@ int main(int argc, char* argv[]) {
     QCommandLineOption shotOpt(QStringLiteral("screenshot"), QStringLiteral("Save a screenshot and quit"), QStringLiteral("png"));
     QCommandLineOption workspaceOpt(QStringLiteral("workspace"), QStringLiteral("edit or photo"), QStringLiteral("name"));
     QCommandLineOption selectOpt(QStringLiteral("select-first-clip"), QStringLiteral("Select the first clip"));
+    QCommandLineOption selectClipOpt(QStringLiteral("select-clip"), QStringLiteral("Select clip TRACK:INDEX"), QStringLiteral("clip"));
     QCommandLineOption exportOpt(QStringLiteral("export-dialog"), QStringLiteral("Open the export dialog"));
+    QCommandLineOption exportCustomOpt(QStringLiteral("export-custom"), QStringLiteral("Open the export dialog in custom mode"));
     QCommandLineOption seekOpt(QStringLiteral("seek"), QStringLiteral("Move the playhead (seconds)"), QStringLiteral("s"));
     QCommandLineOption sizeOpt(QStringLiteral("size"), QStringLiteral("Window size WxH"), QStringLiteral("size"));
-    for (auto* o : {&shotOpt, &workspaceOpt, &selectOpt, &exportOpt, &seekOpt, &sizeOpt}) {
+    for (auto* o : {&shotOpt, &workspaceOpt, &selectOpt, &selectClipOpt, &exportOpt, &exportCustomOpt, &seekOpt, &sizeOpt}) {
         o->setFlags(QCommandLineOption::HiddenFromHelp);
         parser.addOption(*o);
     }
@@ -75,18 +79,36 @@ int main(int argc, char* argv[]) {
         w.setWorkspace(MainWindow::Workspace::Photo);
     if (parser.isSet(selectOpt))
         w.selectFirstClip();
+    if (parser.isSet(selectClipOpt)) {
+        const QStringList ti = parser.value(selectClipOpt).split(QLatin1Char(':'));
+        w.selectFirstClip(ti.value(0).toInt(), ti.value(1).toInt());
+    }
     if (parser.isSet(seekOpt))
         QTimer::singleShot(800, &w, [&w, s = parser.value(seekOpt).toDouble()] { w.seekSeconds(s); });
 
+    if (!parser.isSet(shotOpt)) {
+        Updater::removeLeftovers();
+        w.checkForUpdatesOnStartup();
+    }
+
     if (parser.isSet(shotOpt)) {
         const QString out = parser.value(shotOpt);
-        const bool exportDlg = parser.isSet(exportOpt);
-        QTimer::singleShot(2500, &w, [&w, out, exportDlg] {
+        const bool exportCustom = parser.isSet(exportCustomOpt);
+        const bool exportDlg = parser.isSet(exportOpt) || exportCustom;
+        QTimer::singleShot(2500, &w, [&w, out, exportDlg, exportCustom] {
             if (exportDlg) {
                 w.openExportDialog(false);
+                if (exportCustom)
+                    for (QWidget* top : QApplication::topLevelWidgets())
+                        if (top->isVisible() && top->inherits("lumora::ExportDialog")) {
+                            const auto modes = top->findChildren<QRadioButton*>();
+                            if (!modes.isEmpty())
+                                modes.last()->click(); // custom is the last mode
+                        }
                 QTimer::singleShot(1200, &w, [out] {
                     for (QWidget* top : QApplication::topLevelWidgets())
                         if (top->isVisible() && top->inherits("lumora::ExportDialog")) {
+                            top->adjustSize();
                             top->grab().save(out);
                             break;
                         }

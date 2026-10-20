@@ -14,6 +14,27 @@
 
 Tam yol haritası: [docs/ozellikler.md](docs/ozellikler.md). Mimari: [docs/mimari.md](docs/mimari.md).
 
+## Sürüm 0.2'de neler var
+
+**Çok izli zaman çizelgesi**
+- Ana iz (V1, mıknatıslı) üzerinde istediğiniz kadar video izi, altında istediğiniz kadar ses izi. İz başlığında gizle, sustur ve kilitle düğmeleri; sağ tık menüsünden iz ekleme ve kaldırma.
+- Klipleri izler arasında sürükleme. Üst izlerdeki klipler ana izdeki klibe bağlıdır ve onunla birlikte kayar.
+- Yalnızca ses içeren dosyalar (MP3, M4A, WAV, FLAC…) ses izine eklenir; müzik ve seslendirme için ayrı izler.
+
+**Başlıklar, geçişler, dönüşüm**
+- Başlık klipleri (T): metin, yazı tipi, boyut, kalın/italik, renk, hizalama, konum, kontur, arka plan, yumuşak gölge; giriş ve çıkış animasyonları (solma, yukarı kayma, belirme, daktilo).
+- Geçişler (Ctrl+T): çapraz geçiş, siyaha/beyaza geçiş, dört yönde silme, sola/sağa itme, yakınlaştırma, bulanıklaştırma. Kesimin iki yanında yeterli görüntü yoksa bunu açıkça söyler.
+- Her klipte konum, ölçek, döndürme ve opaklık (resim içinde resim), belirme/kararma, ses düzeyi (dB). Değerleri sürüklemek tek geri alma adımıdır.
+- Önizleme ve dışa aktarma aynı birleştiriciyi kullanır; dışa aktarma 16 bit kanal başına ve Lanczos ölçekleme ile çalışır. Efekt içermeyen kareler kaynaktan doğrudan dönüştürülür.
+- Ses karıştırıcı: birden çok iz, ses düzeyi, belirme/kararma ve geçişlerde eşit güçte çapraz geçiş.
+
+**Dışa aktarma**
+- Yeni **Özel** mod ve hazır ayarlar: YouTube 1080p / 4K, Instagram Reels ve akış, TikTok, X, arşiv (HEVC 10 bit), ProRes 422 HQ, DNxHR HQ.
+- Kodekler: H.264, HEVC, AV1, VP9, ProRes, DNxHR, FFV1. Kodlayıcılar: x264, x265, SVT-AV1, libaom, libvpx ve bilgisayarda gerçekten çalışan donanım kodlayıcıları (NVIDIA NVENC, Intel Quick Sync, AMD AMF, Apple VideoToolbox).
+- Kalite modu: sabit kalite, değişken bit hızı (en yüksek bit hızıyla), sabit bit hızı, hedef dosya boyutu; iki geçişli kodlama. Kare boyutu (siyah bantlı ya da bantsız sığdırma), kare hızı, bit derinliği, kodlama hızı, ses kodeği ve bit hızı.
+- Zaman çizelgesinde başlık, geçiş ya da efekt varsa "Kayıpsız kesim" kendiliğinden kapanır ve nedeni yazılır.
+- Geçerli kareyi 16 bit PNG ya da TIFF olarak dışa aktarma (Ctrl+Alt+S).
+
 ## Sürüm 0.1'de neler var
 
 **Video**
@@ -39,7 +60,7 @@ Tam yol haritası: [docs/ozellikler.md](docs/ozellikler.md). Mimari: [docs/mimar
 - `.lumora` proje dosyası (okunabilir JSON; göreli ve mutlak yollar, eksik medya listesi).
 - Türkçe ve İngilizce arayüz (Görünüm → Dil), koyu ve açık tema, taşınabilir paneller.
 
-Bilinçli olarak sonraki sürümlere bırakılanlar: EXIF meta verisinin fotoğrafa geri yazılması, donanım kodlayıcıları (NVENC/AMF/QSV, 0.2), çok izli zaman çizelgesi (0.2), Renk ve Ses çalışma alanları (0.3 / 0.4).
+Bilinçli olarak sonraki sürümlere bırakılanlar: EXIF meta verisinin fotoğrafa geri yazılması, anahtar karelerle animasyon, dışa aktarma kuyruğu, Renk ve Ses çalışma alanları (0.3 / 0.4).
 
 ## Klavye kısayolları
 
@@ -50,6 +71,9 @@ Bilinçli olarak sonraki sürümlere bırakılanlar: EXIF meta verisinin fotoğr
 | Home / End | Başa / sona git |
 | I / O | Giriş / çıkış noktası |
 | E | Kaynak aralığını zaman çizelgesine ekle |
+| T | Oynatma kafasına başlık ekle |
+| Ctrl+T | Seçili klibe ya da en yakın kesime geçiş ekle |
+| Ctrl+Alt+S | Geçerli kareyi dışa aktar |
 | S veya Ctrl+B | Oynatma kafasından böl |
 | Del | Klibi sil (boşluğu kapat) |
 | Ctrl+J | Sonraki kliple birleştir |
@@ -128,7 +152,7 @@ cmake --build build
 QT_QPA_PLATFORM=offscreen ctest --test-dir build --output-on-failure
 ```
 
-Testler kendi deneme videolarını üretir (her kare kendi numarasını taşır) ve şunları doğrular: kayıpsız kesimde paketlerin bit bit aynı olması, "kaynakla aynı"da kare hassasiyeti, FFV1'de piksel piksel eşitlik, B-kareli H.264 kesimlerinde hiç çözme hatası olmaması, zaman çizelgesi işlemleri, fotoğraf işleme ve proje dosyasının gidiş-dönüşü.
+Testler kendi deneme videolarını üretir (her kare kendi numarasını taşır) ve şunları doğrular: kayıpsız kesimde paketlerin bit bit aynı olması, "kaynakla aynı"da kare hassasiyeti, FFV1'de piksel piksel eşitlik, B-kareli H.264 kesimlerinde hiç çözme hatası olmaması, zaman çizelgesi işlemleri, fotoğraf işleme ve proje dosyasının gidiş-dönüşü. 0.2 ile eklenenler: başlık, geçiş ve karıştırılmış sesli zaman çizelgesinin işlenmesi, özel ayarlarda her karenin korunması, ölçekleme ve kare hızı değişimi, bit hızı modlarının hedefi tutturması, ProRes/DNxHR çıktısı, her hazır ayarın planlanabilmesi ve diğer kodlayıcıların tek ve iki geçişte çalışması.
 
 ## Proje yapısı
 
@@ -137,9 +161,10 @@ src/core/        Arayüzden bağımsız çekirdek (lumora_core kütüphanesi)
   TimeBase.*       Tamsayı zaman tabanı (1/705 600 000 sn), kare hızı yardımcıları
   ffmpeg/          FFmpeg için RAII sarmalayıcılar
   media/           Medya bilgisi, anahtar kare taraması, video/ses çözücüler, medya havuzu
-  timeline/        Zaman çizelgesi modeli (izler, klipler, bağlantılar, değişmezler)
+  timeline/        Zaman çizelgesi modeli (izler, klipler, bağlantılar, başlık/geçiş/dönüşüm ayarları)
+  render/          Kare birleştirici (FrameRenderer), başlık çizici, ses karıştırıcı
   undo/            Geri al / yinele komutları
-  export/          Dışa aktarma planlayıcı (ne kopyalanır, ne kodlanır) ve dışa aktarıcı
+  export/          Dışa aktarma planlayıcı (ne kopyalanır, ne kodlanır), kodlayıcı tablosu ve hazır ayarlar, kopyalayan ve işleyen dışa aktarıcılar
   image/           Fotoğraf ayarları, işleme hattı, fotoğraf kütüphanesi
   project/         .lumora proje dosyası
 src/app/         Qt Widgets arayüzü: ana pencere, paneller, oynatma motoru, pencereler

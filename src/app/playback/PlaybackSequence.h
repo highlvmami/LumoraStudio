@@ -1,39 +1,30 @@
 #pragma once
 
-#include <QString>
-#include <vector>
+#include <QSize>
+#include <memory>
 
 #include "TimeBase.h"
+#include "timeline/Timeline.h"
 
 namespace lumora {
 
 class MediaPool;
-struct TimelineState;
 struct MediaItem;
 
-// Flattened, immutable view of what the preview plays: either the timeline
-// (program) or one media file (source monitor). Built on the GUI thread and
-// handed to the playback threads by value.
-struct PlaybackSegment {
-    QString path;
-    Ticks sourceIn = 0;
-    Ticks sourceOut = 0;
-    Ticks start = 0; // position in the sequence
-    bool video = true;
-    bool audio = false;
-    int rotation = 0;
-
-    Ticks end() const { return start + (sourceOut - sourceIn); }
-};
-
+// What the preview plays: the timeline (program) or one media file shown as a
+// one-clip timeline (source monitor). Built on the GUI thread and handed to
+// the playback threads by value; it carries its own snapshot of the media it
+// uses so the threads never touch the project's media pool.
 struct PlaybackSequence {
-    std::vector<PlaybackSegment> segments;
+    TimelineState timeline;
+    std::shared_ptr<MediaPool> media;
     Ticks duration = 0;
     AVRational frameRate{25, 1};
+    QSize canvas{1920, 1080}; // frame size of the composition
 
-    const PlaybackSegment* segmentAt(Ticks t) const;
+    bool isEmpty() const { return duration <= 0; }
     static PlaybackSequence fromTimeline(const TimelineState& state, const MediaPool& pool, AVRational rate);
-    static PlaybackSequence fromMedia(const MediaItem& item);
+    static PlaybackSequence fromMedia(const std::shared_ptr<MediaItem>& item);
 };
 
 } // namespace lumora

@@ -1,4 +1,6 @@
 #include "MainWindow.h"
+#include "Updater.h"
+#include "dialogs/SettingsDialog.h"
 
 #include <QAction>
 #include <QActionGroup>
@@ -7,6 +9,7 @@
 #include <QDesktopServices>
 #include <QDialog>
 #include <QDialogButtonBox>
+#include <QDir>
 #include <QDockWidget>
 #include <QFileDialog>
 #include <QFileInfo>
@@ -37,6 +40,7 @@
 #include "photo/PhotoWorkspace.h"
 #include "playback/PlaybackEngine.h"
 #include "project/Project.h"
+#include "render/FrameRenderer.h"
 #include "undo/TimelineCommands.h"
 
 namespace lumora {
@@ -78,7 +82,7 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
     m_bin = new MediaBinPanel(m_project->media(), m_cache);
     m_timelineView = new TimelineView(m_project->timeline(), m_project->media(), m_cache, m_videoUndo);
     m_timelinePanel = new TimelinePanel(m_timelineView);
-    m_properties = new PropertiesPanel(m_project);
+    m_properties = new PropertiesPanel(m_project, m_videoUndo);
 
     createActions();
     createDocks();
@@ -142,20 +146,28 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
         m_actJoin->setEnabled(has && m_project->timeline()->canJoinWithNext(sel.front()));
     });
     connect(m_timelineView, &TimelineView::clipDoubleClicked, this, [this](const QUuid& id) {
-        if (const Clip* c = m_project->timeline()->clip(id))
+        if (const Clip* c = m_project->timeline()->clip(id); c && c->kind == ClipKind::Media)
             if (auto media = m_project->media()->find(c->mediaId)) {
                 m_monitor->showSource(media);
                 m_engine->seek(c->sourceIn);
             }
     });
     connect(m_timelineView, &TimelineView::mediaDropped, this,
-            [this](const QList<QUuid>& ids, Ticks at) { addMediaToTimeline(ids, at); });
+            [this](const QList<QUuid>& ids, Ticks at, int track) { addMediaToTimeline(ids, at, track); });
     connect(m_timelineView, &TimelineView::filesDropped, this,
-            [this](const QStringList& paths, Ticks at) { importFiles(paths, at, true); });
-    connect(m_timelineView, &TimelineView::contextMenuForClip, this, [this](const QUuid&, const QPoint& pos) {
+            [this](const QStringList& paths, Ticks at, int track) { importFiles(paths, at, true, track); });
+    connect(m_timelineView, &TimelineView::addTitleRequested, this, [this](int track, Ticks at) { addTitle(track, at); });
+    connect(m_timelineView, &TimelineView::contextMenuForClip, this, [this](const QUuid& id, const QPoint& pos) {
         QMenu menu;
         menu.addAction(m_actSplit);
         menu.addAction(m_actJoin);
+        if (auto loc = m_project->timeline()->locate(id); loc && loc->track == 0) {
+            menu.addSeparator();
+            menu.addAction(m_actAddTransition);
+            const Clip* c = m_project->timeline()->clip(id);
+            if (c && !c->transitionIn.isNone())
+                menu.addAction(tr("Remove transition"), this, &MainWindow::removeTransition);
+        }
         menu.addSeparator();
         menu.addAction(m_actDelete);
         menu.exec(pos);
@@ -272,10 +284,29 @@ void MainWindow::createActions() {
         resizeDocks({m_binDock, m_propsDock}, {300, 280}, Qt::Horizontal);
     });
 
+    m_actAddTitle = make(tr("Add &title"), QKeySequence(Qt::Key_T), [this] { addTitle(); }, Icons::title());
+    m_actAddTitle->setToolTip(tr("Add a title at the playhead on a track above the storyline (T)"));
+    m_actAddTransition = make(tr("Add t&ransition"), QKeySequence(Qt::CTRL | Qt::Key_T), &MainWindow::addTransition,
+                              Icons::transition());
+    m_actAddTransition->setToolTip(tr("Cross dissolve into the selected clip, or at the cut nearest the playhead (Ctrl+T)"));
+    m_actAddVideoTrack = make(tr("Add video track"), {}, [this] {
+        runTimelineEdit(m_videoUndo, m_project->timeline(), tr("Add video track"),
+                        [&] { return m_project->timeline()->addTrack(TrackType::Video) >= 0; });
+    });
+    m_actAddAudioTrack = make(tr("Add audio track"), {}, [this] {
+        runTimelineEdit(m_videoUndo, m_project->timeline(), tr("Add audio track"),
+                        [&] { return m_project->timeline()->addTrack(TrackType::Audio) >= 0; });
+    });
+    m_actExportFrame = make(tr("Export current &frame…"), QKeySequence(Qt::CTRL | Qt::ALT | Qt::Key_S),
+                            &MainWindow::exportFrame);
+
     auto* tb = m_timelinePanel->toolBar();
     tb->addAction(m_actSplit);
     tb->addAction(m_actJoin);
     tb->addAction(m_actDelete);
+    tb->addSeparator();
+    tb->addAction(m_actAddTitle);
+    tb->addAction(m_actAddTransition);
     tb->addSeparator();
     tb->addAction(m_actSnap);
 }
@@ -290,6 +321,7 @@ void MainWindow::createMenus() {
     file->addAction(m_actImport);
     file->addSeparator();
     file->addAction(m_actExport);
+    file->addAction(m_actExportFrame);
     file->addAction(m_actExportPhoto);
     file->addSeparator();
     file->addAction(m_actQuit);
@@ -302,11 +334,23 @@ void MainWindow::createMenus() {
     edit->addAction(m_actJoin);
     edit->addAction(m_actDelete);
     edit->addSeparator();
+    edit->addAction(m_actAddTitle);
+    edit->addAction(m_actAddTransition);
+    edit->addAction(m_actAddVideoTrack);
+    edit->addAction(m_actAddAudioTrack);
+    edit->addSeparator();
     edit->addAction(m_actMarkIn);
     edit->addAction(m_actMarkOut);
     edit->addAction(m_actAddSource);
     edit->addSeparator();
     edit->addAction(m_actSnap);
+    edit->addSeparator();
+    QAction* settings = edit->addAction(tr("&Settings…"), this, [this] {
+        SettingsDialog dlg(m_updater, this);
+        dlg.exec();
+    });
+    settings->setShortcut(QKeySequence(QStringLiteral("Ctrl+,")));
+    settings->setMenuRole(QAction::PreferencesRole);
 
     QMenu* play = menuBar()->addMenu(tr("&Playback"));
     play->addAction(m_actPlay);
@@ -356,6 +400,9 @@ void MainWindow::createMenus() {
     help->addAction(tr("Feature list (roadmap)"), this, [] {
         QDesktopServices::openUrl(QUrl(QStringLiteral("https://github.com/highlvmami/LumoraStudio/blob/main/docs/ozellikler.md")));
     });
+    help->addSeparator();
+    m_updater = new Updater(this);
+    help->addAction(tr("Check for updates…"), m_updater, &Updater::checkNow);
     help->addSeparator();
     QAction* about = help->addAction(tr("About LumoraStudio"), this, &MainWindow::showAbout);
     about->setMenuRole(QAction::AboutRole);
@@ -411,7 +458,8 @@ void MainWindow::setWorkspace(Workspace w) {
     }
     m_undoGroup->setActiveStack(photo ? m_photoUndo : m_videoUndo);
     for (QAction* a : {m_actSplit, m_actDelete, m_actJoin, m_actPlay, m_actPrevFrame, m_actNextFrame, m_actHome, m_actEnd,
-                       m_actMarkIn, m_actMarkOut, m_actAddSource, m_actZoomIn, m_actZoomOut, m_actExport})
+                       m_actMarkIn, m_actMarkOut, m_actAddSource, m_actZoomIn, m_actZoomOut, m_actExport, m_actAddTitle,
+                       m_actAddTransition, m_actAddVideoTrack, m_actAddAudioTrack, m_actExportFrame})
         a->setVisible(!photo);
     m_actExportPhoto->setVisible(photo);
 }
@@ -436,6 +484,11 @@ bool MainWindow::maybeSave() {
     if (r == QMessageBox::Save)
         return saveProject();
     return r == QMessageBox::Discard;
+}
+
+void MainWindow::checkForUpdatesOnStartup() {
+    if (m_updater)
+        m_updater->checkOnStartup();
 }
 
 void MainWindow::closeEvent(QCloseEvent* e) {
@@ -559,7 +612,7 @@ void MainWindow::openPaths(const QStringList& paths) {
         importFiles(media, kInvalidTicks, true);
 }
 
-void MainWindow::importFiles(const QStringList& paths, Ticks at, bool toTimeline) {
+void MainWindow::importFiles(const QStringList& paths, Ticks at, bool toTimeline, int track) {
     QList<QUuid> ids;
     QStringList failed;
     QStringList photos;
@@ -583,7 +636,7 @@ void MainWindow::importFiles(const QStringList& paths, Ticks at, bool toTimeline
         QMessageBox::warning(this, tr("Import media"), tr("Some files could not be opened:\n\n%1").arg(failed.join(QLatin1Char('\n'))));
     if (toTimeline && !ids.isEmpty()) {
         const bool wasEmpty = m_project->timeline()->isEmpty();
-        addMediaToTimeline(ids, at);
+        addMediaToTimeline(ids, at, track);
         if (wasEmpty)
             m_timelineView->zoomToFit();
     }
@@ -595,25 +648,57 @@ void MainWindow::importFiles(const QStringList& paths, Ticks at, bool toTimeline
         statusBar()->showMessage(tr("Imported %n file(s)", nullptr, static_cast<int>(ids.size() + photos.size())), 4000);
 }
 
-void MainWindow::addMediaToTimeline(const QList<QUuid>& ids, Ticks at) {
+void MainWindow::addMediaToTimeline(const QList<QUuid>& ids, Ticks at, int track) {
     for (const auto& id : ids)
-        if (auto m = m_project->media()->find(id))
-            addRangeToTimeline(id, 0, m->info.duration, at == kInvalidTicks ? kInvalidTicks : at);
+        if (auto m = m_project->media()->find(id)) {
+            const Ticks end = addRangeToTimeline(id, 0, m->info.duration, at, track);
+            // Several files dropped on a track are placed one after the other.
+            if (track >= 0 && end != kInvalidTicks)
+                at = end;
+        }
 }
 
-void MainWindow::addRangeToTimeline(const QUuid& mediaId, Ticks in, Ticks out, Ticks at) {
+Ticks MainWindow::addRangeToTimeline(const QUuid& mediaId, Ticks in, Ticks out, Ticks at, int track) {
     auto media = m_project->media()->find(mediaId);
     if (!media)
-        return;
-    if (!media->info.video) {
-        statusBar()->showMessage(media->info.kind == MediaKind::Image
-                                     ? tr("Photos are edited in the Photo workspace; photo-to-video arrives in a later version.")
-                                     : tr("Audio-only files arrive on the timeline in version 0.2."),
-                                 6000);
-        return;
+        return kInvalidTicks;
+    const bool hasVideo = media->info.video.has_value();
+    const bool hasAudio = media->info.audio.has_value();
+    if (!hasVideo && !hasAudio) {
+        statusBar()->showMessage(tr("Photos are edited in the Photo workspace; photo-to-video arrives in a later version."), 6000);
+        return kInvalidTicks;
     }
     Timeline* tl = m_project->timeline();
     const bool first = tl->isEmpty();
+    // Audio-only files go to A1 at the playhead unless dropped on a track.
+    if (!hasVideo && track < 0)
+        track = tl->primaryAudioTrack();
+    if (track >= 0) {
+        const bool audioTrack = tl->tracks()[track].type == TrackType::Audio;
+        if (audioTrack && !hasAudio) {
+            statusBar()->showMessage(tr("This file has no sound; drop it on a video track."), 6000);
+            return kInvalidTicks;
+        }
+        if (at == kInvalidTicks)
+            at = snapToFrame(m_engine->position(), tl->frameRate());
+        QUuid placed;
+        runTimelineEdit(m_videoUndo, tl, tr("Add clip"), [&] {
+            if (first && hasVideo) {
+                const QSignalBlocker b(tl);
+                tl->setFrameRate(media->info.video->frameRate);
+                tl->setResolution(QSize(media->info.video->width, media->info.video->height));
+            }
+            int target = track;
+            if (!audioTrack && !hasVideo)
+                target = tl->audioTrackFor(track);
+            placed = tl->placeMedia(mediaId, in, out, hasVideo && !audioTrack, hasAudio, target, at);
+            return !placed.isNull();
+        });
+        if (first)
+            m_timelineView->zoomToFit();
+        const Clip* c = tl->clip(placed);
+        return c ? c->timelineEnd() : kInvalidTicks;
+    }
     runTimelineEdit(m_videoUndo, tl, tr("Add clip"), [&] {
         if (first) {
             // The first clip defines the sequence: same frame rate and size as
@@ -622,10 +707,119 @@ void MainWindow::addRangeToTimeline(const QUuid& mediaId, Ticks in, Ticks out, T
             tl->setFrameRate(media->info.video->frameRate);
             tl->setResolution(QSize(media->info.video->width, media->info.video->height));
         }
-        return !tl->insertMedia(mediaId, in, out, true, media->info.audio.has_value(), at).isNull();
+        return !tl->insertMedia(mediaId, in, out, true, hasAudio, at).isNull();
     });
     if (first)
         m_timelineView->zoomToFit();
+    return kInvalidTicks;
+}
+
+void MainWindow::addTitle(int track, Ticks at) {
+    Timeline* tl = m_project->timeline();
+    if (at == kInvalidTicks)
+        at = snapToFrame(m_engine->position(), tl->frameRate());
+    const Ticks length = ticksFromSeconds(4);
+    QUuid id;
+    runTimelineEdit(m_videoUndo, tl, tr("Add title"), [&] {
+        int target = track;
+        if (target < 0) {
+            // The lowest video track above the storyline that is free there.
+            for (int ti : tl->state().trackIndices(TrackType::Video)) {
+                if (ti == 0 || tl->tracks()[ti].locked)
+                    continue;
+                bool free = true;
+                for (const auto& c : tl->tracks()[ti].clips)
+                    free &= c.timelineEnd() <= at || c.timelineStart >= at + length;
+                if (free) {
+                    target = ti;
+                    break;
+                }
+            }
+            if (target < 0)
+                target = tl->addTrack(TrackType::Video);
+        }
+        TitleData title;
+        title.text = tr("Your title");
+        id = tl->addTitle(title, length, target, at);
+        return !id.isNull();
+    });
+    if (!id.isNull()) {
+        m_timelineView->selectOnly(id);
+        m_propsDock->show();
+    }
+}
+
+void MainWindow::addTransition() {
+    Timeline* tl = m_project->timeline();
+    const auto& clips = tl->tracks()[0].clips;
+    QUuid target;
+    const auto sel = m_timelineView->selection();
+    if (!sel.isEmpty())
+        if (auto loc = tl->locate(sel.front()); loc && loc->track == 0 && loc->index > 0)
+            target = sel.front();
+    if (target.isNull()) {
+        // The cut nearest to the playhead.
+        const Ticks t = m_engine->position();
+        Ticks best = -1;
+        for (size_t k = 1; k < clips.size(); ++k) {
+            const Ticks d = std::abs(clips[k].timelineStart - t);
+            if (best < 0 || d < best) {
+                best = d;
+                target = clips[k].id;
+            }
+        }
+    }
+    if (target.isNull()) {
+        statusBar()->showMessage(tr("A transition needs two clips next to each other on the storyline."), 6000);
+        return;
+    }
+    const Clip* c = tl->clip(target);
+    Transition tr_ = c->transitionIn.isNone() ? Transition{TransitionType::CrossDissolve, ticksFromSeconds(1)} : c->transitionIn;
+    runTimelineEdit(m_videoUndo, tl, tr("Add transition"), [&] { return tl->setTransition(target, tr_); });
+    m_timelineView->selectOnly(target);
+    auto dur = [this](const QUuid& id) {
+        auto m = m_project->media()->find(id);
+        return m ? m->info.duration : Ticks(0);
+    };
+    if (auto loc = tl->locate(target); loc && tl->state().transitionDuration(loc->index, dur) <= 0)
+        statusBar()->showMessage(tr("There is no extra footage beyond this cut, so the transition cannot be shown. "
+                                    "Trim the clips to leave some media on both sides."),
+                                 8000);
+}
+
+void MainWindow::removeTransition() {
+    const auto sel = m_timelineView->selection();
+    if (sel.isEmpty())
+        return;
+    runTimelineEdit(m_videoUndo, m_project->timeline(), tr("Remove transition"),
+                    [&] { return m_project->timeline()->setTransition(sel.front(), Transition{}); });
+}
+
+void MainWindow::exportFrame() {
+    m_engine->pause();
+    if (m_project->timeline()->isEmpty())
+        return;
+    QSettings s;
+    QString path = QFileDialog::getSaveFileName(this, tr("Export current frame"),
+                                                s.value(QStringLiteral("dirs/export")).toString() + QStringLiteral("/frame.png"),
+                                                tr("PNG image (*.png);;TIFF image (*.tif *.tiff)"));
+    if (path.isEmpty())
+        return;
+    s.setValue(QStringLiteral("dirs/export"), QFileInfo(path).absolutePath());
+    // Rendered at full precision and the timeline's own size.
+    FrameRenderer renderer(m_project->media());
+    renderer.setTimeline(m_project->timeline()->state());
+    renderer.setOutputSize(FrameRenderer::defaultCanvasSize(m_project->timeline()->state(), *m_project->media()));
+    renderer.setPrecision(FrameRenderer::Precision::Final);
+    QApplication::setOverrideCursor(Qt::WaitCursor);
+    QImage img = renderer.render(snapToFrame(m_engine->position(), m_project->timeline()->frameRate()));
+    QApplication::restoreOverrideCursor();
+    // 16-bit PNG/TIFF keeps the full precision of the render.
+    img = img.convertToFormat(QImage::Format_RGBX64);
+    if (img.isNull() || !img.save(path))
+        QMessageBox::warning(this, tr("Export current frame"), tr("Could not save %1.").arg(path));
+    else
+        statusBar()->showMessage(tr("Frame saved to %1").arg(QDir::toNativeSeparators(path)), 6000);
 }
 
 void MainWindow::removeMedia(const QList<QUuid>& ids) {
@@ -668,8 +862,15 @@ void MainWindow::seekSeconds(double s) {
     m_timelineView->setPlayhead(m_engine->position());
 }
 
-void MainWindow::selectFirstClip() {
-    const auto& clips = m_project->timeline()->tracks()[0].clips;
+void MainWindow::selectFirstClip(int track, int index) {
+    const auto& tracks = m_project->timeline()->tracks();
+    if (track < 0 || track >= static_cast<int>(tracks.size()))
+        return;
+    const auto& clips = tracks[track].clips;
+    if (index > 0 && index < static_cast<int>(clips.size())) {
+        m_timelineView->selectOnly(clips[index].id);
+        return;
+    }
     if (!clips.empty())
         m_timelineView->selectOnly(clips.front().id);
 }

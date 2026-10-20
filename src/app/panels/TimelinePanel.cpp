@@ -52,7 +52,12 @@ TimelinePanel::TimelinePanel(TimelineView* view, QWidget* parent) : QWidget(pare
     top->addWidget(fit);
     layout->addLayout(top);
 
-    layout->addWidget(view, 1);
+    auto* viewRow = new QHBoxLayout;
+    viewRow->setSpacing(0);
+    viewRow->addWidget(view, 1);
+    m_vscroll = new QScrollBar(Qt::Vertical);
+    viewRow->addWidget(m_vscroll);
+    layout->addLayout(viewRow, 1);
     m_scroll = new QScrollBar(Qt::Horizontal);
     layout->addWidget(m_scroll);
 
@@ -64,6 +69,7 @@ TimelinePanel::TimelinePanel(TimelineView* view, QWidget* parent) : QWidget(pare
     connect(zoomOut, &QToolButton::clicked, this, [this] { m_view->setPixelsPerSecond(m_view->pixelsPerSecond() / 1.5); });
     connect(fit, &QToolButton::clicked, m_view, &TimelineView::zoomToFit);
     connect(m_scroll, &QScrollBar::valueChanged, m_view, &TimelineView::setScrollX);
+    connect(m_vscroll, &QScrollBar::valueChanged, m_view, &TimelineView::setScrollY);
     connect(m_view, &TimelineView::scrollChanged, this, [this, toSlider] {
         syncScrollBar();
         const QSignalBlocker b(m_zoom);
@@ -76,10 +82,17 @@ void TimelinePanel::setInfoText(const QString& text) { m_info->setText(text); }
 
 void TimelinePanel::syncScrollBar() {
     const QSignalBlocker b(m_scroll);
-    const int visible = std::max(1, m_view->width() - 70);
+    const int visible = std::max(1, m_view->width() - TimelineView::kHeader);
     m_scroll->setRange(0, std::max(0, m_view->contentWidth() - visible));
     m_scroll->setPageStep(visible);
     m_scroll->setValue(m_view->scrollX());
+
+    const QSignalBlocker bv(m_vscroll);
+    const int tall = m_view->contentHeight() - m_view->height();
+    m_vscroll->setVisible(tall > 0);
+    m_vscroll->setRange(0, std::max(0, tall));
+    m_vscroll->setPageStep(m_view->height());
+    m_vscroll->setValue(m_view->scrollY());
 }
 
 } // namespace lumora

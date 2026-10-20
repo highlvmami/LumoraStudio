@@ -258,6 +258,31 @@ QIcon keyframe() {
     });
 }
 
+QIcon title() {
+    return draw([](QPainter& p, QColor c) {
+        p.setPen(pen(c, 2.2));
+        p.drawLine(QPointF(5, 6), QPointF(19, 6));
+        p.drawLine(QPointF(12, 6), QPointF(12, 19));
+        p.setPen(pen(c, 1.6));
+        p.drawLine(QPointF(5, 6), QPointF(5, 8.5));
+        p.drawLine(QPointF(19, 6), QPointF(19, 8.5));
+        p.drawLine(QPointF(9.5, 19), QPointF(14.5, 19));
+    });
+}
+
+QIcon transition() {
+    return draw([](QPainter& p, QColor c) {
+        // Two overlapping frames, one fading into the other.
+        p.setPen(pen(c, 1.8));
+        p.setBrush(Qt::NoBrush);
+        p.drawRoundedRect(QRectF(3, 5, 11, 10), 1.5, 1.5);
+        QColor fill = c;
+        fill.setAlphaF(0.55);
+        p.setBrush(fill);
+        p.drawRoundedRect(QRectF(10, 9, 11, 10), 1.5, 1.5);
+    });
+}
+
 QIcon appIcon() {
     QIcon icon;
     for (int size : {16, 32, 48, 64, 128, 256}) {

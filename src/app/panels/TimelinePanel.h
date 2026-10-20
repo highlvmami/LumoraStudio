@@ -25,6 +25,7 @@ private:
     TimelineView* m_view;
     QToolBar* m_toolbar;
     QScrollBar* m_scroll;
+    QScrollBar* m_vscroll;
     QSlider* m_zoom;
     QLabel* m_info;
 };
