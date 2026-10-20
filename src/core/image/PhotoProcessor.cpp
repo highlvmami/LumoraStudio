@@ -1,10 +1,13 @@
 #include "PhotoProcessor.h"
 
 #include <QColorSpace>
+#include <QPainter>
 #include <QImageReader>
 #include <QImageWriter>
 #include <QtConcurrent/QtConcurrentMap>
 #include <algorithm>
+#include <map>
+#include <mutex>
 #include <cmath>
 #include <numeric>
 #include <vector>
@@ -13,77 +16,108 @@ namespace lumora {
 
 namespace {
 
-inline float srgbToLinear(float v) {
-    return v <= 0.04045f ? v / 12.92f : std::pow((v + 0.055f) / 1.055f, 2.4f);
-}
-inline float linearToSrgb(float v) {
-    if (v <= 0.0f)
-        return 0.0f;
-    return v <= 0.0031308f ? v * 12.92f : 1.055f * std::pow(v, 1.0f / 2.4f) - 0.055f;
-}
-
-// 16-bit decode table: exact for every possible input value.
-const std::vector<float>& decodeTable() {
-    static const std::vector<float> table = [] {
-        std::vector<float> t(65536);
-        for (int i = 0; i < 65536; ++i)
-            t[i] = srgbToLinear(i / 65535.0f);
-        return t;
-    }();
-    return table;
-}
-
-struct ToneParams {
-    float wb[3] = {1, 1, 1};
-    float exposureGain = 1;
-    float contrastPower = 1;
-    bool contrast = false;
-};
-
-ToneParams makeParams(const PhotoAdjustments& a) {
-    ToneParams p;
-    // White balance as per-channel gains in linear light, normalised so that
-    // overall luminance is unchanged (exposure stays separate).
-    const float t = static_cast<float>(a.temperature) / 100.0f;
-    const float m = static_cast<float>(a.tint) / 100.0f;
-    float r = std::exp2(0.45f * t + 0.10f * m);
-    float g = std::exp2(-0.30f * m);
-    float b = std::exp2(-0.45f * t + 0.10f * m);
-    const float lum = 0.2126f * r + 0.7152f * g + 0.0722f * b;
-    p.wb[0] = r / lum;
-    p.wb[1] = g / lum;
-    p.wb[2] = b / lum;
-    p.exposureGain = std::exp2(static_cast<float>(a.exposure));
-    p.contrast = a.contrast != 0.0;
-    p.contrastPower = std::exp2(static_cast<float>(a.contrast) / 100.0f * 0.75f);
-    return p;
-}
-
-constexpr float kMiddleGrey = 0.18f;
-
-void processRow(const QRgba64* in, QRgba64* out, int width, const ToneParams& p, const std::vector<float>& lut) {
-    for (int x = 0; x < width; ++x) {
-        const QRgba64 px = in[x];
-        float rgb[3] = {lut[px.red()], lut[px.green()], lut[px.blue()]};
-        for (int c = 0; c < 3; ++c)
-            rgb[c] *= p.wb[c] * p.exposureGain;
-        if (p.contrast) {
-            // Contrast on luminance in log space around middle grey; scaling
-            // RGB by the luminance ratio keeps hue and saturation stable.
-            const float lum = 0.2126f * rgb[0] + 0.7152f * rgb[1] + 0.0722f * rgb[2];
-            if (lum > 1e-6f) {
-                const float newLum = kMiddleGrey * std::pow(lum / kMiddleGrey, p.contrastPower);
-                const float k = newLum / lum;
-                for (float& v : rgb)
-                    v *= k;
-            }
-        }
-        auto enc = [](float v) {
-            const float e = linearToSrgb(v);
-            return static_cast<quint16>(std::lround(std::clamp(e, 0.0f, 1.0f) * 65535.0f));
-        };
-        out[x] = QRgba64::fromRgba64(enc(rgb[0]), enc(rgb[1]), enc(rgb[2]), px.alpha());
+inline float blendChannel(BlendMode m, float b, float s) {
+    switch (m) {
+    case BlendMode::Normal: return s;
+    case BlendMode::Multiply: return b * s;
+    case BlendMode::Screen: return 1 - (1 - b) * (1 - s);
+    case BlendMode::Overlay: return b < 0.5f ? 2 * b * s : 1 - 2 * (1 - b) * (1 - s);
+    case BlendMode::SoftLight: {
+        // W3C compositing definition.
+        if (s <= 0.5f)
+            return b - (1 - 2 * s) * b * (1 - b);
+        const float d = b <= 0.25f ? ((16 * b - 12) * b + 4) * b : std::sqrt(b);
+        return b + (2 * s - 1) * (d - b);
     }
+    case BlendMode::Darken: return std::min(b, s);
+    case BlendMode::Lighten: return std::max(b, s);
+    case BlendMode::Add: return std::min(1.0f, b + s);
+    case BlendMode::Difference: return std::abs(b - s);
+    }
+    return s;
+}
+
+// Decoded layer pictures, shared by preview and export.
+std::mutex g_layerMutex;
+std::map<QString, QImage> g_layerImages;
+
+QImage layerImage(const QString& path) {
+    {
+        std::lock_guard lock(g_layerMutex);
+        auto it = g_layerImages.find(path);
+        if (it != g_layerImages.end())
+            return it->second;
+    }
+    QImage img = PhotoProcessor::load(path);
+    if (!img.isNull())
+        img = img.convertToFormat(QImage::Format_RGBA64_Premultiplied);
+    std::lock_guard lock(g_layerMutex);
+    if (g_layerImages.size() >= 8)
+        g_layerImages.clear();
+    g_layerImages[path] = img;
+    return img;
+}
+
+// Composites one layer onto `base` (RGBA64 / RGBX64, straight alpha) in place.
+void compositeLayer(QImage& base, const PhotoLayer& layer) {
+    const int w = base.width(), h = base.height();
+    QImage source; // straight colour to blend with, same size as base
+    QImage coverage; // Image layers: premultiplied layer pixels
+    if (layer.kind == LayerKind::Adjustment) {
+        source = ColorProcessor(layer.grade).applied(base);
+    } else {
+        const QImage pic = layerImage(layer.imagePath);
+        if (pic.isNull())
+            return;
+        coverage = QImage(base.size(), QImage::Format_RGBA64_Premultiplied);
+        coverage.fill(Qt::transparent);
+        QPainter p(&coverage);
+        p.setRenderHint(QPainter::SmoothPixmapTransform);
+        const QSizeF size = QSizeF(pic.size()).scaled(QSizeF(base.size()), Qt::KeepAspectRatio) *
+                            std::clamp(layer.scale, 0.01, 100.0);
+        const QPointF centre(w / 2.0 + layer.x * w, h / 2.0 + layer.y * h);
+        p.drawImage(QRectF(centre - QPointF(size.width() / 2, size.height() / 2), size), pic);
+    }
+    const double aspect = h > 0 ? double(w) / h : 1.0;
+    const float opacity = static_cast<float>(std::clamp(layer.opacity, 0.0, 1.0));
+    std::vector<int> rows(h);
+    std::iota(rows.begin(), rows.end(), 0);
+    QtConcurrent::blockingMap(rows, [&](int y) {
+        auto* b = reinterpret_cast<QRgba64*>(base.scanLine(y));
+        const QRgba64* s = source.isNull() ? nullptr : reinterpret_cast<const QRgba64*>(source.constScanLine(y));
+        const QRgba64* c = coverage.isNull() ? nullptr : reinterpret_cast<const QRgba64*>(coverage.constScanLine(y));
+        const double v = (y + 0.5) / h;
+        for (int x = 0; x < w; ++x) {
+            float a = opacity;
+            float top[3];
+            if (c) {
+                const QRgba64 px = c[x];
+                if (px.alpha() == 0)
+                    continue;
+                const float la = px.alpha() / 65535.0f;
+                a *= la;
+                top[0] = px.red() / 65535.0f / la;
+                top[1] = px.green() / 65535.0f / la;
+                top[2] = px.blue() / 65535.0f / la;
+            } else {
+                top[0] = s[x].red() / 65535.0f;
+                top[1] = s[x].green() / 65535.0f;
+                top[2] = s[x].blue() / 65535.0f;
+            }
+            if (layer.mask.shape != MaskShape::None || layer.mask.invert)
+                a *= static_cast<float>(layer.mask.valueAt((x + 0.5) / w, v, aspect));
+            if (a <= 0.0f)
+                continue;
+            const float bottom[3] = {b[x].red() / 65535.0f, b[x].green() / 65535.0f, b[x].blue() / 65535.0f};
+            quint16 out[3];
+            for (int k = 0; k < 3; ++k) {
+                const float blended = blendChannel(layer.blend, bottom[k], std::clamp(top[k], 0.0f, 1.0f));
+                const float r = bottom[k] + (blended - bottom[k]) * a;
+                out[k] = static_cast<quint16>(std::lround(std::clamp(r, 0.0f, 1.0f) * 65535.0f));
+            }
+            b[x] = QRgba64::fromRgba64(out[0], out[1], out[2], b[x].alpha());
+        }
+    });
 }
 
 } // namespace
@@ -117,17 +151,19 @@ QImage PhotoProcessor::apply(const QImage& src, const PhotoAdjustments& adj, boo
         out.setColorSpace(src.colorSpace());
         return out;
     }
-    QImage out(rect.size(), input.format());
+    // Layer masks and placement are relative to the whole picture, so with
+    // layers the crop comes last; without, only the kept part is processed.
+    const bool layers = adj.hasLayerChanges();
+    QImage out = layers ? input.copy() : input.copy(rect);
+    ColorProcessor(adj.color).apply(out);
+    if (layers) {
+        for (const auto& l : adj.layers)
+            if (!l.isNoOp())
+                compositeLayer(out, l);
+        if (rect != out.rect())
+            out = out.copy(rect);
+    }
     out.setColorSpace(src.colorSpace());
-    const ToneParams params = makeParams(adj);
-    const auto& lut = decodeTable();
-    std::vector<int> rows(rect.height());
-    std::iota(rows.begin(), rows.end(), 0);
-    QtConcurrent::blockingMap(rows, [&](int y) {
-        const auto* in = reinterpret_cast<const QRgba64*>(input.constScanLine(rect.top() + y)) + rect.left();
-        auto* o = reinterpret_cast<QRgba64*>(out.scanLine(y));
-        processRow(in, o, rect.width(), params, lut);
-    });
     return out;
 }
 

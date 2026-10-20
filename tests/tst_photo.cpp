@@ -60,10 +60,10 @@ private slots:
         // sRGB 0.5 -> linear 0.214; +1 EV -> 0.428 linear -> sRGB 0.686
         img.setPixelColor(0, 0, QColor::fromRgbF(0.5f, 0.5f, 0.5f));
         PhotoAdjustments adj;
-        adj.exposure = 1.0;
+        adj.color.exposure = 1.0;
         const QImage out = PhotoProcessor::apply(img, adj);
         QVERIFY(std::abs(out.pixelColor(0, 0).redF() - 0.6858) < 0.002);
-        adj.exposure = -1.0;
+        adj.color.exposure = -1.0;
         const QImage dark = PhotoProcessor::apply(img, adj);
         QVERIFY(dark.pixelColor(0, 0).redF() < 0.5f);
     }
@@ -75,7 +75,7 @@ private slots:
         img.setPixelColor(1, 0, QColor::fromRgbF(0.2f, 0.2f, 0.2f));
         img.setPixelColor(2, 0, QColor::fromRgbF(0.8f, 0.8f, 0.8f));
         PhotoAdjustments adj;
-        adj.contrast = 50;
+        adj.color.contrast = 50;
         const QImage out = PhotoProcessor::apply(img, adj);
         QVERIFY(std::abs(out.pixelColor(0, 0).redF() - grey) < 0.002);
         QVERIFY(out.pixelColor(1, 0).redF() < 0.2f);
@@ -86,14 +86,14 @@ private slots:
         QImage img(1, 1, QImage::Format_RGBX64);
         img.setPixelColor(0, 0, QColor::fromRgbF(0.5f, 0.5f, 0.5f));
         PhotoAdjustments adj;
-        adj.temperature = 50;
+        adj.color.temperature = 50;
         QColor warm = PhotoProcessor::apply(img, adj).pixelColor(0, 0);
         QVERIFY(warm.redF() > warm.blueF());
-        adj.temperature = -50;
+        adj.color.temperature = -50;
         QColor cool = PhotoProcessor::apply(img, adj).pixelColor(0, 0);
         QVERIFY(cool.blueF() > cool.redF());
-        adj.temperature = 0;
-        adj.tint = 50;
+        adj.color.temperature = 0;
+        adj.color.tint = 50;
         QColor magenta = PhotoProcessor::apply(img, adj).pixelColor(0, 0);
         QVERIFY(magenta.greenF() < magenta.redF());
     }
@@ -102,7 +102,7 @@ private slots:
         QImage original;
         const QImage working = PhotoProcessor::load(m_src, &original);
         PhotoAdjustments adj;
-        adj.exposure = 0.5;
+        adj.color.exposure = 0.5;
         const QString out = m_dir.filePath("adjusted.png");
         QVERIFY(PhotoExporter::save(out, original, working, adj, {}));
         QImageReader r(out);
@@ -117,16 +117,16 @@ private slots:
         QUndoStack stack;
         const QUuid id = lib.add(m_src);
         PhotoAdjustments a, b, c;
-        b.exposure = 0.3;
-        c.exposure = 0.6;
+        b.color.exposure = 0.3;
+        c.color.exposure = 0.6;
         stack.push(new PhotoAdjustCommand(&lib, id, a, b, "exp", PhotoAdjustCommand::Exposure));
         stack.push(new PhotoAdjustCommand(&lib, id, b, c, "exp", PhotoAdjustCommand::Exposure));
         QCOMPARE(stack.count(), 1);
-        QCOMPARE(lib.find(id)->adjustments.exposure, 0.6);
+        QCOMPARE(lib.find(id)->adjustments.color.exposure, 0.6);
         stack.undo();
-        QCOMPARE(lib.find(id)->adjustments.exposure, 0.0);
+        QCOMPARE(lib.find(id)->adjustments.color.exposure, 0.0);
         stack.redo();
-        QCOMPARE(lib.find(id)->adjustments.exposure, 0.6);
+        QCOMPARE(lib.find(id)->adjustments.color.exposure, 0.6);
     }
 };
 

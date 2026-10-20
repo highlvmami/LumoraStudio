@@ -37,9 +37,22 @@ private slots:
         tl->setTransform(titleId, {0.1, -0.2, 1.5, 12, 0.8});
         tl->setFades(titleId, ticksFromSeconds(0.2), ticksFromSeconds(0.3));
         tl->setGain(tl->tracks()[1].clips[0].id, -6);
+        // Version 3: clip colour, photo layers.
+        ColorGrade grade;
+        grade.saturation = -20;
+        grade.gain = {0.1, 0.0, 0.2};
+        grade.lutPath = dir.filePath("look.cube");
+        grade.lutAmount = 0.5;
+        tl->setColor(tl->tracks()[0].clips[0].id, grade);
         PhotoAdjustments adj;
-        adj.exposure = 1.25;
+        adj.color.exposure = 1.25;
         adj.crop = QRectF(0.1, 0.2, 0.5, 0.5);
+        PhotoLayer layer;
+        layer.id = QUuid::createUuid();
+        layer.name = QStringLiteral("Gökyüzü");
+        layer.mask.shape = MaskShape::Ellipse;
+        layer.grade.exposure = -0.5;
+        adj.layers.push_back(layer);
         p.photos()->add(photo, adj);
         const QString projectPath = dir.filePath("test.lumora");
         QString err;

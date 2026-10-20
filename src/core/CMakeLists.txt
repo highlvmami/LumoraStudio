@@ -9,6 +9,10 @@ add_library(lumora_core STATIC
     media/MediaPool.h media/MediaPool.cpp
     media/VideoDecoder.h media/VideoDecoder.cpp
     media/AudioDecoder.h media/AudioDecoder.cpp
+    color/ColorGrade.h color/ColorGrade.cpp
+    color/ColorProcessor.h color/ColorProcessor.cpp
+    color/Lut.h color/Lut.cpp
+    color/Scopes.h color/Scopes.cpp
     timeline/ClipEffects.h timeline/ClipEffects.cpp
     timeline/Timeline.h timeline/Timeline.cpp
     undo/TimelineCommands.h undo/TimelineCommands.cpp
@@ -34,6 +38,7 @@ target_link_libraries(lumora_core
 
 # Core sources with user-visible strings, picked up by lupdate.
 set(CORE_TRANSLATABLE_SOURCES
+    ${CMAKE_CURRENT_SOURCE_DIR}/color/Lut.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/export/ExportPlanner.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/export/TimelineExporter.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/project/Project.cpp

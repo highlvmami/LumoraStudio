@@ -7,6 +7,7 @@
 #include <map>
 #include <optional>
 
+#include "color/Lut.h"
 #include "export/Encoders.h"
 #include "ffmpeg/FFmpeg.h"
 #include "render/FrameRenderer.h"
@@ -339,7 +340,8 @@ AVRational ExportPlanner::timelineRate(const TimelineState& tl, const MediaPool&
 ExportPlan ExportPlanner::streamCopyBlocked(const TimelineState&) {
     ExportPlan plan;
     plan.mode = ExportMode::StreamCopy;
-    plan.blockers << tr("The timeline has titles, transitions, effects, audio changes or more than one track. These "
+    plan.blockers << tr("The timeline has titles, transitions, colour grading, effects, audio changes or more than one "
+                        "track. These "
                         "have to be drawn into the picture, which a lossless cut cannot do. Choose \"Match source\", "
                         "\"Lossless intermediate\" or \"Custom\".");
     return plan;
@@ -365,6 +367,16 @@ ExportPlan ExportPlanner::planRender(const TimelineState& tl, const MediaPool& p
             if (c.kind == ClipKind::Media && !pool.find(c.mediaId)) {
                 plan.blockers << tr("A clip refers to media that is missing from the project.");
                 return plan;
+            }
+    // A LUT that cannot be read would silently change the look of the export.
+    for (const auto& t : tl.tracks)
+        for (const auto& c : t.clips)
+            if (c.color.hasLut()) {
+                QString err;
+                if (!luts::get(c.color.lutPath, &err)) {
+                    plan.blockers << tr("The LUT %1 cannot be read: %2").arg(QFileInfo(c.color.lutPath).fileName(), err);
+                    return plan;
+                }
             }
 
     const AVOutputFormat* ofmt = guessFormat(settings.outputPath);

@@ -4,6 +4,7 @@
 #include <algorithm>
 #include <cmath>
 
+#include "color/ColorProcessor.h"
 #include "ffmpeg/FFmpeg.h"
 #include "media/VideoDecoder.h"
 #include "render/TitleRenderer.h"
@@ -47,6 +48,8 @@ struct FrameRenderer::Slot {
     QImage image;
     Ticks imagePts = kInvalidTicks;
     QSize imageSize;
+    ColorGrade imageGrade;
+    std::unique_ptr<ColorProcessor> color; // for the clip's current grade
 };
 
 FrameRenderer::FrameRenderer(const MediaPool* pool) : m_pool(pool) {}
@@ -160,7 +163,8 @@ QImage FrameRenderer::clipImage(const Clip& clip, Ticks sourceTime, QSize* fitSi
         target.transpose();
     const int tw = std::max(2, static_cast<int>(std::lround(target.width())));
     const int th = std::max(2, static_cast<int>(std::lround(target.height())));
-    if (slot->imagePts == pts && slot->imageSize == QSize(tw, th) && !slot->image.isNull())
+    if (slot->imagePts == pts && slot->imageSize == QSize(tw, th) && slot->imageGrade == clip.color &&
+        !slot->image.isNull())
         return slot->image;
 
     const bool final = m_precision == Precision::Final;
@@ -191,7 +195,13 @@ QImage FrameRenderer::clipImage(const Clip& clip, Ticks sourceTime, QSize* fitSi
                 px[x * 4 + 3] = 0xffff;
         }
     }
+    if (!clip.color.isIdentity()) {
+        if (!slot->color || !(slot->color->grade() == clip.color))
+            slot->color = std::make_unique<ColorProcessor>(clip.color);
+        slot->color->apply(img);
+    }
     slot->image = img;
+    slot->imageGrade = clip.color;
     slot->imagePts = pts;
     slot->imageSize = QSize(tw, th);
     return img;
@@ -391,7 +401,7 @@ const AVFrame* FrameRenderer::passthroughFrame(Ticks t) {
         const Clip& c = v[k];
         if (!c.contains(t))
             continue;
-        if (c.kind != ClipKind::Media || !c.transform.isIdentity() || fadeFactor(c, t) != 1.0)
+        if (c.kind != ClipKind::Media || !c.transform.isIdentity() || !c.color.isIdentity() || fadeFactor(c, t) != 1.0)
             return nullptr;
         const Ticks dIn = m_state.transitionDuration(k, dur);
         if (dIn > 0 && t < c.timelineStart + dIn / 2)

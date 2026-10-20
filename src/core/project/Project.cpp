@@ -98,6 +98,8 @@ QByteArray Project::toJson() const {
             }
             if (!c.transform.isIdentity())
                 co["transform"] = c.transform.toJson();
+            if (!c.color.isIdentity())
+                co["color"] = c.color.toJson();
             if (!c.transitionIn.isNone())
                 co["transition"] = c.transitionIn.toJson();
             if (c.fadeIn > 0)
@@ -235,6 +237,8 @@ bool Project::fromJson(const QByteArray& json, const QString& baseDir, QString* 
             c.anchorSource = ticksFromJson(co.value("anchorSource"));
             if (co.contains("transform"))
                 c.transform = ClipTransform::fromJson(co.value("transform").toObject());
+            if (co.contains("color"))
+                c.color = ColorGrade::fromJson(co.value("color").toObject());
             if (co.contains("transition"))
                 c.transitionIn = Transition::fromJson(co.value("transition").toObject());
             c.fadeIn = ticksFromJson(co.value("fadeIn"));
