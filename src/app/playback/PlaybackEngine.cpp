@@ -265,6 +265,7 @@ void PlaybackEngine::videoLoop() {
         if (changed || !renderer || media != seq.media) {
             if (!renderer || media != seq.media) {
                 renderer = std::make_unique<FrameRenderer>(seq.media.get());
+                renderer->setDrawSubtitles(true); // the preview shows them; export decides for itself
                 media = seq.media;
             }
             renderer->setTimeline(seq.timeline);

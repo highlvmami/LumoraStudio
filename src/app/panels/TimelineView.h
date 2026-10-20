@@ -15,7 +15,7 @@ class MediaPool;
 class MediaCache;
 
 // Interactive drawing of the timeline: ruler, track headers (hide, mute,
-// lock), every video track above the storyline and every audio track below
+// lock), subtitle tracks on top, every video track above the storyline and every audio track below
 // it, clips with thumbnails, waveforms, fades and key frame marks, transition
 // markers, the playhead, selection, moving clips within and between tracks,
 // trimming, and drops from the media bin.
@@ -58,6 +58,7 @@ signals:
     void scrollChanged();
     void contextMenuForClip(const QUuid& clipId, const QPoint& globalPos);
     void addTitleRequested(int track, lumora::Ticks at);
+    void addSubtitleRequested(int track, lumora::Ticks at);
 
 protected:
     void paintEvent(QPaintEvent*) override;

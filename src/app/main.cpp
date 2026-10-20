@@ -54,7 +54,7 @@ int main(int argc, char* argv[]) {
     parser.addPositionalArgument(QStringLiteral("files"), QStringLiteral("Project (.lumora) or media files to open"));
     // Used to produce the screenshots in docs/screenshots.
     QCommandLineOption shotOpt(QStringLiteral("screenshot"), QStringLiteral("Save a screenshot and quit"), QStringLiteral("png"));
-    QCommandLineOption workspaceOpt(QStringLiteral("workspace"), QStringLiteral("edit, color or photo"), QStringLiteral("name"));
+    QCommandLineOption workspaceOpt(QStringLiteral("workspace"), QStringLiteral("edit, color, audio or photo"), QStringLiteral("name"));
     QCommandLineOption selectOpt(QStringLiteral("select-first-clip"), QStringLiteral("Select the first clip"));
     QCommandLineOption selectClipOpt(QStringLiteral("select-clip"), QStringLiteral("Select clip TRACK:INDEX"), QStringLiteral("clip"));
     QCommandLineOption exportOpt(QStringLiteral("export-dialog"), QStringLiteral("Open the export dialog"));
@@ -79,6 +79,8 @@ int main(int argc, char* argv[]) {
         w.setWorkspace(MainWindow::Workspace::Photo);
     if (parser.value(workspaceOpt) == QLatin1String("color"))
         w.setWorkspace(MainWindow::Workspace::Color);
+    if (parser.value(workspaceOpt) == QLatin1String("audio"))
+        w.setWorkspace(MainWindow::Workspace::Audio);
     if (parser.isSet(selectOpt))
         w.selectFirstClip();
     if (parser.isSet(selectClipOpt)) {

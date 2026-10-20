@@ -64,8 +64,8 @@ Hedef: kullanıcı istemedikçe hiçbir aşamada kalite düşmez.
 
 - ✅ Temel düzeltme: pozlama, kontrast, vurgular, gölgeler, beyazlar, siyahlar, beyaz dengesi, doygunluk, canlılık
 - ✅ Renk tekerlekleri (lift / gamma / gain)
-- Eğriler (RGB, ton, doygunluk)
-- HSL ile tek renk ayarı
+- ✅ Eğriler (ana ton eğrisi ve R/G/B)
+- ✅ HSL ile tek renk ayarı (8 renk aralığı)
 - ✅ LUT içe aktarma (.cube), kendi LUT'unu kaydetme
 - ✅ Kapsamlar: histogram, dalga formu, vektörskop, parade
 - Renk eşleştirme (bir klibi diğerine benzetme)
@@ -85,16 +85,17 @@ Hedef: kullanıcı istemedikçe hiçbir aşamada kalite düşmez.
 - ✅ Başlık editörü: font, kontur, gölge, arka plan, animasyonlu giriş/çıkış
 - Hazır başlık şablonları, alt bilgi bantları
 - Şekiller, oklar, vurgular
-- Altyazı: SRT/VTT içe-dışa aktarma, videoya gömme veya ayrı iz
+- ✅ Altyazı: SRT/VTT içe-dışa aktarma, videoya gömme, görüntüye yakma veya ayrı .srt
 - Otomatik altyazı (yerel konuşma tanıma, ör. Whisper), Türkçe destekli
 
 ### 2.8 Ses
 
 - ✅ Ses izleri, dalga formu, ses seviyesi anahtar kareleri
 - ✅ Geçişte ses yumuşatma (fade)
-- Gürültü giderme, eko azaltma, ses normalleştirme (LUFS hedefi)
-- Ekolayzer, kompresör, limitör
-- Konuşma algılandığında müziği otomatik kısma (ducking)
+- ✅ Gürültü giderme, ses normalleştirme (LUFS hedefi)
+- Eko azaltma
+- ✅ Ekolayzer, kompresör, limitör
+- ✅ Başka klipler (konuşma) çalarken müziği otomatik kısma (ducking)
 - Seslendirme kaydı
 - Sessiz kısımları otomatik silme
 - Çok kanallı ses, 48 kHz / 24-bit kayıpsız iş akışı
@@ -112,7 +113,7 @@ Hedef: kullanıcı istemedikçe hiçbir aşamada kalite düşmez.
 
 ### 3.1 Dosya ve iş akışı
 
-- Biçimler: JPEG, PNG, WebP, AVIF, HEIC, TIFF, PSD (okuma), RAW (CR2/CR3, NEF, ARW, DNG)
+- Biçimler: ✅ JPEG, PNG, WebP, TIFF, ✅ RAW (CR2/CR3, NEF, ARW, RAF, ORF, RW2, DNG …); AVIF, HEIC, PSD (okuma) sonra
 - Tahribatsız düzenleme: orijinal dosya hiç değişmez, ayarlar ayrı saklanır
 - Geçmiş paneli, anlık görüntüler (snapshot), önce/sonra karşılaştırma
 - Toplu düzenleme: bir fotoğrafın ayarını yüzlercesine uygulama, toplu yeniden boyutlandırma ve adlandırma
@@ -125,7 +126,8 @@ Hedef: kullanıcı istemedikçe hiçbir aşamada kalite düşmez.
 - Beyaz dengesini damlalık ile seçme
 - ✅ Canlılık, doygunluk, renk tekerlekleri, LUT
 - Netlik, doku, pus giderme
-- Ton eğrisi, HSL / renk karıştırıcı, renk derecelendirme
+- ✅ Ton eğrisi, HSL / renk karıştırıcı
+- Renk derecelendirme
 - Keskinleştirme, gürültü azaltma
 - Lens düzeltme (bozulma, vinyet, kromatik sapma), perspektif düzeltme
 - Kırpma, düzleştirme, en-boy oranı şablonları
@@ -135,7 +137,7 @@ Hedef: kullanıcı istemedikçe hiçbir aşamada kalite düşmez.
 - ✅ Katmanlar (ayar ve resim katmanları), karışım modları, opaklık
 - Katman grupları
 - ✅ Katman maskeleri: dikdörtgen, elips, degrade; yumuşak kenar, ters çevirme
-- Fırçayla maske boyama
+- ✅ Fırçayla maske boyama (boyut, sertlik, akış, silgi)
 - Seçim araçları: dikdörtgen, kement, sihirli değnek, renk aralığı
 - Otomatik konu seçimi ve arka plan kaldırma (yerel model)
 - Fırça, silgi, damga (klonlama), iyileştirme fırçası
@@ -192,5 +194,5 @@ Hedef: kullanıcı istemedikçe hiçbir aşamada kalite düşmez.
 1. ✅ **Sürüm 0.1:** Video aç, kes, birleştir, kayıpsız dışa aktar (yeniden kodlamasız). Fotoğraf aç, kırp, temel ayarlar, kayıpsız kaydet.
 2. ✅ **Sürüm 0.2:** Çok izli zaman çizelgesi, yazı, geçişler, dışa aktarma ayarları, donanım hızlandırma.
 3. ✅ **Sürüm 0.3:** Renk paneli, kapsamlar, LUT; fotoğrafta katmanlar ve maskeler.
-4. **Sürüm 0.4:** Ses araçları, altyazı, RAW desteği.
+4. ✅ **Sürüm 0.4:** Ses araçları, altyazı, RAW desteği; eğriler, HSL ve fırça maskesi.
 5. **Sonrası:** Yapay zeka araçları, takip, çoklu kamera, eklentiler, HDR.

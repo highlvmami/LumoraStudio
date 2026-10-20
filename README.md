@@ -22,6 +22,39 @@ Açık tema ("Gündüz", Görünüm → Tema):
 
 Tam yol haritası: [docs/ozellikler.md](docs/ozellikler.md). Mimari: [docs/mimari.md](docs/mimari.md).
 
+## Sürüm 0.4'te neler var
+
+![Ses çalışma alanı](docs/screenshots/ses.png)
+
+**Ses çalışma alanı**
+- Üstteki **Ses** sekmesi: seçili klibin sesi ve tüm miksin ana çıkışı. Video klip seçiliyken ona bağlı ses düzenlenir.
+- Klip başına: ses düzeyi, alçak kesme (uğultu ve rüzgâr), gürültü azaltma (sürekli arka plan gürültüsü; spektral, sözlere dokunmadan), üç bantlı ekolayzer, kompresör.
+- **Kısma (ducking):** müzik klibi, başka klipler (ör. konuşma) çalarken kendiliğinden kısılır.
+- **Ana çıkış:** dışa aktarırken ses yüksekliğini EBU R128'e göre ölçüp hedefe getirme (-14 LUFS YouTube/Spotify, -16 podcast, -23 TV) ve tepeleri tavanın altında tutan ileriye bakan limitleyici. **Ses yüksekliğini ölç** düğmesi miksin LUFS ve tepe değerini gösterir.
+- Kalite ilkesi korunur: yalnızca ses değiştiyse görüntü yine bit bit kopyalanır, sadece ses yeniden karıştırılıp kodlanır.
+
+![Altyazı](docs/screenshots/altyazi.png)
+
+**Altyazı**
+- Zaman çizelgesinin en üstünde altyazı izleri (S1, S2 …). Boş yere çift tıklama ya da Shift+T altyazı ekler; metin, süre, dil ve stil (yazı tipi, boyut, kontur, arka plan, yükseklik) Özellikler panelinde.
+- **Düzen → Altyazılar:** SRT/VTT içe aktarma (UTF-8, UTF-16 ve eski Türkçe Windows-1254 dosyaları), SRT/VTT dışa aktarma.
+- Dışa aktarırken üç seçenek: iz olarak göm (MP4/MOV'da mov_text, MKV'de SubRip, WebM'de WebVTT; açılıp kapatılabilir, kayıpsız kesim bozulmaz), görüntüye yak (hep görünür, yeniden kodlanır) ya da videonun yanına .srt olarak kaydet.
+
+![Eğriler ve HSL](docs/screenshots/egriler-hsl.png)
+
+**Renk: eğriler ve HSL**
+- Ton eğrileri: ana eğri ve kırmızı/yeşil/mavi ayrı ayrı. Tıklayıp nokta ekleme, sürükleme, çift/sağ tıklayıp silme. Eğri noktaların arasında taşmaz (monoton ara değerleme).
+- HSL karıştırıcı: 8 renk aralığının her biri için ton, doygunluk, parlaklık. Gri tonlar ve diğer renkler yerinde kalır.
+- Videoda ve fotoğrafta (ayar katmanları dahil) aynı hesap.
+
+![Fırça maskesi](docs/screenshots/firca-maske.png)
+
+**Fotoğraf: fırça maskesi ve RAW**
+- Ayar ve resim katmanlarına **Fırça** maskesi: fotoğrafın üzerine boyayın; boyut, sertlik, akış; Alt ile ya da **Sil** kutusuyla silme. Maske istenirse renkli olarak üstte gösterilir. Darbeler çözünürlükten bağımsız saklanır, önizleme ve tam boyutlu çıktı aynıdır.
+- Kamera RAW dosyaları (CR2/CR3, NEF, ARW, RAF, ORF, RW2, PEF, DNG …) LibRaw ile açılır: kameranın beyaz dengesiyle, 16 bit sRGB olarak, vurguları kırpmadan. Küçük resimde dosyanın içindeki önizleme kullanılır.
+
+**Düzeltme:** Güncelleme penceresi artık Ayarlar penceresinin arkasında açılmıyor.
+
 ## Sürüm 0.3'te neler var
 
 **Renk çalışma alanı (video)**
@@ -84,7 +117,7 @@ Tam yol haritası: [docs/ozellikler.md](docs/ozellikler.md). Mimari: [docs/mimar
 - `.lumora` proje dosyası (okunabilir JSON; göreli ve mutlak yollar, eksik medya listesi).
 - Türkçe ve İngilizce arayüz (Görünüm → Dil), kendine özgü "Gece" (koyu) ve "Gündüz" (açık) tema, taşınabilir paneller.
 
-Bilinçli olarak sonraki sürümlere bırakılanlar: EXIF meta verisinin fotoğrafa geri yazılması, anahtar karelerle animasyon, dışa aktarma kuyruğu, Renk ve Ses çalışma alanları (0.3 / 0.4).
+Bilinçli olarak sonraki sürümlere bırakılanlar: EXIF meta verisinin fotoğrafa geri yazılması, anahtar karelerle animasyon, dışa aktarma kuyruğu.
 
 ## Klavye kısayolları
 
@@ -124,7 +157,8 @@ Gerekenler:
    aqt install-qt windows desktop 6.8.3 win64_msvc2022_64 -m qtmultimedia qtimageformats -O C:\Qt
    ```
 3. **FFmpeg**'i indirin: [BtbN FFmpeg-Builds](https://github.com/BtbN/FFmpeg-Builds/releases/tag/latest) sayfasından `ffmpeg-n8.1-latest-win64-gpl-shared-8.1.zip` dosyasını alıp örneğin `C:\deps\ffmpeg` klasörüne açın (`include`, `lib`, `bin` klasörleri orada olmalı).
-4. "x64 Native Tools Command Prompt for VS 2022" penceresinde:
+4. İsteğe bağlı, RAW fotoğraflar için **LibRaw**: [vcpkg](https://vcpkg.io) ile `vcpkg install libraw:x64-windows`, sonra aşağıdaki `cmake` satırına `-DCMAKE_TOOLCHAIN_FILE=C:\vcpkg\scripts\buildsystems\vcpkg.cmake` ekleyin ve `C:\vcpkg\installed\x64-windows\bin` içindeki DLL'leri programın yanına koyun. LibRaw olmadan da derlenir; yalnızca RAW dosyaları açılmaz.
+5. "x64 Native Tools Command Prompt for VS 2022" penceresinde:
    ```bat
    git clone https://github.com/highlvmami/LumoraStudio.git
    cd LumoraStudio
@@ -133,7 +167,7 @@ Gerekenler:
    cmake --build build
    ```
    Derleme sonunda FFmpeg DLL'leri otomatik olarak `build\src\app` içine kopyalanır.
-5. Çalıştırmak ya da başka bir bilgisayara taşımak için Qt DLL'lerini yanına koyun:
+6. Çalıştırmak ya da başka bir bilgisayara taşımak için Qt DLL'lerini yanına koyun:
    ```bat
    C:\Qt\6.8.3\msvc2022_64\bin\windeployqt.exe --release build\src\app\LumoraStudio.exe
    build\src\app\LumoraStudio.exe
@@ -147,13 +181,14 @@ Hazır derlenmiş paket: her PR ve `main` için GitHub Actions'ta **Build** iş 
 sudo apt install build-essential cmake ninja-build pkg-config \
   qt6-base-dev qt6-multimedia-dev qt6-tools-dev qt6-tools-dev-tools qt6-l10n-tools \
   qt6-image-formats-plugins libgl-dev \
-  libavformat-dev libavcodec-dev libavutil-dev libswscale-dev libswresample-dev
+  libavformat-dev libavcodec-dev libavutil-dev libswscale-dev libswresample-dev \
+  libraw-dev
 cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
 cmake --build build
 ./build/src/app/LumoraStudio
 ```
 
-Başka bir FFmpeg kullanmak için `-DFFMPEG_ROOT=/yol/ffmpeg` verin; verilmezse pkg-config kullanılır.
+Başka bir FFmpeg kullanmak için `-DFFMPEG_ROOT=/yol/ffmpeg` verin; verilmezse pkg-config kullanılır. LibRaw isteğe bağlıdır: yoksa program yine derlenir, yalnızca RAW dosyaları listelenmez.
 
 ### macOS
 
@@ -176,7 +211,7 @@ cmake --build build
 QT_QPA_PLATFORM=offscreen ctest --test-dir build --output-on-failure
 ```
 
-Testler kendi deneme videolarını üretir (her kare kendi numarasını taşır) ve şunları doğrular: kayıpsız kesimde paketlerin bit bit aynı olması, "kaynakla aynı"da kare hassasiyeti, FFV1'de piksel piksel eşitlik, B-kareli H.264 kesimlerinde hiç çözme hatası olmaması, zaman çizelgesi işlemleri, fotoğraf işleme ve proje dosyasının gidiş-dönüşü. 0.2 ile eklenenler: başlık, geçiş ve karıştırılmış sesli zaman çizelgesinin işlenmesi, özel ayarlarda her karenin korunması, ölçekleme ve kare hızı değişimi, bit hızı modlarının hedefi tutturması, ProRes/DNxHR çıktısı, her hazır ayarın planlanabilmesi ve diğer kodlayıcıların tek ve iki geçişte çalışması. 0.3 ile eklenenler: renk ayarlarının her birinin doğru aralığa etki etmesi, .cube okuma (3B/1B, hatalı dosyalar) ve yazma, kaydedilen LUT'un aynı görünümü vermesi, kapsamlar, maskeli ayar katmanları ve resim katmanlarında karışım modları, klip renginin önizlemede ve dışa aktarmada aynı işlenmesi.
+Testler kendi deneme videolarını üretir (her kare kendi numarasını taşır) ve şunları doğrular: kayıpsız kesimde paketlerin bit bit aynı olması, "kaynakla aynı"da kare hassasiyeti, FFV1'de piksel piksel eşitlik, B-kareli H.264 kesimlerinde hiç çözme hatası olmaması, zaman çizelgesi işlemleri, fotoğraf işleme ve proje dosyasının gidiş-dönüşü. 0.2 ile eklenenler: başlık, geçiş ve karıştırılmış sesli zaman çizelgesinin işlenmesi, özel ayarlarda her karenin korunması, ölçekleme ve kare hızı değişimi, bit hızı modlarının hedefi tutturması, ProRes/DNxHR çıktısı, her hazır ayarın planlanabilmesi ve diğer kodlayıcıların tek ve iki geçişte çalışması. 0.3 ile eklenenler: renk ayarlarının her birinin doğru aralığa etki etmesi, .cube okuma (3B/1B, hatalı dosyalar) ve yazma, kaydedilen LUT'un aynı görünümü vermesi, kapsamlar, maskeli ayar katmanları ve resim katmanlarında karışım modları, klip renginin önizlemede ve dışa aktarmada aynı işlenmesi. 0.4 ile eklenenler: EBU referans tonlarıyla ses yüksekliği ölçümü, limitleyicinin tavanı hiç aşmaması, gürültü azaltmanın sinyale dokunmayıp gürültüyü düşürmesi ve gecikmesinin tam olması, ekolayzer, kısma, eşitlemenin hedefi tutturması, ses efektleriyle dışa aktarmada görüntünün bit bit kopyalanması, altyazının gömülmesi/yakılması/.srt olarak kaydedilmesi, SRT/VTT okuma-yazma, eğriler, HSL, fırça maskesi ve RAW (üretilen bir DNG ile) açma.
 
 ## Proje yapısı
 
@@ -185,12 +220,13 @@ src/core/        Arayüzden bağımsız çekirdek (lumora_core kütüphanesi)
   TimeBase.*       Tamsayı zaman tabanı (1/705 600 000 sn), kare hızı yardımcıları
   ffmpeg/          FFmpeg için RAII sarmalayıcılar
   media/           Medya bilgisi, anahtar kare taraması, video/ses çözücüler, medya havuzu
-  timeline/        Zaman çizelgesi modeli (izler, klipler, bağlantılar, başlık/geçiş/dönüşüm ayarları)
+  timeline/        Zaman çizelgesi modeli (izler, klipler, bağlantılar, başlık/geçiş/dönüşüm ayarları), SRT/VTT altyazı okuma/yazma
   render/          Kare birleştirici (FrameRenderer), başlık çizici, ses karıştırıcı
-  color/           Renk ayarları (ColorGrade), renk hattı (ColorProcessor), .cube LUT okuma/yazma, kapsamlar
+  audio/           Ses efektleri (filtreler, gürültü azaltma, kompresör, limitleyici), EBU R128 ses yüksekliği ölçümü
+  color/           Renk ayarları (ColorGrade, eğriler, HSL), renk hattı (ColorProcessor), .cube LUT okuma/yazma, kapsamlar
   undo/            Geri al / yinele komutları
   export/          Dışa aktarma planlayıcı (ne kopyalanır, ne kodlanır), kodlayıcı tablosu ve hazır ayarlar, kopyalayan ve işleyen dışa aktarıcılar
-  image/           Fotoğraf ayarları ve katmanları, işleme hattı, fotoğraf kütüphanesi
+  image/           Fotoğraf ayarları ve katmanları, işleme hattı, fotoğraf kütüphanesi, RAW okuyucu (LibRaw)
   project/         .lumora proje dosyası
 src/app/         Qt Widgets arayüzü: ana pencere, paneller, oynatma motoru, pencereler
 src/i18n/        Çeviriler (lumora_tr.ts)

@@ -328,9 +328,6 @@ ExportPlan ExportPlanner::plan(const TimelineState& tl, const MediaPool& pool, c
                 plan.blockers << tr("No audio encoder available.");
             } else {
                 plan.audioEncoder = enc.front();
-                plan.notes << tr("The sound is mixed (gain, fades, effects or extra audio clips) and encoded as %1. "
-                                 "The picture is not affected by this.")
-                                  .arg(QString::fromUtf8(avcodec_get_name(target)));
             }
         }
     } else if (!settings.includeAudio || !anyAudio) {
@@ -368,7 +365,6 @@ void ExportPlanner::planSubtitles(ExportPlan& plan, const TimelineState& tl, con
     if (settings.subtitles == SubtitleMode::BurnIn) {
         if (plan.video == VideoStrategy::Render) {
             plan.burnSubtitles = true;
-            plan.notes << tr("Subtitles are drawn into the picture.");
         }
         return;
     }
@@ -405,7 +401,12 @@ void ExportPlanner::planSubtitles(ExportPlan& plan, const TimelineState& tl, con
                 const Ticks s = std::max(cue.start, span.tlStart), e = std::min(cue.end, span.tlEnd);
                 if (e <= s)
                     continue;
-                sp.cues.push_back({span.outStart + (s - span.tlStart), span.outStart + (e - span.tlStart), cue.text});
+                const Ticks os = span.outStart + (s - span.tlStart), oe = span.outStart + (e - span.tlStart);
+                // A cue across a cut continues in the next clip: keep it one cue.
+                if (!sp.cues.empty() && sp.cues.back().text == cue.text && std::abs(os - sp.cues.back().end) < kTicksPerSecond / 20)
+                    sp.cues.back().end = std::max(sp.cues.back().end, oe);
+                else
+                    sp.cues.push_back({os, oe, cue.text});
             }
         }
         if (!sp.cues.empty())
@@ -418,14 +419,10 @@ void ExportPlanner::planSubtitles(ExportPlan& plan, const TimelineState& tl, con
         if (codec != AV_CODEC_ID_NONE && avcodec_find_encoder(codec)) {
             plan.subtitleCodec = codec;
             plan.subtitleStreams = streams;
-            plan.notes << tr("%n subtitle track(s) are added as selectable subtitles.", nullptr,
-                             static_cast<int>(streams.size()));
             return;
         }
         plan.notes << tr("The %1 container cannot hold subtitles, so they are saved as .srt next to the video.")
                           .arg(plan.containerName);
-    } else {
-        plan.notes << tr("Subtitles are saved as .srt next to the video.");
     }
     plan.sidecarSubtitles = streams;
 }

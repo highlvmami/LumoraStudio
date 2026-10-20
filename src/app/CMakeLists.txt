@@ -20,6 +20,8 @@ set(APP_SOURCES
     dialogs/SettingsDialog.h dialogs/SettingsDialog.cpp
     color/SliderRow.h color/SliderRow.cpp
     color/ColorWheelWidget.h color/ColorWheelWidget.cpp
+    color/CurvesWidget.h color/CurvesWidget.cpp
+    audio/AudioPanel.h audio/AudioPanel.cpp
     color/ColorPanel.h color/ColorPanel.cpp
     color/ClipColorPanel.h color/ClipColorPanel.cpp
     color/ScopesWidget.h color/ScopesWidget.cpp

@@ -17,14 +17,15 @@ class QFontComboBox;
 class QToolButton;
 class QPushButton;
 class QFormLayout;
+class QLineEdit;
 
 namespace lumora {
 
 class Project;
 struct Clip;
 
-// Right-hand panel: the editable settings of the selected clip (title text
-// and style, position / scale / rotation / opacity, transition, fades, audio
+// Right-hand panel: the editable settings of the selected clip (title or
+// subtitle text and style, position / scale / rotation / opacity, transition, fades, audio
 // gain) followed by the technical details of its file. Every change is one
 // undo step; dragging a value merges into a single step.
 class PropertiesPanel : public QWidget {
@@ -36,6 +37,8 @@ public:
     void showMedia(const QUuid& mediaId);
     void showNothing();
     void refresh();
+    // Puts the cursor in the text of the selected title or subtitle.
+    void focusText();
 
 private:
     QWidget* makeSection(const QString& title, QFormLayout** form);
@@ -47,6 +50,7 @@ private:
     void applyTransform();
     void applyTransition();
     void applyFades();
+    void applySubtitleStyle();
     void refreshEditors(const Clip* clip);
     void refreshInfo(const Clip* clip);
 
@@ -79,6 +83,20 @@ private:
     QComboBox* m_titleAnimOut;
     QDoubleSpinBox* m_titleAnimDuration;
     QDoubleSpinBox* m_titleDuration;
+
+    QWidget* m_subSection;
+    QPlainTextEdit* m_subText;
+    QDoubleSpinBox* m_subDuration;
+    QWidget* m_subTrackSection;
+    QLineEdit* m_subLanguage;
+    QFontComboBox* m_subFont;
+    QDoubleSpinBox* m_subSize;
+    QToolButton* m_subBold;
+    QToolButton* m_subColor;
+    QDoubleSpinBox* m_subOutline;
+    QToolButton* m_subOutlineColor;
+    QSpinBox* m_subBackOpacity;
+    QDoubleSpinBox* m_subY;
 
     QWidget* m_transformSection;
     QDoubleSpinBox* m_posX;

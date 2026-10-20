@@ -82,7 +82,8 @@ ExportDialog::ExportDialog(Project* project, QUndoStack* undo, QWidget* parent)
     }
     // Plain cuts default to the lossless cut; timelines with titles,
     // transitions or several tracks have to be rendered.
-    const bool effects = project->timeline()->state().hasEffects();
+    // Sound changes alone keep the lossless cut: the picture is still copied.
+    const bool effects = project->timeline()->state().hasVideoEffects();
     m_modes->button(static_cast<int>(effects ? ExportMode::MatchSource : ExportMode::StreamCopy))->setChecked(true);
     layout->addWidget(modeBox);
 
@@ -100,6 +101,16 @@ ExportDialog::ExportDialog(Project* project, QUndoStack* undo, QWidget* parent)
     m_audio = new QCheckBox(tr("Include audio"));
     m_audio->setChecked(true);
     form->addRow(QString(), m_audio);
+    m_subtitles = new QComboBox;
+    m_subtitles->addItem(tr("Embed as a subtitle track (can be turned on and off)"), static_cast<int>(SubtitleMode::Embed));
+    m_subtitles->addItem(tr("Burn into the picture (always visible, re-encodes)"), static_cast<int>(SubtitleMode::BurnIn));
+    m_subtitles->addItem(tr("Save as an .srt file next to the video"), static_cast<int>(SubtitleMode::Sidecar));
+    m_subtitles->addItem(tr("Leave out"), static_cast<int>(SubtitleMode::Off));
+    form->addRow(tr("Subtitles:"), m_subtitles);
+    if (!project->timeline()->state().hasSubtitles()) {
+        m_subtitles->hide();
+        form->labelForField(m_subtitles)->hide();
+    }
     layout->addLayout(form);
 
     auto* planBox = new QGroupBox(tr("What will happen"));
@@ -144,6 +155,7 @@ ExportDialog::ExportDialog(Project* project, QUndoStack* undo, QWidget* parent)
         replan();
     });
     connect(m_audio, &QCheckBox::toggled, this, &ExportDialog::replan);
+    connect(m_subtitles, &QComboBox::currentIndexChanged, this, &ExportDialog::replan);
     connect(m_path, &QLineEdit::editingFinished, this, &ExportDialog::replan);
     connect(browseBtn, &QPushButton::clicked, this, &ExportDialog::browse);
     connect(m_snapBtn, &QPushButton::clicked, this, &ExportDialog::snapCuts);
@@ -468,6 +480,7 @@ ExportSettings ExportDialog::settings() const {
     s.mode = static_cast<ExportMode>(m_modes->checkedId());
     s.outputPath = QDir::fromNativeSeparators(m_path->text().trimmed());
     s.includeAudio = m_audio->isChecked();
+    s.subtitles = static_cast<SubtitleMode>(m_subtitles->currentData().toInt());
     if (s.mode == ExportMode::Custom && m_customBox) {
         VideoEncodeOptions& v = s.video;
         v.codec = static_cast<AVCodecID>(m_codec->currentData().toInt());
@@ -575,13 +588,24 @@ void ExportDialog::replan() {
         case AudioStrategy::Copy: line(themeColors().success.name(), tr("Audio: copied unchanged")); break;
         case AudioStrategy::Encode:
             line(m_plan.audioEncoder == QLatin1String("flac") ? themeColors().success.name() : themeColors().warning.name(),
-                 tr("Audio: encoded with %1").arg(m_plan.audioEncoder));
+                 m_plan.audioMixed ? tr("Audio: mixed with your sound settings and encoded with %1; the picture is not touched").arg(m_plan.audioEncoder)
+                                   : tr("Audio: encoded with %1").arg(m_plan.audioEncoder));
             break;
         case AudioStrategy::None: line(themeColors().textDim.name(), tr("Audio: none")); break;
         }
         line(themeColors().textDim.name(), tr("Container: %1 · %n clip(s) · about %2", nullptr,
                                            static_cast<int>(m_plan.segments.size()))
                                             .arg(m_plan.containerName, formatSeconds(m_plan.expectedDuration)));
+    }
+    if (m_plan.blockers.isEmpty()) {
+        if (m_plan.burnSubtitles)
+            line(themeColors().textDim.name(), tr("Subtitles: drawn into the picture"));
+        for (const auto& st : m_plan.subtitleStreams)
+            line(themeColors().success.name(),
+                 tr("Subtitles: %n cue(s) as a track%1", nullptr, int(st.cues.size()))
+                     .arg(st.language.isEmpty() ? QString() : QStringLiteral(" (%1)").arg(st.language)));
+        for (const auto& st : m_plan.sidecarSubtitles)
+            line(themeColors().success.name(), tr("Subtitles: %n cue(s) in a separate .srt file", nullptr, int(st.cues.size())));
     }
     for (const auto& n : m_plan.notes)
         line(themeColors().warning.name(), n.toHtmlEscaped());

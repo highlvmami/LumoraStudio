@@ -141,8 +141,8 @@ std::vector<SubtitleCue> readFile(const QString& path, QString* error) {
         text = utf8.decode(data);
         if (utf8.hasError()) {
             // Old Turkish .srt files are often Windows-1254.
-            QStringDecoder tr("windows-1254");
-            text = tr.isValid() ? QString(tr.decode(data)) : QString::fromLatin1(data);
+            QStringDecoder decoder("windows-1254");
+            text = decoder.isValid() ? QString(decoder.decode(data)) : QString::fromLatin1(data);
         }
     }
     return parse(text, error);

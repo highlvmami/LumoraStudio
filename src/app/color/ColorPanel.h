@@ -4,6 +4,7 @@
 
 #include "color/ColorGrade.h"
 
+class QButtonGroup;
 class QComboBox;
 class QLabel;
 class QToolButton;
@@ -13,10 +14,11 @@ namespace lumora {
 
 class SliderRow;
 class ColorWheelWidget;
+class CurvesWidget;
 
 // Editor for a ColorGrade: light (exposure, contrast, highlights, shadows,
 // whites, blacks), white balance, saturation / vibrance, lift / gamma / gain
-// wheels and a .cube LUT. Used for video clips, photos and photo adjustment
+// wheels, tone curves, an HSL mixer and a .cube LUT. Used for video clips, photos and photo adjustment
 // layers. The panel does not own the grade: it reports each edit and the
 // owner pushes the undo step and calls setGrade() back.
 class ColorPanel : public QWidget {
@@ -42,6 +44,7 @@ signals:
 private:
     void edit(const QString& text, const QString& field, const std::function<void(ColorGrade&)>& change);
     void refreshLutCombo();
+    void showHslBand(int band);
     void chooseLut();
     void saveLookAsLut();
 
@@ -62,6 +65,12 @@ private:
     ColorWheelWidget* m_lift;
     ColorWheelWidget* m_gamma;
     ColorWheelWidget* m_gain;
+    CurvesWidget* m_curves;
+    QButtonGroup* m_hslBands;
+    int m_hslBand = 0;
+    SliderRow* m_hslHue;
+    SliderRow* m_hslSat;
+    SliderRow* m_hslLum;
     QComboBox* m_lut;
     QLabel* m_lutStatus;
     SliderRow* m_lutAmount;

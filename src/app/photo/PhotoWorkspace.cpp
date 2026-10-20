@@ -184,6 +184,16 @@ PhotoWorkspace::PhotoWorkspace(PhotoLibrary* library, QUndoStack* undo, QWidget*
         QSettings().setValue(QStringLiteral("photo/tab"), i);
         updateMaskOverlay();
     });
+    auto applyBrush = [this] { m_view->setBrush(m_layers->brush(), m_layers->showMaskOverlay()); };
+    connect(m_layers, &LayersPanel::brushChanged, this, applyBrush);
+    applyBrush();
+    connect(m_view, &PhotoView::strokePainted, this, [this](const BrushStroke& stroke) {
+        PhotoAdjustments a = current();
+        for (auto& l : a.layers)
+            if (l.id == m_layers->currentLayer())
+                l.mask.strokes.push_back(stroke);
+        pushChange(a, stroke.erase ? tr("Erase from mask") : tr("Paint mask"), PhotoAdjustCommand::Other);
+    });
     connect(m_view, &PhotoView::maskMoved, this, [this](const QRectF& r) {
         PhotoAdjustments a = current();
         for (auto& l : a.layers)

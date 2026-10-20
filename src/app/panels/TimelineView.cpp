@@ -107,6 +107,13 @@ std::vector<TimelineView::Row> TimelineView::rows() const {
     std::vector<Row> out;
     const TimelineState& s = m_timeline->state();
     int y = kRuler + 4 - m_scrollY;
+    const auto subs = s.trackIndices(TrackType::Subtitle);
+    for (auto it = subs.rbegin(); it != subs.rend(); ++it) {
+        out.push_back({*it, y, 36});
+        y += 38;
+    }
+    if (!subs.empty())
+        y += 4;
     const auto video = s.trackIndices(TrackType::Video);
     for (auto it = video.rbegin(); it != video.rend(); ++it) {
         const int h = *it == 0 ? 66 : 48;
@@ -363,22 +370,26 @@ void TimelineView::paintHeader(QPainter& p, const Row& row) {
     p.setBrush(tc.raised);
     p.drawRoundedRect(header, 7, 7);
     // Colour pill: indigo for picture, teal for sound.
-    p.setBrush(t.type == TrackType::Video ? tc.videoClip : tc.audioClip);
-    p.drawRoundedRect(QRectF(header.left() + 5, header.top() + 8, 3, header.height() - 16), 1.5, 1.5);
+    p.setBrush(t.type == TrackType::Video ? tc.videoClip : t.type == TrackType::Subtitle ? tc.accentAlt : tc.audioClip);
+    p.drawRoundedRect(QRectF(header.left() + 5, header.top() + 6, 3, header.height() - 12), 1.5, 1.5);
     p.restore();
     p.setPen(pal.color(QPalette::WindowText));
     QFont bold = font();
     bold.setBold(true);
     p.setFont(bold);
-    p.drawText(QRect(16, row.top + 6, kHeader - 76, 18), Qt::AlignVCenter | Qt::AlignLeft, t.name);
+    const bool compact = row.height < 44;
+    p.drawText(QRect(16, row.top + (compact ? 2 : 6), kHeader - 76, compact ? 16 : 18), Qt::AlignVCenter | Qt::AlignLeft, t.name);
     p.setFont(font());
     p.setPen(pal.color(QPalette::PlaceholderText));
-    QString kind = t.type == TrackType::Video ? (row.track == 0 ? tr("Main") : tr("Video")) : tr("Audio");
-    p.drawText(QRect(16, row.top + 23, kHeader - 76, 18), Qt::AlignVCenter | Qt::AlignLeft,
+    QString kind = t.type == TrackType::Video ? (row.track == 0 ? tr("Main") : tr("Video"))
+                   : t.type == TrackType::Subtitle
+                       ? (t.language.isEmpty() ? tr("Subtitles") : t.language.toUpper())
+                       : tr("Audio");
+    p.drawText(QRect(16, row.top + (compact ? 17 : 23), kHeader - 76, compact ? 16 : 18), Qt::AlignVCenter | Qt::AlignLeft,
                p.fontMetrics().elidedText(kind, Qt::ElideRight, kHeader - 76));
     const QColor fg = pal.color(QPalette::WindowText);
     const QColor off = pal.color(QPalette::PlaceholderText);
-    const bool video = t.type == TrackType::Video;
+    const bool video = t.type != TrackType::Audio; // picture and subtitles are shown / hidden
     const bool visible = video ? !t.hidden : !t.muted;
     const QRect vis = headerButtonRect(row, HeaderButton::Visibility);
     const QRect lock = headerButtonRect(row, HeaderButton::Lock);
@@ -395,10 +406,11 @@ void TimelineView::paintClip(QPainter& p, const Clip& c, int track, const QRect&
     const Track& t = m_timeline->tracks()[track];
     const bool video = t.type == TrackType::Video;
     const bool title = c.kind == ClipKind::Title;
+    const bool subtitle = c.kind == ClipKind::Subtitle;
     const bool selected = isSelected(c);
     const ThemeColors& tc = themeColors();
-    const QColor base = title ? tc.titleClip : video ? tc.videoClip : tc.audioClip;
-    auto media = title ? nullptr : m_pool->find(c.mediaId);
+    const QColor base = subtitle ? tc.accentAlt : title ? tc.titleClip : video ? tc.videoClip : tc.audioClip;
+    auto media = c.hasMedia() ? m_pool->find(c.mediaId) : nullptr;
     QPainterPath path;
     path.addRoundedRect(QRectF(r).adjusted(0.5, 0.5, -0.5, -0.5), 7, 7);
     p.save();
@@ -410,6 +422,24 @@ void TimelineView::paintClip(QPainter& p, const Clip& c, int track, const QRect&
     body.setColorAt(0, base.darker(dark ? 170 : 115));
     body.setColorAt(1, base.darker(dark ? 230 : 140));
     p.fillRect(r, body);
+    if (subtitle) {
+        // Just the words: subtitle rows are short.
+        p.setPen(base.lighter(170));
+        const QString text = c.text.simplified();
+        p.drawText(r.adjusted(7, 0, -5, 0), Qt::AlignVCenter | Qt::AlignLeft,
+                   p.fontMetrics().elidedText(text.isEmpty() ? tr("(empty subtitle)") : text, Qt::ElideRight, r.width() - 12));
+        p.restore();
+        p.setBrush(Qt::NoBrush);
+        if (selected) {
+            p.setPen(QPen(withAlpha(tc.accent, 0.35), 5));
+            p.drawPath(path);
+            p.setPen(QPen(tc.accent, 2));
+        } else {
+            p.setPen(QPen(withAlpha(base.lighter(140), 0.7), 1));
+        }
+        p.drawPath(path);
+        return;
+    }
     if (title) {
         QFont f = font();
         f.setBold(c.title.bold);
@@ -676,7 +706,7 @@ void TimelineView::mousePressEvent(QMouseEvent* e) {
         const HeaderButton b = headerButtonAt(pos, &track);
         if (b != HeaderButton::None) {
             const Track& t = m_timeline->tracks()[track];
-            const bool video = t.type == TrackType::Video;
+            const bool video = t.type != TrackType::Audio;
             bool locked = t.locked, muted = t.muted, hidden = t.hidden;
             if (b == HeaderButton::Lock)
                 locked = !locked;
@@ -807,7 +837,7 @@ void TimelineView::mouseMoveEvent(QMouseEvent* e) {
         if (!c)
             break;
         auto media = m_pool->find(c->mediaId);
-        const Ticks limit = c->kind == ClipKind::Title ? kNoMediaLimit : media ? media->info.duration : c->sourceOut;
+        const Ticks limit = !c->hasMedia() ? kNoMediaLimit : media ? media->info.duration : c->sourceOut;
         const Ticks delta = snapToFrame(ticksFromSeconds((pos.x() - m_pressPos.x()) / m_pps), m_timeline->frameRate());
         if (m_drag == Drag::TrimIn)
             m_timeline->trimIn(m_dragClip, m_dragSourceStart + delta);
@@ -852,6 +882,8 @@ void TimelineView::mouseDoubleClickEvent(QMouseEvent* e) {
         emit clipDoubleClicked(h.clip);
     else if (h.track >= 0 && m_timeline->tracks()[h.track].type == TrackType::Video && h.track != 0)
         emit addTitleRequested(h.track, snapTime(timeAt(e->position().x())));
+    else if (h.track >= 0 && m_timeline->tracks()[h.track].isSubtitle())
+        emit addSubtitleRequested(h.track, snapTime(timeAt(e->position().x())));
 }
 
 void TimelineView::wheelEvent(QWheelEvent* e) {
@@ -918,11 +950,17 @@ void TimelineView::showTrackMenu(int track, Ticks at, const QPoint& globalPos) {
     const auto& tracks = m_timeline->tracks();
     if (track >= 0 && tracks[track].type == TrackType::Video)
         menu.addAction(tr("Add title here"), this, [this, track, at] { emit addTitleRequested(track, at); });
+    if (track >= 0 && tracks[track].isSubtitle())
+        menu.addAction(tr("Add subtitle here"), this, [this, track, at] { emit addSubtitleRequested(track, at); });
     menu.addAction(tr("Add video track"), this, [this] {
         runTimelineEdit(m_undo, m_timeline, tr("Add video track"), [&] { return m_timeline->addTrack(TrackType::Video) >= 0; });
     });
     menu.addAction(tr("Add audio track"), this, [this] {
         runTimelineEdit(m_undo, m_timeline, tr("Add audio track"), [&] { return m_timeline->addTrack(TrackType::Audio) >= 0; });
+    });
+    menu.addAction(tr("Add subtitle track"), this, [this] {
+        runTimelineEdit(m_undo, m_timeline, tr("Add subtitle track"),
+                        [&] { return m_timeline->addTrack(TrackType::Subtitle) >= 0; });
     });
     if (track >= 2) {
         menu.addSeparator();

@@ -123,6 +123,10 @@
         <source>The LUT %1 cannot be read: %2</source>
         <translation>%1 LUT dosyası okunamıyor: %2</translation>
     </message>
+    <message>
+        <source>The %1 container cannot hold subtitles, so they are saved as .srt next to the video.</source>
+        <translation>%1 kabı altyazı taşıyamaz, bu yüzden altyazılar videonun yanına .srt olarak kaydedilir.</translation>
+    </message>
 </context>
 <context>
     <name>Lut</name>
@@ -169,6 +173,13 @@
     <message>
         <source>Only 3D tables can be saved</source>
         <translation>Yalnızca 3B tablolar kaydedilebilir</translation>
+    </message>
+</context>
+<context>
+    <name>SubtitleText</name>
+    <message>
+        <source>No subtitles found. Only SubRip (.srt) and WebVTT (.vtt) files can be read.</source>
+        <translation>Altyazı bulunamadı. Yalnızca SubRip (.srt) ve WebVTT (.vtt) dosyaları okunabilir.</translation>
     </message>
 </context>
 <context>
@@ -252,6 +263,205 @@
     <message>
         <source>No key frame found in %1.</source>
         <translation>%1 içinde anahtar kare bulunamadı.</translation>
+    </message>
+    <message>
+        <source>Loudness %1 LUFS, brought to %2 LUFS (%3 dB).</source>
+        <translation>Ses yüksekliği %1 LUFS idi, %2 LUFS&apos;a getirildi (%3 dB).</translation>
+    </message>
+    <message>
+        <source>Cannot add the subtitles: %1</source>
+        <translation>Altyazılar eklenemiyor: %1</translation>
+    </message>
+    <message>
+        <source>The subtitle file could not be written: %1</source>
+        <translation>Altyazı dosyası yazılamadı: %1</translation>
+    </message>
+    <message>
+        <source>Subtitles saved to %1</source>
+        <translation>Altyazılar kaydedildi: %1</translation>
+    </message>
+</context>
+<context>
+    <name>lumora::AudioPanel</name>
+    <message>
+        <source>Clip sound</source>
+        <translation>Klibin sesi</translation>
+    </message>
+    <message>
+        <source>Volume (dB)</source>
+        <translation>Ses düzeyi (dB)</translation>
+    </message>
+    <message>
+        <source>Low cut (Hz)</source>
+        <translation>Alçak kesme (Hz)</translation>
+    </message>
+    <message>
+        <source>Removes rumble, wind and handling noise below this frequency; 0 = off. 80 Hz suits most voices.</source>
+        <translation>Bu frekansın altındaki uğultuyu, rüzgârı ve tutma gürültüsünü siler; 0 = kapalı. Çoğu konuşmaya 80 Hz uyar.</translation>
+    </message>
+    <message>
+        <source>Noise reduction (%)</source>
+        <translation>Gürültü azaltma (%)</translation>
+    </message>
+    <message>
+        <source>Lowers steady background noise (hum, hiss, fans, air conditioning) between and under the words. High values can sound watery.</source>
+        <translation>Sözlerin arasındaki ve altındaki sürekli arka plan gürültüsünü (vızıltı, cızırtı, fan, klima) azaltır. Yüksek değerler sesi sulu gösterebilir.</translation>
+    </message>
+    <message>
+        <source>Equaliser</source>
+        <translation>Ekolayzer</translation>
+    </message>
+    <message>
+        <source>Bass (dB)</source>
+        <translation>Bas (dB)</translation>
+    </message>
+    <message>
+        <source>Middle (dB)</source>
+        <translation>Orta (dB)</translation>
+    </message>
+    <message>
+        <source>Middle at (Hz)</source>
+        <translation>Orta frekans (Hz)</translation>
+    </message>
+    <message>
+        <source>Treble (dB)</source>
+        <translation>Tiz (dB)</translation>
+    </message>
+    <message>
+        <source>Compressor</source>
+        <translation>Kompresör</translation>
+    </message>
+    <message>
+        <source>Evens out loud and quiet parts, so a voice stays at one level</source>
+        <translation>Yüksek ve alçak yerleri dengeler, böylece konuşma tek bir düzeyde kalır</translation>
+    </message>
+    <message>
+        <source>Threshold (dBFS)</source>
+        <translation>Eşik (dBFS)</translation>
+    </message>
+    <message>
+        <source>Ratio</source>
+        <translation>Oran</translation>
+    </message>
+    <message>
+        <source>Make-up gain (dB)</source>
+        <translation>Telafi kazancı (dB)</translation>
+    </message>
+    <message>
+        <source>Ducking</source>
+        <translation>Kısma (ducking)</translation>
+    </message>
+    <message>
+        <source>Lower under other sound (dB)</source>
+        <translation>Başka ses varken kıs (dB)</translation>
+    </message>
+    <message>
+        <source>For music: it gets quieter by itself while other clips (a voice) play.</source>
+        <translation>Müzik için: başka klipler (bir konuşma) çalarken kendiliğinden kısılır.</translation>
+    </message>
+    <message>
+        <source>Master (whole mix)</source>
+        <translation>Ana çıkış (tüm miks)</translation>
+    </message>
+    <message>
+        <source>Normalise loudness on export</source>
+        <translation>Dışa aktarırken ses yüksekliğini eşitle</translation>
+    </message>
+    <message>
+        <source>Measures the finished mix (EBU R128) and brings it to the target loudness. The limiter is then always on, so nothing clips.</source>
+        <translation>Bitmiş miksi ölçer (EBU R128) ve hedef ses yüksekliğine getirir. Bu durumda limitleyici hep açıktır, hiçbir şey patlamaz.</translation>
+    </message>
+    <message>
+        <source>-14 LUFS: YouTube, Spotify, social media</source>
+        <translation>-14 LUFS: YouTube, Spotify, sosyal medya</translation>
+    </message>
+    <message>
+        <source>-16 LUFS: podcasts, Apple</source>
+        <translation>-16 LUFS: podcast, Apple</translation>
+    </message>
+    <message>
+        <source>-23 LUFS: television (EBU R128)</source>
+        <translation>-23 LUFS: televizyon (EBU R128)</translation>
+    </message>
+    <message>
+        <source>Limiter</source>
+        <translation>Limitleyici</translation>
+    </message>
+    <message>
+        <source>Stops peaks from going above the ceiling, without audible clipping</source>
+        <translation>Tepelerin tavanı aşmasını duyulur bir patlama olmadan engeller</translation>
+    </message>
+    <message>
+        <source>Ceiling (dBFS)</source>
+        <translation>Tavan (dBFS)</translation>
+    </message>
+    <message>
+        <source>Measure loudness</source>
+        <translation>Ses yüksekliğini ölç</translation>
+    </message>
+    <message>
+        <source>Sound changes never re-encode the picture: on export the video is still copied as it is.</source>
+        <translation>Ses değişiklikleri görüntüyü asla yeniden kodlamaz: dışa aktarırken video yine olduğu gibi kopyalanır.</translation>
+    </message>
+    <message>
+        <source>Volume</source>
+        <translation>Ses düzeyi</translation>
+    </message>
+    <message>
+        <source>Low cut</source>
+        <translation>Alçak kesme</translation>
+    </message>
+    <message>
+        <source>Noise reduction</source>
+        <translation>Gürültü azaltma</translation>
+    </message>
+    <message>
+        <source>Turn on compressor</source>
+        <translation>Kompresörü aç</translation>
+    </message>
+    <message>
+        <source>Turn off compressor</source>
+        <translation>Kompresörü kapat</translation>
+    </message>
+    <message>
+        <source>Loudness normalisation</source>
+        <translation>Ses yüksekliği eşitleme</translation>
+    </message>
+    <message>
+        <source>Target loudness</source>
+        <translation>Hedef ses yüksekliği</translation>
+    </message>
+    <message>
+        <source>Limiter ceiling</source>
+        <translation>Limitleyici tavanı</translation>
+    </message>
+    <message>
+        <source>Select a clip with sound in the timeline.</source>
+        <translation>Zaman çizelgesinde sesi olan bir klip seçin.</translation>
+    </message>
+    <message>
+        <source>This clip has no sound.</source>
+        <translation>Bu klibin sesi yok.</translation>
+    </message>
+    <message>
+        <source>%1 LUFS</source>
+        <translation>%1 LUFS</translation>
+    </message>
+    <message>
+        <source>Measuring… (click to stop)</source>
+        <translation>Ölçülüyor… (durdurmak için tıklayın)</translation>
+    </message>
+    <message>
+        <source>The mix is silent.</source>
+        <translation>Miks sessiz.</translation>
+    </message>
+    <message>
+        <source>Loudness %1 LUFS, peak %2 dBFS.</source>
+        <translation>Ses yüksekliği %1 LUFS, tepe %2 dBFS.</translation>
+    </message>
+    <message>
+        <source>Normalising to %1 LUFS changes it by %2 dB.</source>
+        <translation>%1 LUFS&apos;a eşitlemek onu %2 dB değiştirir.</translation>
     </message>
 </context>
 <context>
@@ -446,6 +656,66 @@
         <translation>%1 yazılamıyor:
 %2</translation>
     </message>
+    <message>
+        <source>Curves</source>
+        <translation>Eğriler</translation>
+    </message>
+    <message>
+        <source>HSL mixer</source>
+        <translation>HSL karıştırıcı</translation>
+    </message>
+    <message>
+        <source>Change one colour range at a time: its hue, how strong it is and how bright</source>
+        <translation>Her seferinde bir renk aralığını değiştirin: tonunu, ne kadar canlı ve ne kadar parlak olduğunu</translation>
+    </message>
+    <message>
+        <source>Red</source>
+        <translation>Kırmızı</translation>
+    </message>
+    <message>
+        <source>Orange</source>
+        <translation>Turuncu</translation>
+    </message>
+    <message>
+        <source>Yellow</source>
+        <translation>Sarı</translation>
+    </message>
+    <message>
+        <source>Green</source>
+        <translation>Yeşil</translation>
+    </message>
+    <message>
+        <source>Aqua</source>
+        <translation>Camgöbeği</translation>
+    </message>
+    <message>
+        <source>Blue</source>
+        <translation>Mavi</translation>
+    </message>
+    <message>
+        <source>Purple</source>
+        <translation>Mor</translation>
+    </message>
+    <message>
+        <source>Magenta</source>
+        <translation>Eflatun</translation>
+    </message>
+    <message>
+        <source>Hue</source>
+        <translation>Ton</translation>
+    </message>
+    <message>
+        <source>Luminance</source>
+        <translation>Parlaklık</translation>
+    </message>
+    <message>
+        <source>Curve</source>
+        <translation>Eğri</translation>
+    </message>
+    <message>
+        <source>HSL</source>
+        <translation>HSL</translation>
+    </message>
 </context>
 <context>
     <name>lumora::ColorWheelWidget</name>
@@ -456,6 +726,45 @@
     <message>
         <source>R %1 · G %2 · B %3 · brightness %4</source>
         <translation>K %1 · Y %2 · M %3 · parlaklık %4</translation>
+    </message>
+</context>
+<context>
+    <name>lumora::CurvesWidget</name>
+    <message>
+        <source>RGB</source>
+        <translation>RGB</translation>
+    </message>
+    <message>
+        <source>Red</source>
+        <translation>Kırmızı</translation>
+    </message>
+    <message>
+        <source>Green</source>
+        <translation>Yeşil</translation>
+    </message>
+    <message>
+        <source>Blue</source>
+        <translation>Mavi</translation>
+    </message>
+    <message>
+        <source>Master curve: brightness of all channels</source>
+        <translation>Ana eğri: tüm kanalların parlaklığı</translation>
+    </message>
+    <message>
+        <source>Red channel</source>
+        <translation>Kırmızı kanal</translation>
+    </message>
+    <message>
+        <source>Green channel</source>
+        <translation>Yeşil kanal</translation>
+    </message>
+    <message>
+        <source>Blue channel</source>
+        <translation>Mavi kanal</translation>
+    </message>
+    <message>
+        <source>Click to add a point and drag it. Double-click or right-click a point to remove it; double-click elsewhere to reset the curve.</source>
+        <translation>Nokta eklemek için tıklayıp sürükleyin. Bir noktayı silmek için üzerine çift ya da sağ tıklayın; eğriyi sıfırlamak için boş yere çift tıklayın.</translation>
     </message>
 </context>
 <context>
@@ -773,6 +1082,46 @@
         <source>Container: %1 · about %2</source>
         <translation>Kap: %1 · yaklaşık %2</translation>
     </message>
+    <message>
+        <source>Embed as a subtitle track (can be turned on and off)</source>
+        <translation>Altyazı izi olarak göm (açılıp kapatılabilir)</translation>
+    </message>
+    <message>
+        <source>Burn into the picture (always visible, re-encodes)</source>
+        <translation>Görüntüye yak (hep görünür, yeniden kodlanır)</translation>
+    </message>
+    <message>
+        <source>Save as an .srt file next to the video</source>
+        <translation>Videonun yanına .srt dosyası olarak kaydet</translation>
+    </message>
+    <message>
+        <source>Leave out</source>
+        <translation>Ekleme</translation>
+    </message>
+    <message>
+        <source>Subtitles:</source>
+        <translation>Altyazılar:</translation>
+    </message>
+    <message>
+        <source>Audio: mixed with your sound settings and encoded with %1; the picture is not touched</source>
+        <translation>Ses: ses ayarlarınızla karıştırılır ve %1 ile kodlanır; görüntüye dokunulmaz</translation>
+    </message>
+    <message>
+        <source>Subtitles: drawn into the picture</source>
+        <translation>Altyazılar: görüntünün içine çizilir</translation>
+    </message>
+    <message numerus="yes">
+        <source>Subtitles: %n cue(s) as a track%1</source>
+        <translation>
+            <numerusform>Altyazılar: iz olarak %n satır%1</numerusform>
+        </translation>
+    </message>
+    <message numerus="yes">
+        <source>Subtitles: %n cue(s) in a separate .srt file</source>
+        <translation>
+            <numerusform>Altyazılar: ayrı bir .srt dosyasında %n satır</numerusform>
+        </translation>
+    </message>
 </context>
 <context>
     <name>lumora::LayersPanel</name>
@@ -1016,6 +1365,42 @@
         <source>Move layer down</source>
         <translation>Katmanı aşağı taşı</translation>
     </message>
+    <message>
+        <source>Brush</source>
+        <translation>Fırça</translation>
+    </message>
+    <message>
+        <source>Paint on the photo where the layer should show. Hold Alt to erase.</source>
+        <translation>Katmanın görünmesini istediğiniz yerleri fotoğrafın üzerine boyayın. Silmek için Alt&apos;a basılı tutun.</translation>
+    </message>
+    <message>
+        <source>Brush size (%)</source>
+        <translation>Fırça boyutu (%)</translation>
+    </message>
+    <message>
+        <source>Hardness (%)</source>
+        <translation>Sertlik (%)</translation>
+    </message>
+    <message>
+        <source>Flow (%)</source>
+        <translation>Akış (%)</translation>
+    </message>
+    <message>
+        <source>Erase</source>
+        <translation>Sil</translation>
+    </message>
+    <message>
+        <source>Take away from the mask instead of adding (or hold Alt while painting)</source>
+        <translation>Maskeye eklemek yerine maskeden sil (ya da boyarken Alt&apos;a basılı tutun)</translation>
+    </message>
+    <message>
+        <source>Show the mask on the photo</source>
+        <translation>Maskeyi fotoğrafın üzerinde göster</translation>
+    </message>
+    <message>
+        <source>Clear brush strokes</source>
+        <translation>Fırça darbelerini temizle</translation>
+    </message>
 </context>
 <context>
     <name>lumora::MainWindow</name>
@@ -1034,10 +1419,6 @@
     <message>
         <source>Photo</source>
         <translation>Fotoğraf</translation>
-    </message>
-    <message>
-        <source>Audio tools arrive in version 0.4</source>
-        <translation>Ses araçları 0.4 sürümünde geliyor</translation>
     </message>
     <message>
         <source>Workspaces</source>
@@ -1439,6 +1820,84 @@
         <source>Scopes</source>
         <translation>Kapsamlar</translation>
     </message>
+    <message>
+        <source>Sound: clean up, equalise and level clips, duck music, set the loudness of the mix</source>
+        <translation>Ses: klipleri temizleyin, ekolayzerden geçirin ve dengeleyin, müziği kısın, miksin ses yüksekliğini ayarlayın</translation>
+    </message>
+    <message>
+        <source>Add &amp;subtitle</source>
+        <translation>&amp;Altyazı ekle</translation>
+    </message>
+    <message>
+        <source>Add a subtitle at the playhead (Shift+T)</source>
+        <translation>Oynatma çizgisine altyazı ekle (Shift+T)</translation>
+    </message>
+    <message>
+        <source>Add subtitle track</source>
+        <translation>Altyazı izi ekle</translation>
+    </message>
+    <message>
+        <source>Import subtitles (SRT, VTT)…</source>
+        <translation>Altyazı içe aktar (SRT, VTT)…</translation>
+    </message>
+    <message>
+        <source>Export subtitles…</source>
+        <translation>Altyazıları dışa aktar…</translation>
+    </message>
+    <message>
+        <source>Subtitles</source>
+        <translation>Altyazılar</translation>
+    </message>
+    <message>
+        <source>Add subtitle</source>
+        <translation>Altyazı ekle</translation>
+    </message>
+    <message>
+        <source>Import subtitles</source>
+        <translation>Altyazı içe aktar</translation>
+    </message>
+    <message>
+        <source>Subtitles (*.srt *.vtt);;All files (*)</source>
+        <translation>Altyazılar (*.srt *.vtt);;Tüm dosyalar (*)</translation>
+    </message>
+    <message>
+        <source>%1 has no subtitles.</source>
+        <translation>%1 içinde altyazı yok.</translation>
+    </message>
+    <message>
+        <source>Cannot read %1:
+%2</source>
+        <translation>%1 okunamıyor:
+%2</translation>
+    </message>
+    <message numerus="yes">
+        <source>%n subtitle(s) imported.</source>
+        <translation>
+            <numerusform>%n altyazı içe aktarıldı.</numerusform>
+        </translation>
+    </message>
+    <message>
+        <source>Export subtitles</source>
+        <translation>Altyazıları dışa aktar</translation>
+    </message>
+    <message>
+        <source>There are no subtitles to export yet.</source>
+        <translation>Henüz dışa aktarılacak altyazı yok.</translation>
+    </message>
+    <message>
+        <source>SubRip (*.srt);;WebVTT (*.vtt)</source>
+        <translation>SubRip (*.srt);;WebVTT (*.vtt)</translation>
+    </message>
+    <message>
+        <source>Cannot write %1:
+%2</source>
+        <translation>%1 yazılamıyor:
+%2</translation>
+    </message>
+    <message>
+        <source>Subtitles saved to %1</source>
+        <translation>Altyazılar kaydedildi: %1</translation>
+    </message>
 </context>
 <context>
     <name>lumora::MediaBinPanel</name>
@@ -1733,6 +2192,14 @@ Orijinal dosya asla değişmez: düzenlemeler projede saklanır ve dışa aktar�
     <message>
         <source>Move mask</source>
         <translation>Maskeyi taşı</translation>
+    </message>
+    <message>
+        <source>Erase from mask</source>
+        <translation>Maskeden sil</translation>
+    </message>
+    <message>
+        <source>Paint mask</source>
+        <translation>Maske boya</translation>
     </message>
 </context>
 <context>
@@ -2126,6 +2593,62 @@ Orijinal dosya asla değişmez: düzenlemeler projede saklanır ve dışa aktar�
         <source>Shortened to %1 s by the footage available around the cut.</source>
         <translation>Kesimin çevresindeki görüntü yetmediği için %1 sn&apos;ye kısaltıldı.</translation>
     </message>
+    <message>
+        <source>Subtitle</source>
+        <translation>Altyazı</translation>
+    </message>
+    <message>
+        <source>Type what is said; two lines at most read best</source>
+        <translation>Söyleneni yazın; en fazla iki satır en rahat okunur</translation>
+    </message>
+    <message>
+        <source>Subtitle track</source>
+        <translation>Altyazı izi</translation>
+    </message>
+    <message>
+        <source>e.g. tur, eng</source>
+        <translation>ör. tur, eng</translation>
+    </message>
+    <message>
+        <source>Language of the track (ISO 639-2 code or a name); players show it in their subtitle menu</source>
+        <translation>İzin dili (ISO 639-2 kodu ya da adı); oynatıcılar bunu altyazı menüsünde gösterir</translation>
+    </message>
+    <message>
+        <source>Language</source>
+        <translation>Dil</translation>
+    </message>
+    <message>
+        <source>A dark box behind the text</source>
+        <translation>Metnin arkasında koyu bir kutu</translation>
+    </message>
+    <message>
+        <source>Where the bottom line sits, from the top of the frame</source>
+        <translation>Alt satırın karenin üstünden itibaren yeri</translation>
+    </message>
+    <message>
+        <source>Height in frame</source>
+        <translation>Karedeki yükseklik</translation>
+    </message>
+    <message>
+        <source>The style is used when subtitles are burnt into the picture and in the preview. Embedded subtitles are styled by the player.</source>
+        <translation>Bu stil, altyazılar görüntüye yakıldığında ve önizlemede kullanılır. Gömülü altyazıların görünüşünü oynatıcı belirler.</translation>
+    </message>
+    <message>
+        <source>Edit subtitle</source>
+        <translation>Altyazıyı düzenle</translation>
+    </message>
+    <message>
+        <source>Change subtitle length</source>
+        <translation>Altyazı süresini değiştir</translation>
+    </message>
+    <message>
+        <source>Subtitle language</source>
+        <translation>Altyazı dili</translation>
+    </message>
+    <message>
+        <source>Subtitle style</source>
+        <translation>Altyazı stili</translation>
+    </message>
 </context>
 <context>
     <name>lumora::ScopesWidget</name>
@@ -2284,6 +2807,22 @@ Orijinal dosya asla değişmez: düzenlemeler projede saklanır ve dışa aktar�
     <message>
         <source>Remove track %1</source>
         <translation>%1 izini kaldır</translation>
+    </message>
+    <message>
+        <source>Subtitles</source>
+        <translation>Altyazılar</translation>
+    </message>
+    <message>
+        <source>(empty subtitle)</source>
+        <translation>(boş altyazı)</translation>
+    </message>
+    <message>
+        <source>Add subtitle here</source>
+        <translation>Buraya altyazı ekle</translation>
+    </message>
+    <message>
+        <source>Add subtitle track</source>
+        <translation>Altyazı izi ekle</translation>
     </message>
 </context>
 <context>
