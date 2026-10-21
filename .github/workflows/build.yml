@@ -12,6 +12,11 @@ on:
         type: boolean
         default: false
 
+# Compiled objects are kept in the GitHub Actions cache, so a build only
+# compiles what changed since the last one.
+env:
+  SCCACHE_GHA_ENABLED: "true"
+
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
@@ -20,6 +25,7 @@ jobs:
   windows:
     name: Windows (MSVC, Qt 6.8, FFmpeg 8.1)
     runs-on: windows-latest
+    timeout-minutes: 45
     env:
       QT_VERSION: 6.8.3
       FFMPEG_ZIP: ffmpeg-n8.1-latest-win64-gpl-shared-8.1
@@ -34,13 +40,26 @@ jobs:
           modules: qtmultimedia qtimageformats
           cache: true
 
+      # Cached, so the FFmpeg DLLs stay the same from release to release and
+      # app updates only carry the files that really changed.
+      - name: Cache FFmpeg
+        id: ffmpeg-cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ runner.temp }}/ffmpeg
+          key: ffmpeg-${{ env.FFMPEG_ZIP }}-v1
+
       - name: Download FFmpeg (BtbN shared build)
+        if: steps.ffmpeg-cache.outputs.cache-hit != 'true'
         shell: pwsh
         run: |
           $url = "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/$env:FFMPEG_ZIP.zip"
           Invoke-WebRequest -Uri $url -OutFile ffmpeg.zip
-          Expand-Archive ffmpeg.zip -DestinationPath "$env:RUNNER_TEMP"
-          "FFMPEG_ROOT=$env:RUNNER_TEMP\$env:FFMPEG_ZIP" | Out-File -FilePath $env:GITHUB_ENV -Append
+          Expand-Archive ffmpeg.zip -DestinationPath "$env:RUNNER_TEMP\ffmpeg"
+
+      - name: Locate FFmpeg
+        shell: pwsh
+        run: '"FFMPEG_ROOT=$env:RUNNER_TEMP\ffmpeg\$env:FFMPEG_ZIP" | Out-File -FilePath $env:GITHUB_ENV -Append'
 
       - name: Cache LibRaw (vcpkg)
         id: libraw-cache
@@ -56,13 +75,17 @@ jobs:
       - name: Set up MSVC
         uses: ilammy/msvc-dev-cmd@v1
 
+      - name: Set up sccache
+        uses: mozilla-actions/sccache-action@v0.0.9
+
       - name: Configure
         shell: pwsh
         run: |
           # The vcpkg DLLs are on PATH while configuring, so the tests find them.
           $env:PATH = "C:\vcpkg\installed\x64-windows\bin;$env:PATH"
           cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release `
-            -DCMAKE_TOOLCHAIN_FILE=C:/vcpkg/scripts/buildsystems/vcpkg.cmake -DVCPKG_TARGET_TRIPLET=x64-windows -DLUMORA_REQUIRE_LIBRAW=ON
+            -DCMAKE_TOOLCHAIN_FILE=C:/vcpkg/scripts/buildsystems/vcpkg.cmake -DVCPKG_TARGET_TRIPLET=x64-windows -DLUMORA_REQUIRE_LIBRAW=ON `
+            -DCMAKE_C_COMPILER_LAUNCHER=sccache -DCMAKE_CXX_COMPILER_LAUNCHER=sccache
 
       - name: Build
         run: cmake --build build
@@ -73,15 +96,20 @@ jobs:
           QT_QPA_PLATFORM: offscreen
         run: |
           $env:PATH = "$env:FFMPEG_ROOT\bin;C:\vcpkg\installed\x64-windows\bin;$env:PATH"
-          ctest --test-dir build --output-on-failure
+          ctest --test-dir build --output-on-failure --timeout 300
           if ($LASTEXITCODE -ne 0) {
             # The test log can drown in encoder output; rerun the failures with Qt Test's own log.
             foreach ($t in Get-ChildItem build\tests\tst_*.exe) {
-              & $t.FullName -o "$($t.BaseName).log,txt" 2>$null | Out-Null
-              $code = $LASTEXITCODE
+              # -v1 logs each test function as it starts, so a hang shows where.
+              $p = Start-Process -FilePath $t.FullName -ArgumentList '-v1', '-o', "$($t.BaseName).log,txt" `
+                   -PassThru -NoNewWindow -RedirectStandardError "$($t.BaseName).err"
+              $null = $p.Handle
+              $code = 0
+              if (-not $p.WaitForExit(300000)) { $p.Kill(); $code = 'timeout' } else { $code = $p.ExitCode }
               if ($code -ne 0) {
                 Write-Host "::group::$($t.BaseName) exited with $code"
                 Get-Content "$($t.BaseName).log" -ErrorAction SilentlyContinue
+                dumpbin /nologo /dependents $t.FullName
                 Write-Host "::endgroup::"
               }
             }
@@ -126,6 +154,7 @@ jobs:
   linux:
     name: Linux (GCC, Qt 6.4, FFmpeg 6.1)
     runs-on: ubuntu-24.04
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
 
@@ -137,10 +166,32 @@ jobs:
             qt6-base-dev qt6-multimedia-dev qt6-tools-dev qt6-tools-dev-tools qt6-l10n-tools \
             qt6-image-formats-plugins libgl-dev \
             libavformat-dev libavcodec-dev libavutil-dev libswscale-dev libswresample-dev \
-            libraw-dev
+            libraw-dev espeak-ng
+
+      # A spoken sentence and the smallest Whisper model for the end-to-end
+      # speech recognition test.
+      - name: Speech test data
+        uses: actions/cache@v4
+        with:
+          path: ~/whisper-models
+          key: whisper-ggml-tiny-v1
+
+      - name: Prepare speech test
+        run: |
+          mkdir -p ~/whisper-models
+          [ -f ~/whisper-models/ggml-tiny.bin ] || curl -sSfL -o ~/whisper-models/ggml-tiny.bin \
+            https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-tiny.bin
+          espeak-ng -v en-us -s 140 -w "$RUNNER_TEMP/speech.wav" "Hello world. This is a test of automatic subtitles."
+          echo "LUMORA_WHISPER_MODEL=$HOME/whisper-models/ggml-tiny.bin" >> "$GITHUB_ENV"
+          echo "LUMORA_SPEECH_WAV=$RUNNER_TEMP/speech.wav" >> "$GITHUB_ENV"
+
+      - name: Set up sccache
+        uses: mozilla-actions/sccache-action@v0.0.9
 
       - name: Configure
-        run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DLUMORA_REQUIRE_LIBRAW=ON
+        run: |
+          cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DLUMORA_REQUIRE_LIBRAW=ON \
+            -DCMAKE_C_COMPILER_LAUNCHER=sccache -DCMAKE_CXX_COMPILER_LAUNCHER=sccache
 
       - name: Build
         run: cmake --build build
@@ -148,7 +199,7 @@ jobs:
       - name: Test
         env:
           QT_QPA_PLATFORM: offscreen
-        run: ctest --test-dir build --output-on-failure
+        run: ctest --test-dir build --output-on-failure --timeout 300
 
   # Pushing a tag such as v0.2.0, or running the workflow on main with
   # "release" ticked, publishes a GitHub release with the Windows package;
@@ -177,10 +228,24 @@ jobs:
           name: LumoraStudio-windows-x64
           path: LumoraStudio
 
+      # Besides the whole package: manifest.json (every file's checksum) and a
+      # patch with only the files changed since the previous release, which
+      # is all the updater downloads when it is enough.
       - name: Create the release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          previous=$(gh release view --json tagName -q .tagName 2>/dev/null || true)
+          if [ -n "$previous" ]; then
+            gh release download "$previous" -p manifest.json -O previous-manifest.json || true
+          fi
+          python3 .github/scripts/release_manifest.py --package LumoraStudio --version "${TAG#v}" \
+            --out manifest.json --previous previous-manifest.json --patch-dir patch
           zip -r -q LumoraStudio-windows-x64.zip LumoraStudio
-          gh release create "$TAG" LumoraStudio-windows-x64.zip --target "$GITHUB_SHA" \
+          assets="LumoraStudio-windows-x64.zip manifest.json"
+          if [ -d patch ]; then
+            (cd patch && zip -r -q ../LumoraStudio-windows-x64-patch.zip LumoraStudio)
+            assets="$assets LumoraStudio-windows-x64-patch.zip"
+          fi
+          gh release create "$TAG" $assets --target "$GITHUB_SHA" \
             --title "LumoraStudio ${TAG#v}" --generate-notes

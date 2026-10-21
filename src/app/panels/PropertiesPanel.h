@@ -40,6 +40,11 @@ public:
     // Puts the cursor in the text of the selected title or subtitle.
     void focusText();
 
+signals:
+    // Long analyses run by the main window (progress dialog, playhead).
+    void stabilizeRequested(const QUuid& clipId);
+    void trackRequested(const QUuid& clipId);
+
 private:
     QWidget* makeSection(const QString& title, QFormLayout** form);
     QToolButton* makeColorButton();
@@ -83,6 +88,17 @@ private:
     QComboBox* m_titleAnimOut;
     QDoubleSpinBox* m_titleAnimDuration;
     QDoubleSpinBox* m_titleDuration;
+
+    QWidget* m_stabSection;
+    QCheckBox* m_stabOn;
+    QDoubleSpinBox* m_stabSmoothing;
+    QSpinBox* m_stabZoom;
+    QLabel* m_stabInfo;
+
+    QWidget* m_trackSection;
+    QPushButton* m_trackStart;
+    QPushButton* m_trackClear;
+    QLabel* m_trackInfo;
 
     QWidget* m_freezeSection;
     QDoubleSpinBox* m_freezeDuration;

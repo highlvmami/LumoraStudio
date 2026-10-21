@@ -1922,6 +1922,132 @@
         <source>Hold the frame for (seconds):</source>
         <translation>Kare kaç saniye kalsın:</translation>
     </message>
+    <message>
+        <source>&amp;Automatic subtitles from speech…</source>
+        <translation>Konuşmadan &amp;otomatik altyazı…</translation>
+    </message>
+    <message>
+        <source>Writes subtitles from what is said, on this computer (Whisper)</source>
+        <translation>Söylenenleri bu bilgisayarda altyazıya döker (Whisper)</translation>
+    </message>
+    <message>
+        <source>Cancel</source>
+        <translation>İptal</translation>
+    </message>
+    <message>
+        <source>Automatic subtitles</source>
+        <translation>Otomatik altyazı</translation>
+    </message>
+    <message>
+        <source>This build of LumoraStudio has no speech recognition.</source>
+        <translation>LumoraStudio&apos;nun bu sürümünde konuşma tanıma yok.</translation>
+    </message>
+    <message>
+        <source>LumoraStudio listens to the timeline and writes what is said as a new subtitle track. Recognition runs on this computer; nothing is sent anywhere. The model is downloaded once.</source>
+        <translation>LumoraStudio zaman çizelgesini dinler ve söylenenleri yeni bir altyazı izine yazar. Tanıma bu bilgisayarda yapılır, hiçbir şey dışarı gönderilmez. Model yalnızca bir kez indirilir.</translation>
+    </message>
+    <message>
+        <source>Turkish</source>
+        <translation>Türkçe</translation>
+    </message>
+    <message>
+        <source>English</source>
+        <translation>İngilizce</translation>
+    </message>
+    <message>
+        <source>German</source>
+        <translation>Almanca</translation>
+    </message>
+    <message>
+        <source>French</source>
+        <translation>Fransızca</translation>
+    </message>
+    <message>
+        <source>Spanish</source>
+        <translation>İspanyolca</translation>
+    </message>
+    <message>
+        <source>Arabic</source>
+        <translation>Arapça</translation>
+    </message>
+    <message>
+        <source>Russian</source>
+        <translation>Rusça</translation>
+    </message>
+    <message>
+        <source>Detect automatically</source>
+        <translation>Kendisi bulsun</translation>
+    </message>
+    <message>
+        <source>Spoken language</source>
+        <translation>Konuşulan dil</translation>
+    </message>
+    <message>
+        <source>%1 · downloaded</source>
+        <translation>%1 · indirildi</translation>
+    </message>
+    <message>
+        <source>%1 · %2 MB download</source>
+        <translation>%1 · %2 MB indirilecek</translation>
+    </message>
+    <message>
+        <source>Model</source>
+        <translation>Model</translation>
+    </message>
+    <message>
+        <source>Write subtitles</source>
+        <translation>Altyazıyı yaz</translation>
+    </message>
+    <message>
+        <source>Downloading the speech recognition model…</source>
+        <translation>Konuşma tanıma modeli indiriliyor…</translation>
+    </message>
+    <message>
+        <source>The model could not be downloaded: %1</source>
+        <translation>Model indirilemedi: %1</translation>
+    </message>
+    <message>
+        <source>Listening and writing subtitles…</source>
+        <translation>Dinleniyor ve altyazı yazılıyor…</translation>
+    </message>
+    <message>
+        <source>No speech was heard on the timeline.</source>
+        <translation>Zaman çizelgesinde konuşma duyulmadı.</translation>
+    </message>
+    <message numerus="yes">
+        <source>%n subtitle(s) written. Check them: select a cue to correct its text in Properties.</source>
+        <translation>
+            <numerusform>%n altyazı yazıldı. Kontrol edin: düzeltmek için bir satırı seçip metnini Özellikler panelinde değiştirin.</numerusform>
+        </translation>
+    </message>
+    <message>
+        <source>Measuring the camera movement…</source>
+        <translation>Kamera hareketi ölçülüyor…</translation>
+    </message>
+    <message>
+        <source>Stabilise</source>
+        <translation>Sabitle</translation>
+    </message>
+    <message>
+        <source>The camera movement could not be measured in this clip.</source>
+        <translation>Bu klipte kamera hareketi ölçülemedi.</translation>
+    </message>
+    <message>
+        <source>Following the object…</source>
+        <translation>Nesne takip ediliyor…</translation>
+    </message>
+    <message>
+        <source>Follow an object</source>
+        <translation>Nesneyi takip et</translation>
+    </message>
+    <message>
+        <source>The clip now follows the object. Play it back to check.</source>
+        <translation>Klip artık nesneyi takip ediyor. Kontrol etmek için oynatın.</translation>
+    </message>
+    <message>
+        <source>Draw a box around the object to follow (Esc cancels)</source>
+        <translation>Takip edilecek nesnenin çevresine bir kutu çizin (Esc: vazgeç)</translation>
+    </message>
 </context>
 <context>
     <name>lumora::MediaBinPanel</name>
@@ -2689,6 +2815,70 @@ Orijinal dosya asla değişmez: düzenlemeler projede saklanır ve dışa aktar�
         <source>Shows the frame at %1 of the source.</source>
         <translation>Kaynağın %1 anındaki kareyi gösterir.</translation>
     </message>
+    <message>
+        <source>Stabilisation</source>
+        <translation>Sabitleme</translation>
+    </message>
+    <message>
+        <source>Steady the shaky camera</source>
+        <translation>Titreyen kamerayı sabitle</translation>
+    </message>
+    <message>
+        <source>How much camera movement is smoothed away; larger values also remove slow wobble</source>
+        <translation>Kamera hareketinin ne kadarının yumuşatılacağı; büyük değerler yavaş salınımı da giderir</translation>
+    </message>
+    <message>
+        <source>Smoothing</source>
+        <translation>Yumuşatma</translation>
+    </message>
+    <message>
+        <source>Enlarges the picture so its moving edges stay outside the frame</source>
+        <translation>Görüntüyü büyütür, böylece oynayan kenarları kadrajın dışında kalır</translation>
+    </message>
+    <message>
+        <source>Motion tracking</source>
+        <translation>Hareket takibi</translation>
+    </message>
+    <message>
+        <source>Follow an object…</source>
+        <translation>Bir nesneyi takip et…</translation>
+    </message>
+    <message>
+        <source>Draw a box around something in the picture; this clip then moves with it</source>
+        <translation>Görüntüdeki bir şeyin çevresine kutu çizin; bu klip onunla birlikte hareket eder</translation>
+    </message>
+    <message>
+        <source>Stop following</source>
+        <translation>Takibi kaldır</translation>
+    </message>
+    <message>
+        <source>Stabilise</source>
+        <translation>Sabitle</translation>
+    </message>
+    <message>
+        <source>Turn off stabilisation</source>
+        <translation>Sabitlemeyi kapat</translation>
+    </message>
+    <message>
+        <source>Change smoothing</source>
+        <translation>Yumuşatmayı değiştir</translation>
+    </message>
+    <message>
+        <source>Change stabilisation zoom</source>
+        <translation>Sabitleme yakınlaştırmasını değiştir</translation>
+    </message>
+    <message>
+        <source>The camera movement is measured once when you turn it on.</source>
+        <translation>Açtığınızda kamera hareketi bir kez ölçülür.</translation>
+    </message>
+    <message>
+        <source>Make this clip move with something in the picture below it, e.g. a name above a person.</source>
+        <translation>Bu klibi alttaki görüntüde bir şeyle birlikte hareket ettirin, örneğin bir kişinin üstündeki ismi.</translation>
+    </message>
+    <message>
+        <source>This clip follows a tracked object (%1 positions).</source>
+        <translation>Bu klip takip edilen bir nesneyi izliyor (%1 konum).</translation>
+    </message>
 </context>
 <context>
     <name>lumora::ScopesWidget</name>
@@ -2946,6 +3136,49 @@ Orijinal dosya asla değişmez: düzenlemeler projede saklanır ve dışa aktar�
     <message>
         <source>LumoraStudio could not be updated, so the current version was kept. Close any other copy of LumoraStudio and try again.</source>
         <translation>LumoraStudio güncellenemedi, mevcut sürüm korundu. Açık başka bir LumoraStudio penceresi varsa kapatıp yeniden deneyin.</translation>
+    </message>
+    <message>
+        <source>Preparing the update…</source>
+        <translation>Güncelleme hazırlanıyor…</translation>
+    </message>
+</context>
+<context>
+    <name>lumora::speech</name>
+    <message>
+        <source>Fast (base)</source>
+        <translation>Hızlı (base)</translation>
+    </message>
+    <message>
+        <source>Balanced (small)</source>
+        <translation>Dengeli (small)</translation>
+    </message>
+    <message>
+        <source>Most accurate (large v3 turbo)</source>
+        <translation>En doğru (large v3 turbo)</translation>
+    </message>
+    <message>
+        <source>This build of LumoraStudio has no speech recognition.</source>
+        <translation>LumoraStudio&apos;nun bu sürümünde konuşma tanıma yok.</translation>
+    </message>
+    <message>
+        <source>There is nothing to listen to.</source>
+        <translation>Dinlenecek bir şey yok.</translation>
+    </message>
+    <message>
+        <source>The speech recognition model is missing.</source>
+        <translation>Konuşma tanıma modeli bulunamadı.</translation>
+    </message>
+    <message>
+        <source>The timeline has no sound.</source>
+        <translation>Zaman çizelgesinde ses yok.</translation>
+    </message>
+    <message>
+        <source>The speech recognition model cannot be read. Download it again.</source>
+        <translation>Konuşma tanıma modeli okunamıyor. Yeniden indirin.</translation>
+    </message>
+    <message>
+        <source>Speech recognition failed.</source>
+        <translation>Konuşma tanıma başarısız oldu.</translation>
     </message>
 </context>
 </TS>

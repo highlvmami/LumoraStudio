@@ -3,6 +3,7 @@
 #include <QImage>
 #include <QRect>
 #include <QString>
+#include <functional>
 #include <vector>
 
 extern "C" {
@@ -21,6 +22,9 @@ struct TestVideoSpec {
     bool audio = true;
     const char* encoder = "mpeg4";
     int solidLuma = -1;   // >= 0: plain grey frames of this luma (no index pattern)
+    // When set, paints the luma of frame `index` (8-bit grey, width x height)
+    // instead of the index pattern; chroma is neutral.
+    std::function<QImage(int index)> paint;
 };
 
 // Writes a synthetic MP4 whose frames carry their own index as a binary

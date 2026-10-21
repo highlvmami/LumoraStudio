@@ -225,6 +225,21 @@ private slots:
         QVERIFY(tl.isEmpty());
     }
 
+    void splittingAConnectedClipKeepsBothHalvesInPlace() {
+        Timeline tl;
+        tl.insertMedia(QUuid::createUuid(), 0, sec(10), true, true);
+        const int v2 = tl.addTrack(TrackType::Video);
+        TitleData title;
+        const QUuid t = tl.addTitle(title, sec(4), v2, sec(2));
+        QVERIFY(tl.splitAt(sec(3)));
+        const auto& clips = tl.tracks()[v2].clips;
+        QCOMPARE(clips.size(), size_t(2));
+        QCOMPARE(clips[0].id, t);
+        QCOMPARE(clips[0].timelineStart, sec(2));
+        QCOMPARE(clips[1].timelineStart, sec(3));
+        QCOMPARE(clips[1].timelineEnd(), sec(6));
+    }
+
     void titleDurationOverwritesOnFreeTracks() {
         Timeline tl;
         const int v2 = tl.addTrack(TrackType::Video);

@@ -54,10 +54,13 @@ QByteArray Project::toJson() const {
     root["format"] = "LumoraStudio project";
     const auto& stracks = m_timeline->state().tracks;
     const bool subtitles = std::any_of(stracks.begin(), stracks.end(), [](const Track& t) { return t.isSubtitle(); });
-    const bool freezes = std::any_of(stracks.begin(), stracks.end(), [](const Track& t) {
-        return std::any_of(t.clips.begin(), t.clips.end(), [](const Clip& c) { return c.kind == ClipKind::Freeze; });
-    });
-    root["version"] = freezes ? kFormatVersion : subtitles ? 3 : 2;
+    auto anyClip = [&](auto pred) {
+        return std::any_of(stracks.begin(), stracks.end(),
+                           [&](const Track& t) { return std::any_of(t.clips.begin(), t.clips.end(), pred); });
+    };
+    const bool motion = anyClip([](const Clip& c) { return !c.stabilization.path.empty() || c.stabilization.enabled || !c.motion.isEmpty(); });
+    const bool freezes = anyClip([](const Clip& c) { return c.kind == ClipKind::Freeze; });
+    root["version"] = motion ? 5 : freezes ? 4 : subtitles ? 3 : 2;
     root["application"] = QCoreApplication::applicationVersion();
 
     QJsonArray media;
@@ -120,6 +123,10 @@ QByteArray Project::toJson() const {
                 co["transform"] = c.transform.toJson();
             if (!c.color.isIdentity())
                 co["color"] = c.color.toJson();
+            if (!c.stabilization.path.empty() || c.stabilization.enabled)
+                co["stabilization"] = c.stabilization.toJson();
+            if (!c.motion.isEmpty())
+                co["motion"] = c.motion.toJson();
             if (!c.transitionIn.isNone())
                 co["transition"] = c.transitionIn.toJson();
             if (c.fadeIn > 0)
@@ -271,6 +278,9 @@ bool Project::fromJson(const QByteArray& json, const QString& baseDir, QString* 
                 c.transform = ClipTransform::fromJson(co.value("transform").toObject());
             if (co.contains("color"))
                 c.color = ColorGrade::fromJson(co.value("color").toObject());
+            if (co.contains("stabilization"))
+                c.stabilization = Stabilization::fromJson(co.value("stabilization").toObject());
+            c.motion = MotionPath::fromJson(co.value("motion").toArray());
             if (co.contains("transition"))
                 c.transitionIn = Transition::fromJson(co.value("transition").toObject());
             c.fadeIn = ticksFromJson(co.value("fadeIn"));

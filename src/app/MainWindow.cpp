@@ -14,7 +14,20 @@
 #include <QFileDialog>
 #include <QFileInfo>
 #include <QFrame>
+#include <QEventLoop>
+#include <QFormLayout>
+#include <QFutureWatcher>
+#include <QComboBox>
+#include <QNetworkAccessManager>
+#include <QNetworkReply>
+#include <QSaveFile>
 #include <QInputDialog>
+#include <QProgressDialog>
+#include <QPushButton>
+#include <QTimer>
+#include <QtConcurrent/QtConcurrentRun>
+#include <atomic>
+#include <optional>
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QMenu>
@@ -46,9 +59,13 @@
 #include "panels/PropertiesPanel.h"
 #include "panels/TimelinePanel.h"
 #include "panels/TimelineView.h"
+#include "panels/VideoView.h"
+#include "playback/PlaybackSequence.h"
 #include "photo/PhotoWorkspace.h"
 #include "playback/PlaybackEngine.h"
 #include "project/Project.h"
+#include "ai/SpeechToText.h"
+#include "motion/Analysis.h"
 #include "render/FrameRenderer.h"
 #include "timeline/Subtitles.h"
 #include "undo/TimelineCommands.h"
@@ -92,6 +109,8 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
     m_timelineView = new TimelineView(m_project->timeline(), m_project->media(), m_cache, m_videoUndo);
     m_timelinePanel = new TimelinePanel(m_timelineView);
     m_properties = new PropertiesPanel(m_project, m_videoUndo);
+    connect(m_properties, &PropertiesPanel::stabilizeRequested, this, &MainWindow::stabilizeClip);
+    connect(m_properties, &PropertiesPanel::trackRequested, this, &MainWindow::trackClip);
     m_clipColor = new ClipColorPanel(m_project, m_videoUndo);
     m_scopes = new ScopesWidget;
     m_audio = new AudioPanel(m_project, m_videoUndo);
@@ -367,6 +386,8 @@ void MainWindow::createActions() {
                         [&] { return m_project->timeline()->addTrack(TrackType::Subtitle) >= 0; });
     });
     m_actImportSubtitles = make(tr("Import subtitles (SRT, VTT)…"), {}, &MainWindow::importSubtitles);
+    m_actAutoSubtitles = make(tr("&Automatic subtitles from speech…"), {}, &MainWindow::autoSubtitles, Icons::title());
+    m_actAutoSubtitles->setToolTip(tr("Writes subtitles from what is said, on this computer (Whisper)"));
     m_actExportSubtitles = make(tr("Export subtitles…"), {}, &MainWindow::exportSubtitles);
     m_actExportFrame = make(tr("Export current &frame…"), QKeySequence(Qt::CTRL | Qt::ALT | Qt::Key_S),
                             &MainWindow::exportFrame);
@@ -414,6 +435,7 @@ void MainWindow::createMenus() {
     QMenu* subs = edit->addMenu(tr("Subtitles"));
     subs->addAction(m_actAddSubtitle);
     subs->addAction(m_actAddSubtitleTrack);
+    subs->addAction(m_actAutoSubtitles);
     subs->addSeparator();
     subs->addAction(m_actImportSubtitles);
     subs->addAction(m_actExportSubtitles);
@@ -582,7 +604,7 @@ void MainWindow::setWorkspace(Workspace w) {
     for (QAction* a : {m_actSplit, m_actDelete, m_actJoin, m_actFreeze, m_actPlay, m_actPrevFrame, m_actNextFrame, m_actHome, m_actEnd,
                        m_actMarkIn, m_actMarkOut, m_actAddSource, m_actZoomIn, m_actZoomOut, m_actExport, m_actAddTitle,
                        m_actAddTransition, m_actAddVideoTrack, m_actAddAudioTrack, m_actExportFrame, m_actAddSubtitle,
-                       m_actAddSubtitleTrack, m_actImportSubtitles, m_actExportSubtitles})
+                       m_actAddSubtitleTrack, m_actImportSubtitles, m_actExportSubtitles, m_actAutoSubtitles})
         a->setVisible(!photo);
     m_actExportPhoto->setVisible(photo);
 }
@@ -1152,6 +1174,240 @@ void MainWindow::freezeFrame() {
     });
     if (!freezeId.isNull())
         m_timelineView->selectOnly(freezeId);
+}
+
+namespace {
+
+// Runs `work` on a worker thread behind a modal progress dialog. Returns
+// nullopt when the user cancels.
+template <class T>
+std::optional<T> withProgress(QWidget* parent, const QString& label, std::function<T(const motion::Progress&)> work) {
+    auto progress = std::make_shared<std::atomic<int>>(0);
+    auto cancel = std::make_shared<std::atomic_bool>(false);
+    QProgressDialog dlg(label, MainWindow::tr("Cancel"), 0, 1000, parent);
+    dlg.setWindowModality(Qt::WindowModal);
+    dlg.setMinimumDuration(0);
+    dlg.setAutoClose(false);
+    dlg.setAutoReset(false);
+    QObject::connect(&dlg, &QProgressDialog::canceled, [cancel] { *cancel = true; });
+    QTimer timer;
+    QObject::connect(&timer, &QTimer::timeout, &dlg, [&] { dlg.setValue(*progress); });
+    timer.start(100);
+    QFutureWatcher<T> watcher;
+    QEventLoop loop;
+    QObject::connect(&watcher, &QFutureWatcher<T>::finished, &loop, &QEventLoop::quit);
+    watcher.setFuture(QtConcurrent::run([work = std::move(work), progress, cancel] {
+        return work([progress, cancel](double p) {
+            *progress = static_cast<int>(std::clamp(p, 0.0, 1.0) * 1000);
+            return !*cancel;
+        });
+    }));
+    loop.exec();
+    if (*cancel)
+        return std::nullopt;
+    return watcher.result();
+}
+
+} // namespace
+
+namespace {
+
+// Downloads `url` to `dest` behind a progress dialog. False when it failed
+// (with `error` set) or was cancelled (`error` empty).
+bool downloadFile(QWidget* parent, const QUrl& url, const QString& dest, const QString& label, QString* error) {
+    QNetworkAccessManager net;
+    QNetworkRequest req(url);
+    req.setAttribute(QNetworkRequest::RedirectPolicyAttribute, QNetworkRequest::NoLessSafeRedirectPolicy);
+    QSaveFile file(dest);
+    if (!file.open(QIODevice::WriteOnly)) {
+        *error = file.errorString();
+        return false;
+    }
+    QProgressDialog dlg(label, MainWindow::tr("Cancel"), 0, 1000, parent);
+    dlg.setWindowModality(Qt::WindowModal);
+    dlg.setMinimumDuration(0);
+    dlg.setAutoClose(false);
+    dlg.setAutoReset(false);
+    QNetworkReply* reply = net.get(req);
+    QObject::connect(reply, &QNetworkReply::readyRead, &dlg, [&] { file.write(reply->readAll()); });
+    QObject::connect(reply, &QNetworkReply::downloadProgress, &dlg, [&](qint64 got, qint64 total) {
+        if (total > 0)
+            dlg.setValue(static_cast<int>(got * 1000 / total));
+        dlg.setLabelText(QStringLiteral("%1\n%2 / %3 MB").arg(label).arg(got / 1000000).arg(total > 0 ? total / 1000000 : 0));
+    });
+    QObject::connect(&dlg, &QProgressDialog::canceled, reply, &QNetworkReply::abort);
+    QEventLoop loop;
+    QObject::connect(reply, &QNetworkReply::finished, &loop, &QEventLoop::quit);
+    loop.exec();
+    file.write(reply->readAll());
+    const bool cancelled = dlg.wasCanceled();
+    const bool ok = reply->error() == QNetworkReply::NoError && !cancelled;
+    if (!ok && !cancelled)
+        *error = reply->errorString();
+    reply->deleteLater();
+    if (!ok) {
+        file.cancelWriting();
+        return false;
+    }
+    if (!file.commit()) {
+        *error = file.errorString();
+        return false;
+    }
+    return true;
+}
+
+} // namespace
+
+void MainWindow::autoSubtitles() {
+    if (!speech::available()) {
+        QMessageBox::information(this, tr("Automatic subtitles"), tr("This build of LumoraStudio has no speech recognition."));
+        return;
+    }
+    Timeline* tl = m_project->timeline();
+    if (tl->isEmpty())
+        return;
+
+    QDialog dlg(this);
+    dlg.setWindowTitle(tr("Automatic subtitles"));
+    auto* layout = new QVBoxLayout(&dlg);
+    auto* intro = new QLabel(tr("LumoraStudio listens to the timeline and writes what is said as a new subtitle track. "
+                                "Recognition runs on this computer; nothing is sent anywhere. The model is downloaded once."));
+    intro->setWordWrap(true);
+    layout->addWidget(intro);
+    auto* form = new QFormLayout;
+    auto* language = new QComboBox;
+    const std::pair<QString, QString> languages[] = {
+        {QStringLiteral("tr"), tr("Turkish")}, {QStringLiteral("en"), tr("English")},  {QStringLiteral("de"), tr("German")},
+        {QStringLiteral("fr"), tr("French")},  {QStringLiteral("es"), tr("Spanish")},  {QStringLiteral("ar"), tr("Arabic")},
+        {QStringLiteral("ru"), tr("Russian")}, {QStringLiteral("auto"), tr("Detect automatically")}};
+    for (const auto& [code, name] : languages)
+        language->addItem(name, code);
+    QSettings settings;
+    language->setCurrentIndex(std::max(0, language->findData(settings.value(QStringLiteral("speech/language"), QStringLiteral("tr")))));
+    form->addRow(tr("Spoken language"), language);
+    auto* model = new QComboBox;
+    for (const auto& m : speech::models()) {
+        const bool have = QFileInfo::exists(speech::modelPath(m.id));
+        model->addItem(have ? tr("%1 · downloaded").arg(m.label) : tr("%1 · %2 MB download").arg(m.label).arg(m.sizeMB), m.id);
+    }
+    model->setCurrentIndex(std::max(0, model->findData(settings.value(QStringLiteral("speech/model"), speech::defaultModel()))));
+    form->addRow(tr("Model"), model);
+    layout->addLayout(form);
+    auto* buttons = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel);
+    buttons->button(QDialogButtonBox::Ok)->setText(tr("Write subtitles"));
+    markPrimary(buttons->button(QDialogButtonBox::Ok));
+    connect(buttons, &QDialogButtonBox::accepted, &dlg, &QDialog::accept);
+    connect(buttons, &QDialogButtonBox::rejected, &dlg, &QDialog::reject);
+    layout->addWidget(buttons);
+    if (dlg.exec() != QDialog::Accepted)
+        return;
+    const QString lang = language->currentData().toString();
+    const QString modelId = model->currentData().toString();
+    settings.setValue(QStringLiteral("speech/language"), lang);
+    settings.setValue(QStringLiteral("speech/model"), modelId);
+
+    const QString path = speech::modelPath(modelId);
+    if (!QFileInfo::exists(path)) {
+        QString error;
+        if (!downloadFile(this, speech::modelUrl(modelId), path, tr("Downloading the speech recognition model…"), &error)) {
+            if (!error.isEmpty())
+                QMessageBox::warning(this, tr("Automatic subtitles"), tr("The model could not be downloaded: %1").arg(error));
+            return;
+        }
+    }
+    speech::Options options;
+    options.modelPath = path;
+    options.language = lang;
+    const TimelineState state = tl->state();
+    const MediaPool* pool = m_project->media();
+    const Ticks end = tl->duration();
+    const auto result = withProgress<speech::Result>(this, tr("Listening and writing subtitles…"),
+                                                     [state, pool, end, options](const motion::Progress& p) {
+                                                         return speech::transcribe(state, *pool, 0, end, options, p);
+                                                     });
+    if (!result || result->cancelled)
+        return;
+    if (!result->error.isEmpty()) {
+        QMessageBox::warning(this, tr("Automatic subtitles"), result->error);
+        return;
+    }
+    if (result->cues.empty()) {
+        QMessageBox::information(this, tr("Automatic subtitles"), tr("No speech was heard on the timeline."));
+        return;
+    }
+    const QString iso = lang == QLatin1String("auto") ? QString() : subtitles::isoLanguage(lang);
+    runTimelineEdit(m_videoUndo, tl, tr("Automatic subtitles"), [&] { return tl->addSubtitleTrack(result->cues, iso) >= 0; });
+    statusBar()->showMessage(tr("%n subtitle(s) written. Check them: select a cue to correct its text in Properties.", nullptr,
+                                static_cast<int>(result->cues.size())),
+                             8000);
+}
+
+void MainWindow::stabilizeClip(const QUuid& clipId) {
+    Timeline* tl = m_project->timeline();
+    const Clip* c = tl->clip(clipId);
+    auto media = c ? m_project->media()->find(c->mediaId) : nullptr;
+    if (!c || c->kind != ClipKind::Media || !media || !media->info.video)
+        return;
+    const QString path = media->path;
+    const Ticks from = c->sourceIn, to = c->sourceOut;
+    const auto camera = withProgress<std::vector<CameraSample>>(
+        this, tr("Measuring the camera movement…"),
+        [path, from, to](const motion::Progress& p) { return motion::analyzeCameraPath(path, from, to, p); });
+    if (!camera)
+        return;
+    c = tl->clip(clipId);
+    if (!c)
+        return;
+    if (camera->size() < 2) {
+        QMessageBox::warning(this, tr("Stabilise"), tr("The camera movement could not be measured in this clip."));
+        return;
+    }
+    Stabilization s = c->stabilization;
+    s.enabled = true;
+    s.path = *camera;
+    s.zoom = s.requiredZoom(motion::pictureAspect(*m_project->media(), *c));
+    runTimelineEdit(m_videoUndo, tl, tr("Stabilise"), [&] { return tl->setStabilization(clipId, s); });
+}
+
+void MainWindow::trackClip(const QUuid& id) {
+    const QUuid clipId = !id.isNull() ? id : m_timelineView->selection().isEmpty() ? QUuid() : m_timelineView->selection().front();
+    const Clip* c = m_project->timeline()->clip(clipId);
+    if (!c)
+        return;
+    // The object is picked on the first frame of the clip.
+    if (m_monitor->mode() != MonitorPanel::Mode::Program)
+        m_monitor->showProgram(PlaybackSequence::fromTimeline(m_project->timeline()->state(), *m_project->media(),
+                                                              m_project->timeline()->frameRate()),
+                               true);
+    m_engine->pause();
+    m_engine->seek(c->timelineStart);
+    VideoView* view = m_monitor->view();
+    auto picked = std::make_shared<QMetaObject::Connection>();
+    auto cancelled = std::make_shared<QMetaObject::Connection>();
+    *picked = connect(view, &VideoView::regionPicked, this, [this, clipId, picked, cancelled](const QRectF& region) {
+        disconnect(*picked);
+        disconnect(*cancelled);
+        Timeline* tl = m_project->timeline();
+        const Clip* c = tl->clip(clipId);
+        if (!c)
+            return;
+        const TimelineState state = tl->state();
+        const MediaPool* pool = m_project->media();
+        const Ticks from = c->timelineStart, to = c->timelineEnd();
+        const AVRational rate = tl->frameRate();
+        const auto path = withProgress<MotionPath>(this, tr("Following the object…"), [state, pool, from, to, region, rate](const motion::Progress& p) {
+            return motion::trackRegion(state, *pool, from, to, region, rate, p);
+        });
+        if (!path || path->isEmpty())
+            return;
+        runTimelineEdit(m_videoUndo, tl, tr("Follow an object"), [&] { return tl->setMotionPath(clipId, *path); });
+        statusBar()->showMessage(tr("The clip now follows the object. Play it back to check."), 5000);
+    });
+    *cancelled = connect(view, &VideoView::regionPickCancelled, this, [picked, cancelled] {
+        disconnect(*picked);
+        disconnect(*cancelled);
+    });
+    view->startRegionPick(tr("Draw a box around the object to follow (Esc cancels)"));
 }
 
 void MainWindow::deleteSelection() {

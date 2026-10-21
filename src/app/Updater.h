@@ -13,8 +13,9 @@ class QProgressDialog;
 namespace lumora {
 
 // Keeps the app up to date from the project's GitHub releases. On Windows
-// the release package is downloaded, checked against its published SHA-256
-// and copied over the app folder, keeping the old files until the new
+// the release package (or, when this install is the previous version, a
+// patch with only the changed files) is downloaded, checked against its
+// published SHA-256 and copied over the app folder, keeping the old files until the new
 // version has started; elsewhere the release page is opened.
 class Updater : public QObject {
     Q_OBJECT
@@ -42,6 +43,8 @@ signals:
 private:
     void check(bool interactive);
     void offer(const QJsonObject& release, bool interactive);
+    // Picks the patch when it is enough for this install, else the package.
+    void prepare(const QJsonObject& release, const QString& version);
     void download(const QJsonObject& asset, const QString& version);
     void install(const QString& zipPath);
     bool canReplaceFiles() const;

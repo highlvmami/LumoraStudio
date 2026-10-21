@@ -44,6 +44,9 @@ public:
     void selectFirstClip(int track = 0, int index = 0);
     void openExportDialog(bool modal);
     void seekSeconds(double s);
+    void autoSubtitles();
+    // Starts following an object with the selected clip.
+    void trackClip(const QUuid& clipId = {});
 
 protected:
     void closeEvent(QCloseEvent* e) override;
@@ -82,6 +85,7 @@ private:
     void deleteSelection();
     void joinSelection();
     void freezeFrame();
+    void stabilizeClip(const QUuid& clipId);
     void refreshProgram();
     void showShortcuts();
     void showAbout();
@@ -153,6 +157,7 @@ private:
     QAction* m_actAddSubtitle;
     QAction* m_actAddSubtitleTrack;
     QAction* m_actImportSubtitles;
+    QAction* m_actAutoSubtitles;
     QAction* m_actExportSubtitles;
     QAction* m_actExportFrame;
     class Updater* m_updater = nullptr;

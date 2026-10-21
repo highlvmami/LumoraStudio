@@ -22,6 +22,27 @@ Açık tema ("Gündüz", Görünüm → Tema):
 
 Tam yol haritası: [docs/ozellikler.md](docs/ozellikler.md). Mimari: [docs/mimari.md](docs/mimari.md).
 
+## Sürüm 0.5'te neler var
+
+![Sabitleme](docs/screenshots/sabitleme.png)
+
+**Görüntü sabitleme**
+- Video klibi seçin, Özellikler panelinde **Sabitleme → Titreyen kamerayı sabitle**. Kamera hareketi bir kez ölçülür (köşe noktaları kareden kareye izlenir), sonra her kare yumuşatılmış bir yola oturtulur.
+- **Yumuşatma** ne kadar sarsıntının giderileceğini, **Yakınlaştırma** kenarların kadraj dışında kalması için gereken büyütmeyi ayarlar; yakınlaştırma yumuşatmaya göre kendiliğinden hesaplanır. Yeniden ölçmeden değiştirilebilir, geri alınabilir.
+
+![Hareket takibi](docs/screenshots/takip.png)
+
+**Hareket takibi**
+- Bir başlık ya da üst izdeki bir klip seçin, **Hareket takibi → Bir nesneyi takip et…** deyin ve önizlemede nesnenin çevresine bir kutu çizin. Klip, ana izdeki görüntüde o nesneyle birlikte hareket eder (örneğin bir kişinin üstündeki isim).
+- Takip ekranda görünen görüntü üzerinde yapılır; dönüşümler, geçişler ve sabitleme hesaba katılır. Küçük hatalar nesnenin görünüşüne göre düzeltildiği için kareden kareye birikmez.
+
+![Otomatik altyazı](docs/screenshots/otomatik-altyazi.png)
+
+**Otomatik altyazı (Whisper, tamamen yerel)**
+- **Düzen → Altyazılar → Konuşmadan otomatik altyazı…**: zaman çizelgesindeki ses dinlenir, söylenenler yeni bir altyazı izine satır satır yazılır. Türkçe varsayılan; İngilizce, Almanca, Fransızca, İspanyolca, Arapça, Rusça ya da otomatik dil bulma da var.
+- Tanıma bu bilgisayarda yapılır, hiçbir şey dışarı gönderilmez. Model (hızlı / dengeli / en doğru) ilk kullanımda bir kez indirilir.
+- Yazılan satırlar normal altyazıdır: düzeltilebilir, biçimlendirilebilir, videoya gömülebilir ya da .srt olarak kaydedilebilir.
+
 ## Sürüm 0.4.2: kesimlerde akıcı önizleme
 
 - Önizleme oynatılırken kesim noktalarından ve geçişlerden geçerken takılma giderildi: sonraki kliplerin çözücüsü arka planda önceden açılıp ilk karesine konumlanır, geçişteki iki klip aynı anda çözülür. Büyük telefon videolarında (ör. 1440x2560) kesimdeki en uzun kare süresi yaklaşık 190 ms'den 35 ms'ye indi.

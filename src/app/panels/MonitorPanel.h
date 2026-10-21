@@ -53,6 +53,7 @@ public:
     void showSource(const MediaItemPtr& item);
     void showProgram(const PlaybackSequence& seq, bool switchMode);
     MediaItemPtr sourceItem() const { return m_source; }
+    VideoView* view() const { return m_view; }
 
     // Source marks (media time).
     Ticks markIn() const;

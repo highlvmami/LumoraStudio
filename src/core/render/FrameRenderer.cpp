@@ -336,7 +336,8 @@ QImage FrameRenderer::clipImage(const Clip& clip, Ticks sourceTime, QSize* fitSi
         *fitSize = fit.toSize();
     // Pixel size of the converted image (before rotation), capped so a big
     // zoom does not allocate huge images; the painter upscales the rest.
-    const double scale = std::clamp(clip.transform.scale, 0.01, 2.0);
+    const double zoom = clip.stabilization.isActive() ? std::clamp(clip.stabilization.zoom, 1.0, 2.0) : 1.0;
+    const double scale = std::clamp(clip.transform.scale * zoom, 0.01, 2.0);
     QSizeF target = fit * scale;
     if (sideways)
         target.transpose();
@@ -399,7 +400,9 @@ void FrameRenderer::drawLayer(QPainter& p, const Clip& clip, Ticks t, Ticks sour
     if (alpha <= 0.0)
         return;
     const QSizeF frame(m_output);
-    const QPointF centre(frame.width() / 2 + tr.x * frame.width(), frame.height() / 2 + tr.y * frame.height());
+    const QPointF follow = clip.motion.offsetAt(t - clip.timelineStart);
+    const QPointF centre(frame.width() / 2 + (tr.x + follow.x()) * frame.width(),
+                         frame.height() / 2 + (tr.y + follow.y()) * frame.height());
     if (clip.kind == ClipKind::Title) {
         p.save();
         p.translate(centre);
@@ -424,7 +427,18 @@ void FrameRenderer::drawLayer(QPainter& p, const Clip& clip, Ticks t, Ticks sour
     QSizeF size = QSizeF(fit) * scale;
     if (rotation == 90 || rotation == 270)
         size.transpose();
-    const bool exact = std::fmod(angle, 360.0) == 0.0 && QSize(qRound(size.width()), qRound(size.height())) == img.size();
+    bool stabilized = false;
+    if (clip.stabilization.isActive()) {
+        // In the decoded picture's own axes: move the frame onto the smoothed
+        // camera path and zoom in so its edges stay outside the frame.
+        const auto c = clip.stabilization.correctionAt(sourceTime);
+        p.translate(c.x * size.width(), c.y * size.height());
+        p.rotate(c.angle);
+        const double z = std::clamp(clip.stabilization.zoom, 1.0, 2.0);
+        p.scale(z, z);
+        stabilized = true;
+    }
+    const bool exact = !stabilized && std::fmod(angle, 360.0) == 0.0 && QSize(qRound(size.width()), qRound(size.height())) == img.size();
     p.setRenderHint(QPainter::SmoothPixmapTransform, !exact);
     p.drawImage(QRectF(QPointF(-size.width() / 2, -size.height() / 2), size), img);
     p.restore();
@@ -604,7 +618,8 @@ const AVFrame* FrameRenderer::passthroughFrame(Ticks t) {
         const Clip& c = v[k];
         if (!c.contains(t))
             continue;
-        if (!c.hasMedia() || !c.transform.isIdentity() || !c.color.isIdentity() || fadeFactor(c, t) != 1.0)
+        if (!c.hasMedia() || !c.transform.isIdentity() || !c.color.isIdentity() || fadeFactor(c, t) != 1.0 ||
+            c.stabilization.isActive() || !c.motion.isEmpty())
             return nullptr;
         const Ticks dIn = m_state.transitionDuration(k, dur);
         if (dIn > 0 && t < c.timelineStart + dIn / 2)

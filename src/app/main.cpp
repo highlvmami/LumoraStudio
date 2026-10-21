@@ -65,7 +65,10 @@ int main(int argc, char* argv[]) {
     QCommandLineOption exportCustomOpt(QStringLiteral("export-custom"), QStringLiteral("Open the export dialog in custom mode"));
     QCommandLineOption seekOpt(QStringLiteral("seek"), QStringLiteral("Move the playhead (seconds)"), QStringLiteral("s"));
     QCommandLineOption sizeOpt(QStringLiteral("size"), QStringLiteral("Window size WxH"), QStringLiteral("size"));
-    for (auto* o : {&shotOpt, &workspaceOpt, &selectOpt, &selectClipOpt, &exportOpt, &exportCustomOpt, &seekOpt, &sizeOpt}) {
+    QCommandLineOption autoSubsOpt(QStringLiteral("auto-subtitles-dialog"), QStringLiteral("Open the automatic subtitles dialog"));
+    QCommandLineOption trackOpt(QStringLiteral("track-selected"), QStringLiteral("Start following an object with the selected clip"));
+    for (auto* o : {&shotOpt, &workspaceOpt, &selectOpt, &selectClipOpt, &exportOpt, &exportCustomOpt, &seekOpt, &sizeOpt,
+                    &autoSubsOpt, &trackOpt}) {
         o->setFlags(QCommandLineOption::HiddenFromHelp);
         parser.addOption(*o);
     }
@@ -103,7 +106,29 @@ int main(int argc, char* argv[]) {
         const QString out = parser.value(shotOpt);
         const bool exportCustom = parser.isSet(exportCustomOpt);
         const bool exportDlg = parser.isSet(exportOpt) || exportCustom;
-        QTimer::singleShot(2500, &w, [&w, out, exportDlg, exportCustom] {
+        const bool autoSubs = parser.isSet(autoSubsOpt), track = parser.isSet(trackOpt);
+        QTimer::singleShot(2500, &w, [&w, out, exportDlg, exportCustom, autoSubs, track] {
+            if (autoSubs) {
+                QTimer::singleShot(1200, &w, [out] {
+                    for (QWidget* top : QApplication::topLevelWidgets())
+                        if (top->isVisible() && top->inherits("QDialog")) {
+                            top->adjustSize();
+                            top->grab().save(out);
+                            break;
+                        }
+                    QCoreApplication::exit(0);
+                });
+                w.autoSubtitles();
+                return;
+            }
+            if (track) {
+                w.trackClip();
+                QTimer::singleShot(1200, &w, [&w, out] {
+                    w.grab().save(out);
+                    QCoreApplication::exit(0);
+                });
+                return;
+            }
             if (exportDlg) {
                 w.openExportDialog(false);
                 if (exportCustom)

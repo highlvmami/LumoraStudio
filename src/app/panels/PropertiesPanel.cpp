@@ -23,6 +23,7 @@
 
 #include "Theme.h"
 #include "export/ExportPlanner.h"
+#include "motion/Analysis.h"
 #include "project/Project.h"
 #include "timeline/Subtitles.h"
 #include "undo/TimelineCommands.h"
@@ -269,6 +270,39 @@ PropertiesPanel::PropertiesPanel(Project* project, QUndoStack* undo, QWidget* pa
     f->addRow(m_transitionNote);
     layout->addWidget(m_transitionSection);
 
+    // --- stabilisation ---
+    m_stabSection = makeSection(tr("Stabilisation"), &f);
+    m_stabOn = new QCheckBox(tr("Steady the shaky camera"));
+    f->addRow(m_stabOn);
+    m_stabSmoothing = dspin(0.2, 5, 0.1, 1, sec);
+    m_stabSmoothing->setToolTip(tr("How much camera movement is smoothed away; larger values also remove slow wobble"));
+    f->addRow(tr("Smoothing"), m_stabSmoothing);
+    m_stabZoom = new QSpinBox;
+    m_stabZoom->setRange(100, 150);
+    m_stabZoom->setSuffix(QStringLiteral(" %"));
+    m_stabZoom->setToolTip(tr("Enlarges the picture so its moving edges stay outside the frame"));
+    f->addRow(tr("Zoom"), m_stabZoom);
+    m_stabInfo = new QLabel;
+    m_stabInfo->setWordWrap(true);
+    m_stabInfo->setStyleSheet(QStringLiteral("color: palette(placeholder-text);"));
+    f->addRow(m_stabInfo);
+    layout->addWidget(m_stabSection);
+
+    // --- motion tracking ---
+    m_trackSection = makeSection(tr("Motion tracking"), &f);
+    m_trackInfo = new QLabel;
+    m_trackInfo->setWordWrap(true);
+    m_trackInfo->setStyleSheet(QStringLiteral("color: palette(placeholder-text);"));
+    f->addRow(m_trackInfo);
+    m_trackStart = new QPushButton(tr("Follow an object…"));
+    m_trackStart->setToolTip(tr("Draw a box around something in the picture; this clip then moves with it"));
+    m_trackClear = new QPushButton(tr("Stop following"));
+    auto* trackRow = new QHBoxLayout;
+    trackRow->addWidget(m_trackStart);
+    trackRow->addWidget(m_trackClear);
+    f->addRow(trackRow);
+    layout->addWidget(m_trackSection);
+
     // --- fades ---
     m_fadeSection = makeSection(tr("Fades"), &f);
     m_fadeIn = dspin(0, 600, 0.1, 2, sec);
@@ -354,6 +388,43 @@ PropertiesPanel::PropertiesPanel(Project* project, QUndoStack* undo, QWidget* pa
                 applySubtitleStyle();
             }
         });
+    connect(m_stabOn, &QCheckBox::toggled, this, [this](bool on) {
+        if (m_updating || m_clip.isNull())
+            return;
+        const Clip* c = m_project->timeline()->clip(m_clip);
+        if (on && c && c->stabilization.path.size() < 2) {
+            emit stabilizeRequested(m_clip); // needs the camera path first
+            refresh();
+            return;
+        }
+        edit(on ? tr("Stabilise") : tr("Turn off stabilisation"), {}, [&](const Clip& c) {
+            Stabilization s = c.stabilization;
+            s.enabled = on;
+            return m_project->timeline()->setStabilization(c.id, s);
+        });
+    });
+    connect(m_stabSmoothing, &QDoubleSpinBox::valueChanged, this, [this](double v) {
+        edit(tr("Change smoothing"), QStringLiteral("stab-smoothing"), [&](const Clip& c) {
+            Stabilization s = c.stabilization;
+            s.smoothing = v;
+            s.zoom = s.requiredZoom(motion::pictureAspect(*m_project->media(), c));
+            return m_project->timeline()->setStabilization(c.id, s);
+        });
+    });
+    connect(m_stabZoom, &QSpinBox::valueChanged, this, [this](int v) {
+        edit(tr("Change stabilisation zoom"), QStringLiteral("stab-zoom"), [&](const Clip& c) {
+            Stabilization s = c.stabilization;
+            s.zoom = v / 100.0;
+            return m_project->timeline()->setStabilization(c.id, s);
+        });
+    });
+    connect(m_trackStart, &QPushButton::clicked, this, [this] {
+        if (!m_clip.isNull())
+            emit trackRequested(m_clip);
+    });
+    connect(m_trackClear, &QPushButton::clicked, this, [this] {
+        edit(tr("Stop following"), {}, [&](const Clip& c) { return m_project->timeline()->setMotionPath(c.id, {}); });
+    });
     connect(m_freezeDuration, &QDoubleSpinBox::valueChanged, this, [this](double v) {
         edit(tr("Change freeze length"), QStringLiteral("duration"),
              [&](const Clip& c) { return m_project->timeline()->setDuration(c.id, ticksFromSeconds(v)); });
@@ -596,6 +667,27 @@ void PropertiesPanel::refreshEditors(const Clip* clip) {
         m_titleAnimOut->setCurrentIndex(m_titleAnimOut->findData(static_cast<int>(t.animationOut)));
         setSpin(m_titleAnimDuration, ticksToSeconds(t.animationDuration));
         setSpin(m_titleDuration, ticksToSeconds(clip->duration()));
+    }
+
+    const bool stab = video && clip->kind == ClipKind::Media;
+    m_stabSection->setVisible(stab);
+    if (stab) {
+        const Stabilization& s = clip->stabilization;
+        m_stabOn->setChecked(s.isActive());
+        m_stabSmoothing->setEnabled(s.isActive());
+        m_stabZoom->setEnabled(s.isActive());
+        setSpin(m_stabSmoothing, s.smoothing);
+        m_stabZoom->setValue(qRound(s.zoom * 100));
+        m_stabInfo->setText(s.path.size() > 1 ? QString() : tr("The camera movement is measured once when you turn it on."));
+        m_stabInfo->setVisible(s.path.size() < 2);
+    }
+    const bool follow = video && track != 0 && (clip->kind == ClipKind::Media || clip->kind == ClipKind::Title);
+    m_trackSection->setVisible(follow);
+    if (follow) {
+        m_trackClear->setEnabled(!clip->motion.isEmpty());
+        m_trackInfo->setText(clip->motion.isEmpty()
+                                 ? tr("Make this clip move with something in the picture below it, e.g. a name above a person.")
+                                 : tr("This clip follows a tracked object (%1 positions).").arg(clip->motion.points.size()));
     }
 
     m_freezeSection->setVisible(isFreeze);
