@@ -32,6 +32,7 @@ class PhotoWorkspace;
 class ClipColorPanel;
 class ScopesWidget;
 class AudioPanel;
+class HelpPage;
 
 class MainWindow : public QMainWindow {
     Q_OBJECT
@@ -41,7 +42,7 @@ public:
 
     // Opens a project or imports media files given on the command line.
     void openPaths(const QStringList& paths);
-    enum class Workspace { Edit = 0, Color = 1, Audio = 2, Photo = 3 };
+    enum class Workspace { Edit = 0, Color = 1, Audio = 2, Photo = 3, Help = 4 };
     void setWorkspace(Workspace w);
 
     // Used by --screenshot for the documentation.
@@ -52,6 +53,7 @@ public:
     // Starts following an object with the selected clip.
     void trackClip(const QUuid& clipId = {});
     void showFullScreenPreview();
+    void showHelpSection(const QString& id);
 
 protected:
     void closeEvent(QCloseEvent* e) override;
@@ -105,6 +107,7 @@ private:
     void removeBackground(const QUuid& clipId, const QString& model);
     void refreshProgram();
     void showShortcuts();
+    QString shortcutsHtml() const;
     void closeFullScreenPreview();
     void setWindowFullScreen(bool on);
     void showAbout();
@@ -130,6 +133,7 @@ private:
     TimelinePanel* m_timelinePanel;
     PropertiesPanel* m_properties;
     PhotoWorkspace* m_photo;
+    HelpPage* m_help;
     ClipColorPanel* m_clipColor;
     ScopesWidget* m_scopes;
     AudioPanel* m_audio;
@@ -185,6 +189,7 @@ private:
     QAction* m_actExportFrame;
     QAction* m_actFullScreenPreview;
     QAction* m_actFullScreenWindow;
+    QAction* m_actHowTo;
     class Updater* m_updater = nullptr;
 };
 

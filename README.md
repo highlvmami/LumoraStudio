@@ -22,6 +22,14 @@ Açık tema ("Gündüz", Görünüm → Tema):
 
 Tam yol haritası: [docs/ozellikler.md](docs/ozellikler.md). Mimari: [docs/mimari.md](docs/mimari.md).
 
+## Sürüm 0.6.4: nasıl kullanılır
+
+![Nasıl kullanılır sekmesi](docs/screenshots/nasil-kullanilir.png)
+
+- Üstteki sekmelerin sonunda yeni bir **Nasıl kullanılır** sekmesi var (**F1** ya da **Yardım → Nasıl kullanılır**). Bir kitapçık gibi açılır ve önce "Sağdan bir bölüm seçin" der.
+- Sağdaki bölüm menüsü yerinde kalır; bir bölüme tıklayınca anlatımı aynı sekmede solda açılır. Bölümler: Başlarken, Video kurgusu, Başlıklar ve geçişler, Çıkartmalar, Altyazılar, Akıllı video araçları, Renk, Ses, Fotoğraf, Dışa aktarma, Tam ekran ve ayarlar, Klavye kısayolları.
+- Sayfalar arayüz diliyle (Türkçe ya da İngilizce) gelir; yeni bir dil için `src/app/resources/help/<dil>/` klasörüne sayfaları eklemek yeter.
+
 ## Sürüm 0.6.2: tam ekran
 
 ![Tam ekran önizleme](docs/screenshots/tam-ekran.png)
