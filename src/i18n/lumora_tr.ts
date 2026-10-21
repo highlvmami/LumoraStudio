@@ -1940,7 +1940,7 @@
     </message>
     <message>
         <source>This build of LumoraStudio has no speech recognition.</source>
-        <translation>LumoraStudio'nun bu sürümünde konuşma tanıma yok.</translation>
+        <translation>LumoraStudio&apos;nun bu sürümünde konuşma tanıma yok.</translation>
     </message>
     <message>
         <source>LumoraStudio listens to the timeline and writes what is said as a new subtitle track. Recognition runs on this computer; nothing is sent anywhere. The model is downloaded once.</source>
@@ -3137,6 +3137,10 @@ Orijinal dosya asla değişmez: düzenlemeler projede saklanır ve dışa aktar�
         <source>LumoraStudio could not be updated, so the current version was kept. Close any other copy of LumoraStudio and try again.</source>
         <translation>LumoraStudio güncellenemedi, mevcut sürüm korundu. Açık başka bir LumoraStudio penceresi varsa kapatıp yeniden deneyin.</translation>
     </message>
+    <message>
+        <source>Preparing the update…</source>
+        <translation>Güncelleme hazırlanıyor…</translation>
+    </message>
 </context>
 <context>
     <name>lumora::speech</name>
@@ -3154,7 +3158,7 @@ Orijinal dosya asla değişmez: düzenlemeler projede saklanır ve dışa aktar�
     </message>
     <message>
         <source>This build of LumoraStudio has no speech recognition.</source>
-        <translation>LumoraStudio'nun bu sürümünde konuşma tanıma yok.</translation>
+        <translation>LumoraStudio&apos;nun bu sürümünde konuşma tanıma yok.</translation>
     </message>
     <message>
         <source>There is nothing to listen to.</source>

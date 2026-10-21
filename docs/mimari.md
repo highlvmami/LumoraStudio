@@ -87,3 +87,5 @@ Bu belge 0.1'den 0.5'e kadarki sürümlerin nasıl kurulduğunu ve [özellik lis
 - Çıkış noktası, çözme sırasına göre istenen sondan sonra gelen ilk pakette durur; böylece referansı eksik hiçbir kare yazılmaz. B-kareli videoda bu, kesimin birkaç kare erken bitmesi demektir ve kullanıcıya önceden söylenir.
 - Paketlerin zaman damgaları birleştirme boyunca kaydırılır, DTS her zaman artan tutulur.
 - Bölümlerin kodek parametreleri aynı değilse kopyalama reddedilir ve "Kaynakla aynı" ya da "Kayıpsız ara format" önerilir.
+
+**Güncellemeler küçük parçalarla gelir.** Yayın iş akışı tam paketin yanında `manifest.json` (paketteki her dosyanın SHA-256'sı) ve önceki sürümden bu yana değişen dosyaları taşıyan `LumoraStudio-windows-x64-patch.zip` yayımlar (`.github/scripts/release_manifest.py`). Güncelleyici kurulu dosyaları manifestle karşılaştırır (`update/UpdateManifest`); eksik ya da farklı olanların hepsi yamadaysa yalnızca yamayı indirir, değilse tam paketi. FFmpeg ve Qt CI'da önbellekte tutulduğu için sürümden sürüme değişmez, yama çoğunlukla birkaç MB'tır. CI derlemeleri sccache ile önceki derlemenin nesnelerini yeniden kullanır.

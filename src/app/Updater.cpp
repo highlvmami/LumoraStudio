@@ -8,6 +8,7 @@
 #include <QDirIterator>
 #include <QFileInfo>
 #include <QFile>
+#include <QFutureWatcher>
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QMainWindow>
@@ -22,6 +23,9 @@
 #include <QTimer>
 #include <QUuid>
 #include <QVersionNumber>
+#include <QtConcurrent>
+
+#include "update/UpdateManifest.h"
 
 namespace lumora {
 
@@ -29,6 +33,10 @@ namespace {
 
 const char* const kLatestRelease = "https://api.github.com/repos/highlvmami/LumoraStudio/releases/latest";
 const char* const kWindowsAsset = "LumoraStudio-windows-x64.zip";
+// Only the files that changed since the previous release, and the list of
+// every file's checksum that tells whether that is enough.
+const char* const kPatchAsset = "LumoraStudio-windows-x64-patch.zip";
+const char* const kManifestAsset = "manifest.json";
 const char* const kAutoKey = "updates/autoCheck";
 const char* const kLastKey = "updates/lastCheck";
 
@@ -46,6 +54,19 @@ QVersionNumber version(QString s) {
     if (s.startsWith(QLatin1Char('v')) || s.startsWith(QLatin1Char('V')))
         s.remove(0, 1);
     return QVersionNumber::fromString(s);
+}
+
+QJsonObject releaseAsset(const QJsonObject& release, const char* name) {
+    for (const QJsonValue& a : release.value(QLatin1String("assets")).toArray())
+        if (a.toObject().value(QLatin1String("name")).toString() == QLatin1String(name))
+            return a.toObject();
+    return {};
+}
+
+// GitHub publishes "sha256:<hex>" for every release asset.
+QByteArray assetSha256(const QJsonObject& asset) {
+    const QString digest = asset.value(QLatin1String("digest")).toString();
+    return digest.startsWith(QLatin1String("sha256:")) ? digest.mid(7).toLatin1().toLower() : QByteArray();
 }
 
 // Extracts a release zip with the tar.exe that ships with Windows 10 and later.
@@ -125,10 +146,7 @@ void Updater::offer(const QJsonObject& release, bool interactive) {
     const QString tag = release.value(QLatin1String("tag_name")).toString();
     const QString newVersion = version(tag).toString();
     const QUrl page(release.value(QLatin1String("html_url")).toString());
-    QJsonObject asset;
-    for (const QJsonValue& a : release.value(QLatin1String("assets")).toArray())
-        if (a.toObject().value(QLatin1String("name")).toString() == QLatin1String(kWindowsAsset))
-            asset = a.toObject();
+    const QJsonObject asset = releaseAsset(release, kWindowsAsset);
 
 #ifdef Q_OS_WIN
     const bool automatic = !asset.isEmpty() && canReplaceFiles();
@@ -159,7 +177,7 @@ void Updater::offer(const QJsonObject& release, bool interactive) {
     if (box.clickedButton() != yes)
         return;
     if (automatic)
-        download(asset, newVersion);
+        prepare(release, newVersion);
     else
         QDesktopServices::openUrl(page);
 }
@@ -171,12 +189,57 @@ bool Updater::canReplaceFiles() const {
     return probe.open();
 }
 
+void Updater::prepare(const QJsonObject& release, const QString& newVersion) {
+    const QJsonObject full = releaseAsset(release, kWindowsAsset);
+    const QJsonObject patch = releaseAsset(release, kPatchAsset);
+    const QJsonObject manifestAsset = releaseAsset(release, kManifestAsset);
+    if (patch.isEmpty() || manifestAsset.isEmpty()) {
+        download(full, newVersion);
+        return;
+    }
+
+    // Compare the installed files with the new release; when only the files
+    // in the patch differ, a few megabytes do instead of the whole package.
+    m_progress = new QProgressDialog(tr("Preparing the update…"), QString(), 0, 0, dialogParent());
+    m_progress->setWindowModality(Qt::WindowModal);
+    m_progress->setWindowTitle(tr("Update"));
+    m_progress->setMinimumDuration(0);
+    m_progress->setValue(0);
+
+    QNetworkRequest req = request(QUrl(manifestAsset.value(QLatin1String("browser_download_url")).toString()));
+    req.setRawHeader("Accept", "application/octet-stream");
+    QNetworkReply* reply = m_net.get(req);
+    const QByteArray expected = assetSha256(manifestAsset);
+    connect(reply, &QNetworkReply::finished, this, [this, reply, expected, full, patch, newVersion] {
+        reply->deleteLater();
+        const QByteArray data = reply->readAll();
+        std::optional<update::Manifest> manifest;
+        if (reply->error() == QNetworkReply::NoError
+            && (expected.isEmpty() || QCryptographicHash::hash(data, QCryptographicHash::Sha256).toHex() == expected))
+            manifest = update::Manifest::fromJson(data);
+        if (!manifest) {
+            if (m_progress)
+                m_progress->deleteLater();
+            download(full, newVersion);
+            return;
+        }
+        auto* watcher = new QFutureWatcher<QStringList>(this);
+        connect(watcher, &QFutureWatcher<QStringList>::finished, this,
+                [this, watcher, manifest = *manifest, full, patch, newVersion] {
+                    watcher->deleteLater();
+                    if (m_progress)
+                        m_progress->deleteLater();
+                    download(update::patchCovers(manifest, watcher->result()) ? patch : full, newVersion);
+                });
+        watcher->setFuture(QtConcurrent::run([manifest = *manifest, dir = QCoreApplication::applicationDirPath()] {
+            return update::outdatedFiles(manifest, dir);
+        }));
+    });
+}
+
 void Updater::download(const QJsonObject& asset, const QString& newVersion) {
     const QUrl url(asset.value(QLatin1String("browser_download_url")).toString());
-    // GitHub publishes "sha256:<hex>" for every release asset.
-    const QString digest = asset.value(QLatin1String("digest")).toString();
-    const QByteArray expected =
-        digest.startsWith(QLatin1String("sha256:")) ? digest.mid(7).toLatin1().toLower() : QByteArray();
+    const QByteArray expected = assetSha256(asset);
 
     const QString zipPath =
         QDir::temp().filePath(QStringLiteral("LumoraStudio-%1-%2.zip")

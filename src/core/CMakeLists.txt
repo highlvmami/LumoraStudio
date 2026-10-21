@@ -38,6 +38,7 @@ add_library(lumora_core STATIC
     image/PhotoLibrary.h image/PhotoLibrary.cpp
     image/RawDecoder.h image/RawDecoder.cpp
     project/Project.h project/Project.cpp
+    update/UpdateManifest.h update/UpdateManifest.cpp
 )
 
 target_include_directories(lumora_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
