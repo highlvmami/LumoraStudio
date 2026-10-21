@@ -19,7 +19,8 @@ namespace lumora {
 enum class TrackType { Video, Audio, Subtitle };
 
 // Freeze clips hold one frame of a media item (freezeTime) for their whole
-// duration; like titles their "source" range is simply [0, duration).
+// duration; like titles their "source" range is simply [0, duration). Still
+// pictures (photos, stickers) are freeze clips of an image media item.
 enum class ClipKind { Media, Title, Subtitle, Freeze };
 
 // A clip references a range [sourceIn, sourceOut) of a media item and is
@@ -57,6 +58,11 @@ struct Clip {
     TitleData title;             // ClipKind::Title
     QString text;                // ClipKind::Subtitle
     Ticks freezeTime = 0;        // ClipKind::Freeze: media time of the held frame
+    // Repeating video (e.g. an animated sticker): when loopLength > 0 the
+    // media range [loopStart, loopStart + loopLength) plays over and over, so
+    // the clip may be longer than its media. Linked audio is not repeated.
+    Ticks loopStart = 0;
+    Ticks loopLength = 0;
 
     bool hasMedia() const { return kind == ClipKind::Media || kind == ClipKind::Freeze; }
 
@@ -66,7 +72,15 @@ struct Clip {
     Ticks toSource(Ticks t) const { return sourceIn + (t - timelineStart); }
     bool contains(Ticks t) const { return t >= timelineStart && t < timelineEnd(); }
     // Media time whose picture is shown at timeline time `t`.
-    Ticks mediaTime(Ticks t) const { return kind == ClipKind::Freeze ? freezeTime : toSource(t); }
+    Ticks mediaTime(Ticks t) const {
+        if (kind == ClipKind::Freeze)
+            return freezeTime;
+        const Ticks s = toSource(t);
+        if (loopLength > 0 && s >= loopStart + loopLength)
+            return loopStart + (s - loopStart) % loopLength;
+        return s;
+    }
+    bool loops() const { return kind == ClipKind::Media && loopLength > 0; }
 
     bool operator==(const Clip&) const = default;
 };
@@ -184,6 +198,9 @@ public:
     // Adds a title clip. On V1 it is inserted like media (ripple); on other
     // video tracks it is placed at `at`, overwriting.
     QUuid addTitle(const TitleData& title, Ticks duration, int track, Ticks at);
+    // Adds a still picture (an image media item) shown for `duration`, placed
+    // like a title: rippled into V1, overwriting on other video tracks.
+    QUuid addStill(const QUuid& mediaId, Ticks duration, int track, Ticks at, const ClipTransform& transform = {});
     // Moves a clip (with its linked clips) to another track and/or time.
     // Storyline clips that move to another track leave the storyline (the
     // gap closes); clips that move onto V1 are inserted at the nearest edit.
@@ -202,6 +219,10 @@ public:
     bool setRedaction(const QUuid& clipId, const Redaction& r);
     bool setBackgroundRemoval(const QUuid& clipId, const BackgroundRemoval& b);
     bool setTransition(const QUuid& clipId, const Transition& t);
+    // Repeats the media of a video clip: the range from its in point to the
+    // end of the media (`mediaDuration`) loops. Off restores the length to
+    // what the media holds.
+    bool setLoop(const QUuid& clipId, bool on, Ticks mediaDuration);
     bool setFades(const QUuid& clipId, Ticks fadeIn, Ticks fadeOut);
     bool setGain(const QUuid& clipId, double gainDb);
     bool setAudioEffects(const QUuid& clipId, const AudioEffects& fx);
@@ -257,6 +278,8 @@ private:
     // Clears [from, to) on a non-magnetic track (splitting and trimming the
     // clips that overlap it), ignoring the clips in `keep`.
     void clearRange(int track, Ticks from, Ticks to, const std::vector<QUuid>& keep = {});
+    // Places a clip without a source range (title, still) of `duration`.
+    QUuid addGenerated(Clip c, Ticks duration, int track, Ticks at);
     // Connects a clip on a non-magnetic track to the storyline clip under it.
     void anchor(Clip& c);
 

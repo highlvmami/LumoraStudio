@@ -24,7 +24,7 @@ int bitDepthOf(AVPixelFormat fmt) {
 
 QStringList videoFileExtensions() {
     return {"mp4", "m4v", "mov", "mkv", "webm", "avi", "mxf", "mts", "m2ts", "ts", "3gp", "wmv", "flv", "mpg",
-            "mpeg"};
+            "mpeg", "gif"};
 }
 
 QStringList imageFileExtensions() {

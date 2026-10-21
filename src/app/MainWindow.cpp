@@ -196,7 +196,24 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
     // --- wiring ---
     connect(m_tabs, &QTabBar::currentChanged, this, [this](int i) { setWorkspace(static_cast<Workspace>(i)); });
 
+    connect(m_monitor->view(), &VideoView::transformEdited, this, [this](const ClipTransform& t, bool finished) {
+        Timeline* tl = m_project->timeline();
+        const auto sel = m_timelineView->selection();
+        if (sel.isEmpty())
+            return;
+        // Live while dragging; one undo step for the whole drag.
+        if (!m_transformBefore)
+            m_transformBefore = tl->state();
+        tl->setTransform(sel.front(), t);
+        if (finished) {
+            if (!(*m_transformBefore == tl->state()))
+                pushTimelineSnapshot(m_videoUndo, tl, *m_transformBefore, tr("Move picture"));
+            m_transformBefore.reset();
+            updateTransformBox();
+        }
+    });
     connect(m_project->timeline(), &Timeline::changed, this, [this] {
+        updateTransformBox();
         refreshProgram();
         markDirty();
     });
@@ -206,6 +223,7 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
     connect(m_cache, &MediaCache::keyframesReady, m_properties, &PropertiesPanel::refresh);
 
     connect(m_engine, &PlaybackEngine::positionChanged, this, [this](Ticks t) {
+        updateTransformBox();
         if (m_monitor->mode() == MonitorPanel::Mode::Program) {
             m_timelineView->setPlayhead(t);
             if (m_engine->isPlaying())
@@ -232,6 +250,7 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
         m_clipColor->showClip(sel.isEmpty() ? QUuid() : sel.front());
         m_audio->showClip(sel.isEmpty() ? QUuid() : sel.front());
         const bool has = !sel.isEmpty();
+        updateTransformBox();
         m_actDelete->setEnabled(has);
         m_actJoin->setEnabled(has && m_project->timeline()->canJoinWithNext(sel.front()));
     });
@@ -290,6 +309,7 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
     connect(m_monitor, &MonitorPanel::filesDropped, this, [this](const QStringList& p) { importFiles(p, kInvalidTicks, true); });
     connect(m_monitor, &MonitorPanel::mediaDropped, this, [this](const QList<QUuid>& ids) { addMediaToTimeline(ids); });
     connect(m_monitor, &MonitorPanel::modeChanged, this, [this](MonitorPanel::Mode m) {
+        updateTransformBox();
         const bool source = m == MonitorPanel::Mode::Source;
         m_actMarkIn->setEnabled(source);
         m_actMarkOut->setEnabled(source);
@@ -373,6 +393,8 @@ void MainWindow::createActions() {
 
     m_actAddTitle = make(tr("Add &title"), QKeySequence(Qt::Key_T), [this] { addTitle(); }, Icons::title());
     m_actAddTitle->setToolTip(tr("Add a title at the playhead on a track above the storyline (T)"));
+    m_actAddSticker = make(tr("Add stic&ker…"), QKeySequence(Qt::SHIFT | Qt::Key_K), [this] { addSticker(); }, Icons::sticker());
+    m_actAddSticker->setToolTip(tr("Put a picture, animated GIF or video on top of the video at the playhead (Shift+K)"));
     m_actAddTransition = make(tr("Add t&ransition"), QKeySequence(Qt::CTRL | Qt::Key_T), &MainWindow::addTransition,
                               Icons::transition());
     m_actAddTransition->setToolTip(tr("Cross dissolve into the selected clip, or at the cut nearest the playhead (Ctrl+T)"));
@@ -404,6 +426,7 @@ void MainWindow::createActions() {
     tb->addAction(m_actDelete);
     tb->addSeparator();
     tb->addAction(m_actAddTitle);
+    tb->addAction(m_actAddSticker);
     tb->addAction(m_actAddTransition);
     tb->addSeparator();
     tb->addAction(m_actSnap);
@@ -434,6 +457,7 @@ void MainWindow::createMenus() {
     edit->addAction(m_actDelete);
     edit->addSeparator();
     edit->addAction(m_actAddTitle);
+    edit->addAction(m_actAddSticker);
     edit->addAction(m_actAddTransition);
     edit->addAction(m_actAddVideoTrack);
     edit->addAction(m_actAddAudioTrack);
@@ -607,7 +631,7 @@ void MainWindow::setWorkspace(Workspace w) {
         selectClipAtPlayhead();
     m_undoGroup->setActiveStack(photo ? m_photoUndo : m_videoUndo);
     for (QAction* a : {m_actSplit, m_actDelete, m_actJoin, m_actFreeze, m_actPlay, m_actPrevFrame, m_actNextFrame, m_actHome, m_actEnd,
-                       m_actMarkIn, m_actMarkOut, m_actAddSource, m_actZoomIn, m_actZoomOut, m_actExport, m_actAddTitle,
+                       m_actMarkIn, m_actMarkOut, m_actAddSource, m_actZoomIn, m_actZoomOut, m_actExport, m_actAddTitle, m_actAddSticker,
                        m_actAddTransition, m_actAddVideoTrack, m_actAddAudioTrack, m_actExportFrame, m_actAddSubtitle,
                        m_actAddSubtitleTrack, m_actImportSubtitles, m_actExportSubtitles, m_actAutoSubtitles})
         a->setVisible(!photo);
@@ -777,7 +801,9 @@ void MainWindow::importFiles(const QStringList& paths, Ticks at, bool toTimeline
             failed << QStringLiteral("%1: %2").arg(QFileInfo(path).fileName(), err);
             continue;
         }
-        if (item->info.kind == MediaKind::Image)
+        // Pictures dropped on the timeline become still clips; elsewhere they
+        // open in the photo editor.
+        if (item->info.kind == MediaKind::Image && !(toTimeline && at != kInvalidTicks))
             photos << item->path;
         else
             ids << item->id;
@@ -815,12 +841,33 @@ Ticks MainWindow::addRangeToTimeline(const QUuid& mediaId, Ticks in, Ticks out, 
         return kInvalidTicks;
     const bool hasVideo = media->info.video.has_value();
     const bool hasAudio = media->info.audio.has_value();
-    if (!hasVideo && !hasAudio) {
-        statusBar()->showMessage(tr("Photos are edited in the Photo workspace; photo-to-video arrives in a later version."), 6000);
-        return kInvalidTicks;
-    }
     Timeline* tl = m_project->timeline();
     const bool first = tl->isEmpty();
+    if (media->info.kind == MediaKind::Image) {
+        if (track >= 0 && !tl->tracks()[track].isVideo()) {
+            statusBar()->showMessage(tr("Pictures go on a video track."), 6000);
+            return kInvalidTicks;
+        }
+        QUuid placed;
+        runTimelineEdit(m_videoUndo, tl, tr("Add picture"), [&] {
+            if (first) {
+                // A sequence that starts with a photo gets its shape.
+                const QSignalBlocker b(tl);
+                tl->setFrameRate(AVRational{30, 1});
+                tl->setResolution(QSize(media->info.imageWidth & ~1, media->info.imageHeight & ~1));
+            }
+            if (track >= 0 && at == kInvalidTicks)
+                at = snapToFrame(m_engine->position(), tl->frameRate());
+            placed = tl->addStill(mediaId, ticksFromSeconds(5), std::max(track, tl->primaryVideoTrack()), at);
+            return !placed.isNull();
+        });
+        if (first)
+            m_timelineView->zoomToFit();
+        const Clip* c = tl->clip(placed);
+        return c && track >= 0 ? c->timelineEnd() : kInvalidTicks;
+    }
+    if (!hasVideo && !hasAudio)
+        return kInvalidTicks;
     // Audio-only files go to A1 at the playhead unless dropped on a track.
     if (!hasVideo && track < 0)
         track = tl->primaryAudioTrack();
@@ -865,6 +912,121 @@ Ticks MainWindow::addRangeToTimeline(const QUuid& mediaId, Ticks in, Ticks out, 
     return kInvalidTicks;
 }
 
+void MainWindow::updateTransformBox() {
+    VideoView* view = m_monitor->view();
+    const auto sel = m_timelineView->selection();
+    const Timeline* tl = m_project->timeline();
+    const Clip* c = sel.size() == 1 ? tl->clip(sel.front()) : nullptr;
+    const Ticks now = m_engine->position();
+    auto loc = c ? tl->locate(c->id) : std::nullopt;
+    auto media = c && c->hasMedia() ? m_project->media()->find(c->mediaId) : nullptr;
+    if (m_monitor->mode() != MonitorPanel::Mode::Program || !c || !media || !loc || !tl->tracks()[loc->track].isVideo() ||
+        !c->contains(now)) {
+        view->setTransformBox(std::nullopt);
+        return;
+    }
+    // The picture's display size fitted into the frame, as the renderer does.
+    QSizeF display;
+    if (media->info.kind == MediaKind::Image) {
+        display = QSizeF(media->info.imageWidth, media->info.imageHeight);
+    } else if (const auto& v = media->info.video) {
+        double w = v->width;
+        if (v->sampleAspectRatio.num > 0 && v->sampleAspectRatio.den > 0)
+            w = w * v->sampleAspectRatio.num / v->sampleAspectRatio.den;
+        display = v->rotation == 90 || v->rotation == 270 ? QSizeF(v->height, w) : QSizeF(w, v->height);
+    }
+    const QSizeF canvas(FrameRenderer::defaultCanvasSize(tl->state(), *m_project->media()));
+    if (display.isEmpty() || canvas.isEmpty()) {
+        view->setTransformBox(std::nullopt);
+        return;
+    }
+    const QSizeF fit = display.scaled(canvas, Qt::KeepAspectRatio);
+    view->setTransformBox(c->transform, QSizeF(fit.width() / canvas.width(), fit.height() / canvas.height()),
+                          c->motion.offsetAt(now - c->timelineStart));
+}
+
+int MainWindow::freeOverlayTrack(Ticks at, Ticks length) {
+    Timeline* tl = m_project->timeline();
+    // The lowest video track above the storyline that is free there.
+    for (int ti : tl->state().trackIndices(TrackType::Video)) {
+        if (ti == 0 || tl->tracks()[ti].locked)
+            continue;
+        bool free = true;
+        for (const auto& c : tl->tracks()[ti].clips)
+            free &= c.timelineEnd() <= at || c.timelineStart >= at + length;
+        if (free)
+            return ti;
+    }
+    return tl->addTrack(TrackType::Video);
+}
+
+void MainWindow::addSticker() {
+    QSettings s;
+    QStringList patterns;
+    for (const auto& e : imageFileExtensions() + videoFileExtensions())
+        patterns << QStringLiteral("*.") + e;
+    const QString file = QFileDialog::getOpenFileName(
+        this, tr("Add sticker"), s.value(QStringLiteral("dirs/stickers"), s.value(QStringLiteral("dirs/media"))).toString(),
+        tr("Pictures and videos (%1);;All files (*)").arg(patterns.join(QLatin1Char(' '))));
+    if (file.isEmpty())
+        return;
+    s.setValue(QStringLiteral("dirs/stickers"), QFileInfo(file).absolutePath());
+    QString err;
+    auto item = m_project->media()->import(file, &err);
+    if (!item) {
+        QMessageBox::warning(this, tr("Add sticker"), tr("The file could not be opened:\n\n%1").arg(err));
+        return;
+    }
+    placeSticker(item->id);
+}
+
+QUuid MainWindow::placeSticker(const QUuid& mediaId, int track, Ticks at) {
+    auto media = m_project->media()->find(mediaId);
+    if (!media)
+        return {};
+    const bool still = media->info.kind == MediaKind::Image;
+    if (!still && !media->info.video) {
+        statusBar()->showMessage(tr("This file has no picture to show as a sticker."), 6000);
+        return {};
+    }
+    Timeline* tl = m_project->timeline();
+    if (at == kInvalidTicks)
+        at = snapToFrame(m_engine->position(), tl->frameRate());
+    const Ticks mediaLength = still ? 0 : media->info.duration;
+    // Short silent videos (animated GIFs) repeat for as long as a picture shows.
+    const Ticks pictureLength = ticksFromSeconds(5);
+    const bool loop = !still && !media->info.audio && mediaLength > 0 && mediaLength < pictureLength;
+    const Ticks length = still || loop ? pictureLength : mediaLength;
+    // A small sticker in the upper right corner, ready to be dragged.
+    ClipTransform transform;
+    transform.scale = 0.35;
+    transform.x = 0.28;
+    transform.y = -0.24;
+    QUuid id;
+    runTimelineEdit(m_videoUndo, tl, tr("Add sticker"), [&] {
+        const int target = track > 0 && tl->tracks()[track].isVideo() ? track : freeOverlayTrack(at, length);
+        if (still) {
+            id = tl->addStill(mediaId, length, target, at, transform);
+            return !id.isNull();
+        }
+        id = tl->placeMedia(mediaId, 0, mediaLength, true, media->info.audio.has_value(), target, at);
+        if (id.isNull())
+            return false;
+        tl->setTransform(id, transform);
+        if (loop) {
+            tl->setLoop(id, true, mediaLength);
+            tl->trimOut(id, length, 0);
+        }
+        return true;
+    });
+    if (!id.isNull()) {
+        m_timelineView->selectOnly(id);
+        m_propsDock->show();
+        m_properties->showClip(id);
+    }
+    return id;
+}
+
 void MainWindow::addTitle(int track, Ticks at) {
     Timeline* tl = m_project->timeline();
     if (at == kInvalidTicks)
@@ -872,23 +1034,7 @@ void MainWindow::addTitle(int track, Ticks at) {
     const Ticks length = ticksFromSeconds(4);
     QUuid id;
     runTimelineEdit(m_videoUndo, tl, tr("Add title"), [&] {
-        int target = track;
-        if (target < 0) {
-            // The lowest video track above the storyline that is free there.
-            for (int ti : tl->state().trackIndices(TrackType::Video)) {
-                if (ti == 0 || tl->tracks()[ti].locked)
-                    continue;
-                bool free = true;
-                for (const auto& c : tl->tracks()[ti].clips)
-                    free &= c.timelineEnd() <= at || c.timelineStart >= at + length;
-                if (free) {
-                    target = ti;
-                    break;
-                }
-            }
-            if (target < 0)
-                target = tl->addTrack(TrackType::Video);
-        }
+        const int target = track >= 0 ? track : freeOverlayTrack(at, length);
         TitleData title;
         title.text = tr("Your title");
         id = tl->addTitle(title, length, target, at);

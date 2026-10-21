@@ -50,6 +50,12 @@ void SliderRow::setValue(double v) {
     m_spin->setValue(v);
 }
 
+void SliderRow::setRange(double min, double max) {
+    const QSignalBlocker b1(m_slider), b2(m_spin);
+    m_spin->setRange(min, max);
+    m_slider->setRange(static_cast<int>(std::lround(min / m_step)), static_cast<int>(std::lround(max / m_step)));
+}
+
 bool SliderRow::eventFilter(QObject* o, QEvent* e) {
     if (o == m_slider && e->type() == QEvent::MouseButtonDblClick) {
         setValue(m_default);

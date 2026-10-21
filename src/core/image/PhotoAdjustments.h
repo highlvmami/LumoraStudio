@@ -61,7 +61,7 @@ BlendMode blendModeFromId(const QString& id);
 
 enum class LayerKind {
     Adjustment, // colour settings applied to everything below, through the mask
-    Image,      // another picture placed on top
+    Image,      // another picture (or a frame of a video) placed on top: a sticker
 };
 
 struct PhotoLayer {
@@ -73,10 +73,12 @@ struct PhotoLayer {
     BlendMode blend = BlendMode::Normal;
     LayerMask mask;
     ColorGrade grade;     // Adjustment layers
-    QString imagePath;    // Image layers
+    QString imagePath;    // Image layers: a picture or a video file
+    Ticks frameTime = 0;  // Image layers from a video: media time of the frame shown
     double x = 0.0;       // Image layers: centre offset as a fraction of the photo size
     double y = 0.0;
     double scale = 1.0;   // 1 = fit inside the photo
+    double rotation = 0.0; // degrees, clockwise
 
     bool operator==(const PhotoLayer&) const = default;
     // True when the layer changes no pixel.

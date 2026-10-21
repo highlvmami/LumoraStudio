@@ -1,6 +1,47 @@
 #include "VideoDecoder.h"
 
+#include <QTransform>
+
 namespace lumora {
+
+QImage decodeVideoFrame(const QString& path, Ticks t, QString* error) {
+    VideoDecoder dec;
+    if (!dec.open(path, error))
+        return {};
+    const AVFrame* f = dec.frameAt(std::max<Ticks>(0, t));
+    if (!f || f->width <= 0 || f->height <= 0) {
+        if (error)
+            *error = QStringLiteral("No picture at this time");
+        return {};
+    }
+    int w = f->width;
+    if (f->sample_aspect_ratio.num > 0 && f->sample_aspect_ratio.den > 0)
+        w = std::max(1, static_cast<int>(av_rescale(w, f->sample_aspect_ratio.num, f->sample_aspect_ratio.den)));
+    av::SwsPtr sws(sws_getContext(f->width, f->height, static_cast<AVPixelFormat>(f->format), w, f->height, AV_PIX_FMT_RGBA64,
+                                  SWS_LANCZOS | SWS_ACCURATE_RND | SWS_FULL_CHR_H_INT, nullptr, nullptr, nullptr));
+    if (!sws)
+        return {};
+    int cs = SWS_CS_DEFAULT;
+    switch (f->colorspace) {
+    case AVCOL_SPC_BT709: cs = SWS_CS_ITU709; break;
+    case AVCOL_SPC_BT2020_NCL:
+    case AVCOL_SPC_BT2020_CL: cs = SWS_CS_BT2020; break;
+    case AVCOL_SPC_BT470BG:
+    case AVCOL_SPC_SMPTE170M: cs = SWS_CS_ITU601; break;
+    default: cs = f->height >= 720 ? SWS_CS_ITU709 : SWS_CS_ITU601;
+    }
+    sws_setColorspaceDetails(sws.get(), sws_getCoefficients(cs), f->color_range == AVCOL_RANGE_JPEG ? 1 : 0,
+                             sws_getCoefficients(SWS_CS_DEFAULT), 1, 0, 1 << 16, 1 << 16);
+    const AVPixFmtDescriptor* d = av_pix_fmt_desc_get(static_cast<AVPixelFormat>(f->format));
+    const bool alpha = d && (d->flags & AV_PIX_FMT_FLAG_ALPHA);
+    QImage img(w, f->height, alpha ? QImage::Format_RGBA64 : QImage::Format_RGBX64);
+    uint8_t* dst[4] = {img.bits(), nullptr, nullptr, nullptr};
+    int stride[4] = {static_cast<int>(img.bytesPerLine()), 0, 0, 0};
+    sws_scale(sws.get(), f->data, f->linesize, 0, f->height, dst, stride);
+    if (const int rot = dec.info().rotation)
+        img = img.transformed(QTransform().rotate(rot));
+    return img;
+}
 
 bool VideoDecoder::open(const QString& path, QString* error, int threads) {
     m_path = path;

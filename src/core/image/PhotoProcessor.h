@@ -33,6 +33,9 @@ public:
 
     // Downscaled copy for interactive preview (never used for export).
     static QImage makeProxy(const QImage& rgba64, int maxSide = 2048);
+    // Pixel size of the picture an Image layer shows (empty when it cannot
+    // be read).
+    static QSize layerPictureSize(const PhotoLayer& layer);
 };
 
 enum class PhotoFormat { Png, Tiff, Jpeg, WebP };

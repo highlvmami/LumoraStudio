@@ -5,6 +5,7 @@
 #include <optional>
 
 #include "image/PhotoAdjustments.h"
+#include "panels/TransformGizmo.h"
 
 namespace lumora {
 
@@ -30,12 +31,16 @@ public:
     // With a brush mask selected, dragging paints a stroke with this brush;
     // `tint` shows the mask as a coloured overlay.
     void setBrush(const BrushStroke& brush, bool tint);
+    // Move / resize / turn handles for the selected picture layer.
+    void setPictureBox(const std::optional<TransformGizmo::Box>& box);
 
 signals:
     void cropEdited(const QRectF& normalized); // emitted on mouse release
     void maskMoved(const QRectF& normalized);  // emitted on mouse release
     void strokePainted(const lumora::BrushStroke& stroke); // emitted on mouse release
     void filesDropped(const QStringList& paths);
+    // While dragging the picture handles (finished = false) and on release.
+    void pictureMoved(const lumora::TransformGizmo::Box& box, bool finished);
 
 protected:
     void paintEvent(QPaintEvent*) override;
@@ -75,6 +80,7 @@ private:
     QImage m_tintImage;
     std::optional<BrushStroke> m_stroke; // being painted
     std::optional<QPointF> m_hover;
+    TransformGizmo m_gizmo;
 };
 
 } // namespace lumora

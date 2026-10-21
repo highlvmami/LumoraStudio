@@ -60,7 +60,8 @@ LayersPanel::LayersPanel(QWidget* parent) : QWidget(parent) {
     bar->setSpacing(2);
     m_addAdjustment = toolButton(Icons::add(), tr("Adjustment"),
                                  tr("Add an adjustment layer: colour settings applied through a mask"));
-    m_addPicture = toolButton(Icons::import(), tr("Picture…"), tr("Add another picture as a layer on top"));
+    m_addPicture = toolButton(Icons::sticker(), tr("Sticker…"),
+                              tr("Put another picture, or a frame of a video, on top of the photo as a sticker"));
     m_up = toolButton({}, {}, tr("Move the layer up"));
     m_up->setArrowType(Qt::UpArrow);
     m_down = toolButton({}, {}, tr("Move the layer down"));
@@ -106,6 +107,16 @@ LayersPanel::LayersPanel(QWidget* parent) : QWidget(parent) {
     pl->addWidget(m_picX);
     pl->addWidget(m_picY);
     pl->addWidget(m_picScale);
+    m_picRotation = new SliderRow(tr("Rotation (°)"), -180, 180, 1, 0);
+    m_picRotation->setDefault(0);
+    pl->addWidget(m_picRotation);
+    m_picFrame = new SliderRow(tr("Video frame (s)"), 0, 1, 0.04, 2);
+    m_picFrame->setDefault(0);
+    pl->addWidget(m_picFrame);
+    auto* picHint = new QLabel(tr("Drag the sticker on the photo to move it, a corner to resize it, the round knob to turn it."));
+    picHint->setWordWrap(true);
+    picHint->setStyleSheet(QStringLiteral("color: palette(placeholder-text);"));
+    pl->addWidget(picHint);
     el->addWidget(m_pictureBox);
 
     auto* maskBox = new QGroupBox(tr("Mask"));
@@ -215,6 +226,9 @@ LayersPanel::LayersPanel(QWidget* parent) : QWidget(parent) {
     bind(m_picX, tr("Move picture"), QStringLiteral("x"), [](PhotoLayer& l, double v) { l.x = v / 100; });
     bind(m_picY, tr("Move picture"), QStringLiteral("y"), [](PhotoLayer& l, double v) { l.y = v / 100; });
     bind(m_picScale, tr("Picture size"), QStringLiteral("scale"), [](PhotoLayer& l, double v) { l.scale = v / 100; });
+    bind(m_picRotation, tr("Turn picture"), QStringLiteral("rotation"), [](PhotoLayer& l, double v) { l.rotation = v; });
+    bind(m_picFrame, tr("Sticker frame"), QStringLiteral("frame"),
+         [](PhotoLayer& l, double v) { l.frameTime = ticksFromSeconds(v); });
     bind(m_maskX, tr("Move mask"), QStringLiteral("maskX"), [](PhotoLayer& l, double v) {
         l.mask.rect.moveCenter(QPointF(v / 100, l.mask.rect.center().y()));
     });
@@ -344,6 +358,18 @@ void LayersPanel::syncEditors() {
         m_picX->setValue(l->x * 100);
         m_picY->setValue(l->y * 100);
         m_picScale->setValue(l->scale * 100);
+        m_picRotation->setValue(l->rotation);
+        // Video stickers show one frame; pick which.
+        const bool video = l->kind == LayerKind::Image && !l->imagePath.isEmpty() && !isImageFile(l->imagePath);
+        m_picFrame->setVisible(video);
+        if (video) {
+            if (!m_durations.contains(l->imagePath)) {
+                const auto info = probeMedia(l->imagePath);
+                m_durations.insert(l->imagePath, info ? ticksToSeconds(info->duration) : 0.0);
+            }
+            m_picFrame->setRange(0, std::max(0.04, m_durations.value(l->imagePath)));
+            m_picFrame->setValue(ticksToSeconds(l->frameTime));
+        }
         m_maskShape->setCurrentIndex(m_maskShape->findData(static_cast<int>(l->mask.shape)));
         const bool masked = l->mask.shape != MaskShape::None;
         const bool brush = l->mask.shape == MaskShape::Brush;
@@ -417,23 +443,27 @@ void LayersPanel::addAdjustment() {
 void LayersPanel::addPicture() {
     QSettings s;
     QStringList filters;
-    for (const auto& ext : imageFileExtensions())
+    for (const auto& ext : imageFileExtensions() + videoFileExtensions())
         filters << QStringLiteral("*.") + ext;
-    const QString path = QFileDialog::getOpenFileName(this, tr("Add picture layer"),
-                                                      s.value(QStringLiteral("dirs/photos")).toString(),
-                                                      tr("Pictures (%1)").arg(filters.join(QLatin1Char(' '))));
+    const QString path = QFileDialog::getOpenFileName(
+        this, tr("Add sticker"), s.value(QStringLiteral("dirs/stickers"), s.value(QStringLiteral("dirs/photos"))).toString(),
+        tr("Pictures and videos (%1)").arg(filters.join(QLatin1Char(' '))));
     if (path.isEmpty())
         return;
-    s.setValue(QStringLiteral("dirs/photos"), QFileInfo(path).absolutePath());
+    s.setValue(QStringLiteral("dirs/stickers"), QFileInfo(path).absolutePath());
     PhotoLayer l;
     l.id = QUuid::createUuid();
     l.kind = LayerKind::Image;
     l.imagePath = path;
-    l.scale = 0.5;
+    l.name = QFileInfo(path).completeBaseName();
+    // Small, in the upper right corner, ready to be dragged.
+    l.scale = 0.35;
+    l.x = 0.28;
+    l.y = -0.24;
     auto layers = m_layers;
     layers.push_back(l);
     m_current = l.id;
-    commit(layers, tr("Add picture layer"));
+    commit(layers, tr("Add sticker"));
     emit currentLayerChanged();
 }
 

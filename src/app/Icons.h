@@ -33,6 +33,7 @@ QIcon compare();
 QIcon keyframe();
 QIcon title();
 QIcon transition();
+QIcon sticker();
 QIcon close();
 QIcon popOut();
 QIcon appIcon();

@@ -1,5 +1,6 @@
 #pragma once
 
+#include <QHash>
 #include <QUuid>
 #include <QWidget>
 #include <functional>
@@ -73,6 +74,9 @@ private:
     SliderRow* m_picX;
     SliderRow* m_picY;
     SliderRow* m_picScale;
+    SliderRow* m_picRotation;
+    SliderRow* m_picFrame; // video stickers: which frame (seconds)
+    QHash<QString, double> m_durations; // seconds, per video sticker file
     QComboBox* m_maskShape;
     QWidget* m_maskEditors;
     SliderRow* m_maskX;

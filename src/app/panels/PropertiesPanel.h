@@ -124,6 +124,11 @@ private:
     QWidget* m_freezeSection;
     QDoubleSpinBox* m_freezeDuration;
     QLabel* m_freezeInfo;
+    QWidget* m_stillSection; // pictures and stickers on the timeline
+    QDoubleSpinBox* m_stillDuration;
+    QWidget* m_loopSection;  // video clips
+    QCheckBox* m_loop;
+    QLabel* m_loopInfo;
 
     QWidget* m_subSection;
     QPlainTextEdit* m_subText;

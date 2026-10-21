@@ -5,6 +5,9 @@
 #include <QUuid>
 
 #include "TimeBase.h"
+#include "timeline/Timeline.h"
+
+#include <optional>
 
 class QUndoGroup;
 class QUndoStack;
@@ -73,6 +76,15 @@ private:
     void addMediaToTimeline(const QList<QUuid>& ids, Ticks at = kInvalidTicks, int track = -1);
     Ticks addRangeToTimeline(const QUuid& media, Ticks in, Ticks out, Ticks at = kInvalidTicks, int track = -1);
     void addTitle(int track = -1, Ticks at = kInvalidTicks);
+    // Asks for a picture or video and places it small over the picture at
+    // the playhead, on a free track above the storyline.
+    void addSticker();
+    QUuid placeSticker(const QUuid& mediaId, int track = -1, Ticks at = kInvalidTicks);
+    // The lowest video track above V1 with nothing in [at, at + length);
+    // adds one when all are taken. Call inside a timeline edit.
+    int freeOverlayTrack(Ticks at, Ticks length);
+    // Shows move / resize / turn handles for the selected clip in the viewer.
+    void updateTransformBox();
     void addTransition();
     void addSubtitle(int track = -1, Ticks at = kInvalidTicks);
     void importSubtitles();
@@ -153,6 +165,8 @@ private:
     QAction* m_actZoomOut;
     QAction* m_actResetLayout;
     QAction* m_actAddTitle;
+    QAction* m_actAddSticker;
+    std::optional<TimelineState> m_transformBefore; // while dragging handles in the viewer
     QAction* m_actAddTransition;
     QAction* m_actAddVideoTrack;
     QAction* m_actAddAudioTrack;

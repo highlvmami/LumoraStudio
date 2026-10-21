@@ -60,6 +60,11 @@ private:
     DecodedFrame m_lookahead; // decoded frame following m_current
 };
 
+// Decodes the frame of a video shown at media time `t` at full quality:
+// display size (square pixels, rotation applied), 16 bits per channel,
+// straight alpha kept (e.g. GIF, WebM or ProRes 4444 with transparency).
+QImage decodeVideoFrame(const QString& path, Ticks t, QString* error = nullptr);
+
 // Converts decoded frames to QImages for display, scaling down when asked.
 // Preview only; exports never go through this path.
 class FrameConverter {

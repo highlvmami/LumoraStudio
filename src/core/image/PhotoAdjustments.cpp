@@ -283,6 +283,10 @@ QJsonObject PhotoLayer::toJson() const {
         o["x"] = x;
         o["y"] = y;
         o["scale"] = scale;
+        if (rotation != 0.0)
+            o["rotation"] = rotation;
+        if (frameTime != 0)
+            o["frameTime"] = QString::number(frameTime);
     }
     return o;
 }
@@ -303,6 +307,8 @@ PhotoLayer PhotoLayer::fromJson(const QJsonObject& o) {
     l.x = o.value("x").toDouble(0.0);
     l.y = o.value("y").toDouble(0.0);
     l.scale = o.value("scale").toDouble(1.0);
+    l.rotation = o.value("rotation").toDouble(0.0);
+    l.frameTime = o.value("frameTime").toString().toLongLong();
     return l;
 }
 

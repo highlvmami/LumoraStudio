@@ -15,6 +15,7 @@ namespace lumora {
 
 VideoView::VideoView(QWidget* parent) : QWidget(parent) {
     setAcceptDrops(true);
+    setMouseTracking(true);
     setMinimumSize(320, 180);
     setAttribute(Qt::WA_OpaquePaintEvent);
 }
@@ -41,6 +42,18 @@ QRect VideoView::imageRect() const {
     return QRect(QPoint((width() - s.width()) / 2, (height() - s.height()) / 2), s);
 }
 
+void VideoView::setTransformBox(const std::optional<ClipTransform>& t, QSizeF fit, QPointF follow) {
+    if (m_gizmo.dragging())
+        return; // the drag owns the box until it ends
+    if (!t) {
+        m_gizmo.setBox(std::nullopt);
+    } else {
+        m_transform = *t;
+        m_gizmo.setBox(TransformGizmo::Box{fit, t->x, t->y, t->scale, t->rotation, follow});
+    }
+    update();
+}
+
 void VideoView::startRegionPick(const QString& hint) {
     m_picking = true;
     m_pickHint = hint;
@@ -61,6 +74,8 @@ void VideoView::cancelRegionPick() {
 }
 
 void VideoView::mousePressEvent(QMouseEvent* e) {
+    if (!m_picking && e->button() == Qt::LeftButton && m_gizmo.press(e->position(), imageRect()))
+        return;
     if (!m_picking || e->button() != Qt::LeftButton)
         return QWidget::mousePressEvent(e);
     m_pickStart = e->position().toPoint();
@@ -69,6 +84,22 @@ void VideoView::mousePressEvent(QMouseEvent* e) {
 }
 
 void VideoView::mouseMoveEvent(QMouseEvent* e) {
+    if (!m_picking && m_gizmo.box()) {
+        if (m_gizmo.move(e->position(), imageRect(), e->modifiers())) {
+            const auto& b = *m_gizmo.box();
+            m_transform.x = b.x;
+            m_transform.y = b.y;
+            m_transform.scale = b.scale;
+            m_transform.rotation = b.rotation;
+            update();
+            emit transformEdited(m_transform, false);
+            return;
+        }
+        if (auto c = m_gizmo.cursorAt(e->position(), imageRect()))
+            setCursor(*c);
+        else
+            unsetCursor();
+    }
     if (!m_picking || !(e->buttons() & Qt::LeftButton))
         return QWidget::mouseMoveEvent(e);
     m_pickRect = QRect(m_pickStart, e->position().toPoint()).normalized().intersected(imageRect());
@@ -76,6 +107,10 @@ void VideoView::mouseMoveEvent(QMouseEvent* e) {
 }
 
 void VideoView::mouseReleaseEvent(QMouseEvent* e) {
+    if (!m_picking && e->button() == Qt::LeftButton && m_gizmo.release()) {
+        emit transformEdited(m_transform, true);
+        return;
+    }
     if (!m_picking || e->button() != Qt::LeftButton)
         return QWidget::mouseReleaseEvent(e);
     const QRect img = imageRect();
@@ -117,6 +152,8 @@ void VideoView::paintEvent(QPaintEvent*) {
         p.setPen(themeColors().textFaint);
         p.drawText(rect().adjusted(24, 24, -24, -24), Qt::AlignCenter | Qt::TextWordWrap, m_placeholder);
     }
+    if (!m_picking && !m_image.isNull())
+        m_gizmo.paint(p, imageRect(), themeColors().accent);
     if (m_picking) {
         const ThemeColors& tc = themeColors();
         if (!m_pickRect.isEmpty()) {

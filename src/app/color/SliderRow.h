@@ -14,6 +14,7 @@ public:
     SliderRow(const QString& label, double min, double max, double step, int decimals, QWidget* parent = nullptr);
     double value() const { return m_value; }
     void setValue(double v);
+    void setRange(double min, double max);
     // Value restored by a double-click (0 unless set).
     void setDefault(double v) { m_default = v; }
 

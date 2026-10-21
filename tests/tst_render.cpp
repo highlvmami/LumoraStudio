@@ -133,6 +133,66 @@ private slots:
         QVERIFY(meanLuma(renderAt(tl, sec(1.5)), QRect(0, 0, 320, 240)) < 50);
     }
 
+    void stickerPictureKeepsItsTransparency() {
+        // A square PNG: transparent on the left, red on the right.
+        QImage png(100, 100, QImage::Format_ARGB32);
+        png.fill(Qt::transparent);
+        for (int y = 0; y < 100; ++y)
+            for (int x = 50; x < 100; ++x)
+                png.setPixel(x, y, qRgba(255, 0, 0, 255));
+        const QString path = m_dir.filePath("sticker.png");
+        QVERIFY(png.save(path));
+        auto sticker = m_pool.import(path);
+        QVERIFY(sticker && sticker->info.kind == MediaKind::Image);
+
+        Timeline tl;
+        tl.insertMedia(m_dark->id, 0, sec(4), true, false);
+        const int v2 = tl.addTrack(TrackType::Video);
+        const QUuid id = tl.addStill(sticker->id, sec(2), v2, sec(1)); // fits as 240 x 240 in the middle
+        QVERIFY(!id.isNull());
+        QCOMPARE(tl.clip(id)->kind, ClipKind::Freeze);
+        QVERIFY(tl.state().hasVideoEffects());
+        for (auto precision : {FrameRenderer::Precision::Final, FrameRenderer::Precision::Preview}) {
+            const QImage img = renderAt(tl, sec(1.5), precision).convertToFormat(QImage::Format_RGB32);
+            const QRgb left = img.pixel(100, 120), right = img.pixel(220, 120);
+            QVERIFY2(qRed(left) < 70 && qRed(left) == qGreen(left), qPrintable(QString::number(left, 16))); // the video shows through
+            QVERIFY2(qRed(right) > 240 && qGreen(right) < 15, qPrintable(QString::number(right, 16)));
+        }
+        // Moved, shrunk and turned like any clip.
+        QVERIFY(tl.setTransform(id, {-0.25, 0.0, 0.5, 180.0, 1.0}));
+        const QImage moved = renderAt(tl, sec(1.5)).convertToFormat(QImage::Format_RGB32);
+        QVERIFY(qRed(moved.pixel(60, 120)) > 240);  // turned: red is now on the left of the sticker
+        QVERIFY(qRed(moved.pixel(220, 120)) < 70);
+        // Pictures last as long as you like.
+        QVERIFY(tl.trimOut(id, sec(30), 0));
+        QCOMPARE(tl.clip(id)->duration(), sec(30));
+        QVERIFY(qRed(renderAt(tl, sec(20)).convertToFormat(QImage::Format_RGB32).pixel(60, 120)) > 240);
+    }
+
+    void loopingClipsRepeatTheirMedia() {
+        Timeline tl;
+        const Ticks length = m_pattern->info.duration; // 100 frames
+        tl.insertMedia(m_pattern->id, frames(10), length, true, false);
+        const QUuid id = tl.tracks()[0].clips[0].id;
+        QVERIFY(!tl.trimOut(id, frames(200), length)); // not past the media yet
+        QVERIFY(tl.setLoop(id, true, length));
+        QVERIFY(tl.state().hasVideoEffects());
+        QVERIFY(tl.trimOut(id, frames(250), length));
+        QCOMPARE(tl.clip(id)->duration(), frames(240));
+        // Frames 10..99 play, then 10..99 again.
+        QCOMPARE(frameIndexOf(renderAt(tl, frames(5))), 15);
+        QCOMPARE(frameIndexOf(renderAt(tl, frames(95))), 15);
+        QCOMPARE(frameIndexOf(renderAt(tl, frames(200))), 30);
+        // Cutting keeps the rhythm.
+        QVERIFY(tl.splitAt(frames(150)));
+        QCOMPARE(frameIndexOf(renderAt(tl, frames(200))), 30);
+        QVERIFY(!tl.canJoinWithNext(id) || tl.joinWithNext(id));
+        // Off: back to what the media holds.
+        const QUuid first = tl.tracks()[0].clips[0].id;
+        QVERIFY(tl.setLoop(first, false, length));
+        QVERIFY(tl.clip(first)->sourceOut <= length);
+    }
+
     void fadesAndTitles() {
         Timeline tl;
         tl.insertMedia(m_bright->id, 0, sec(2), true, false);

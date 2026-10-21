@@ -2,6 +2,10 @@
 
 #include <QImage>
 #include <QWidget>
+#include <optional>
+
+#include "panels/TransformGizmo.h"
+#include "timeline/ClipEffects.h"
 
 namespace lumora {
 
@@ -19,7 +23,14 @@ public:
     void cancelRegionPick();
     bool isPickingRegion() const { return m_picking; }
 
+    // Move / resize / turn handles for the selected clip's picture. `fit` is
+    // the size of the untransformed picture as a fraction of the frame;
+    // `follow` an extra offset (motion tracking).
+    void setTransformBox(const std::optional<ClipTransform>& transform, QSizeF fit = {}, QPointF follow = {});
+
 signals:
+    // While dragging (finished = false) and once on release.
+    void transformEdited(const lumora::ClipTransform& t, bool finished);
     void sizeChanged(QSize physicalSize);
     void filesDropped(const QStringList& paths);
     void mediaDropped(const QList<QUuid>& ids);
@@ -46,6 +57,8 @@ private:
     QString m_pickHint;
     QPoint m_pickStart;
     QRect m_pickRect;
+    TransformGizmo m_gizmo;
+    ClipTransform m_transform; // of the box shown
 };
 
 } // namespace lumora

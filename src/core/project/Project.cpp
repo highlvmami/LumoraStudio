@@ -63,7 +63,20 @@ QByteArray Project::toJson() const {
     const auto& photoEntries = m_photos->entries();
     const bool ai = anyClip([](const Clip& c) { return !c.redaction.tracks.empty() || c.redaction.enabled || c.background.enabled; }) ||
                     std::any_of(photoEntries.begin(), photoEntries.end(), [](const auto& p) { return p.adjustments.hasAiChanges(); });
-    root["version"] = ai ? 6 : motion ? 5 : freezes ? 4 : subtitles ? 3 : 2;
+    // Stickers: pictures on the timeline, repeating clips, turned or video
+    // picture layers on photos.
+    const bool stickers =
+        anyClip([this](const Clip& c) {
+            if (c.loops())
+                return true;
+            auto m = c.kind == ClipKind::Freeze ? m_media->find(c.mediaId) : nullptr;
+            return m && m->info.kind == MediaKind::Image;
+        }) ||
+        std::any_of(photoEntries.begin(), photoEntries.end(), [](const auto& p) {
+            return std::any_of(p.adjustments.layers.begin(), p.adjustments.layers.end(),
+                               [](const PhotoLayer& l) { return l.rotation != 0.0 || l.frameTime != 0; });
+        });
+    root["version"] = stickers ? 7 : ai ? 6 : motion ? 5 : freezes ? 4 : subtitles ? 3 : 2;
     root["application"] = QCoreApplication::applicationVersion();
 
     QJsonArray media;
@@ -136,6 +149,10 @@ QByteArray Project::toJson() const {
                 co["background"] = c.background.toJson();
             if (!c.transitionIn.isNone())
                 co["transition"] = c.transitionIn.toJson();
+            if (c.loops()) {
+                co["loopStart"] = ticksToJson(c.loopStart);
+                co["loopLength"] = ticksToJson(c.loopLength);
+            }
             if (c.fadeIn > 0)
                 co["fadeIn"] = ticksToJson(c.fadeIn);
             if (c.fadeOut > 0)
@@ -294,6 +311,8 @@ bool Project::fromJson(const QByteArray& json, const QString& baseDir, QString* 
                 c.background = BackgroundRemoval::fromJson(co.value("background").toObject());
             if (co.contains("transition"))
                 c.transitionIn = Transition::fromJson(co.value("transition").toObject());
+            c.loopStart = ticksFromJson(co.value("loopStart"));
+            c.loopLength = ticksFromJson(co.value("loopLength"));
             c.fadeIn = ticksFromJson(co.value("fadeIn"));
             c.fadeOut = ticksFromJson(co.value("fadeOut"));
             c.gainDb = co.value("gainDb").toDouble(0.0);
