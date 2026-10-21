@@ -17,6 +17,8 @@ namespace lumora {
 
 constexpr int kAudioRate = 48000;
 constexpr int kAudioChannels = 2;
+// How far ahead of the playhead upcoming clips get their decoders ready.
+constexpr Ticks kPrefetchHorizon = 2 * kTicksPerSecond;
 
 // Thread-safe float ring buffer exposed as a QIODevice for QAudioSink (pull
 // mode). The decoder thread blocks in write() while the buffer is full.
@@ -321,6 +323,9 @@ void PlaybackEngine::videoLoop() {
         if (!image.isNull())
             QMetaObject::invokeMethod(this, [this, image, pos] { emit frameReady(image, pos); }, Qt::QueuedConnection);
         if (playing) {
+            // Get the clips after the next cuts ready while this one plays.
+            if (seq.media)
+                renderer->prefetch(pos, kPrefetchHorizon);
             QMetaObject::invokeMethod(this, [this, pos] {
                 if (!m_playing)
                     return;

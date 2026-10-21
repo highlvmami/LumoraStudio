@@ -1,6 +1,8 @@
 #include <QTemporaryDir>
 #include <QtTest>
+#include <chrono>
 #include <cmath>
+#include <thread>
 
 #include "TestMedia.h"
 #include "media/MediaPool.h"
@@ -64,6 +66,27 @@ private slots:
         QCOMPARE(frameIndexOf(renderAt(tl, frames(49))), 59);
         // Outside the timeline: black.
         QVERIFY(meanLuma(renderAt(tl, frames(80)), QRect(0, 0, 320, 240)) < 1.0);
+    }
+
+    void prefetchedDecodersShowTheRightFrames() {
+        // A cut inside one file and a jump to another part of it: playback
+        // prepares both decoders ahead and the frames stay exact.
+        Timeline tl;
+        tl.insertMedia(m_pattern->id, 0, frames(40), true, false);
+        QVERIFY(tl.splitAt(frames(20)));
+        tl.insertMedia(m_pattern->id, frames(60), frames(90), true, false);
+        FrameRenderer r(&m_pool);
+        r.setTimeline(tl.state());
+        r.setOutputSize(QSize(320, 240));
+        QCOMPARE(frameIndexOf(r.render(0)), 0);
+        r.prefetch(0, sec(2));
+        std::this_thread::sleep_for(std::chrono::milliseconds(500));
+        for (int f = 1; f < 70; ++f) {
+            const int expected = f < 40 ? f : 60 + (f - 40);
+            QCOMPARE(frameIndexOf(r.render(frames(f))), expected);
+            r.prefetch(frames(f), sec(2));
+        }
+        QCOMPARE(r.prefetchedDecoders(), 2);
     }
 
     void crossDissolveBlendsBothClips() {

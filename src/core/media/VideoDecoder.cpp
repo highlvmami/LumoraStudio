@@ -21,10 +21,21 @@ bool VideoDecoder::open(const QString& path, QString* error, int threads) {
         return false;
     m_pkt = av::makePacket();
     m_origin = m_fmt->start_time != AV_NOPTS_VALUE ? ticksFromStream(m_fmt->start_time, AVRational{1, AV_TIME_BASE}) : 0;
-
-    if (auto probed = probeMedia(path); probed && probed->video)
-        m_info = *probed->video;
+    // Described from the stream that is already open (probing would open
+    // the file a second time, which is slow for big phone videos).
+    m_info = videoStreamInfo(m_stream, m_fmt->duration != AV_NOPTS_VALUE
+                                           ? ticksFromStream(m_fmt->duration, AVRational{1, AV_TIME_BASE})
+                                           : 0);
     return true;
+}
+
+namespace {
+// Decoding forward up to this far is cheaper than seeking.
+constexpr Ticks kForwardLimit = 2 * kTicksPerSecond;
+} // namespace
+
+bool VideoDecoder::reachesForward(Ticks t) const {
+    return m_current.valid() && t >= m_current.pts && t - m_current.pts < kForwardLimit;
 }
 
 Ticks VideoDecoder::nominalFrameDuration() const { return frameDuration(m_info.frameRate); }
@@ -106,12 +117,8 @@ const AVFrame* VideoDecoder::frameAt(Ticks t, Ticks* framePts, Ticks* frameDur) 
         ((m_lookahead.valid() && t < m_lookahead.pts) || (!m_lookahead.valid() && m_eof)))
         return result();
 
-    // Decide whether decoding forward is cheaper than seeking.
-    const Ticks forwardLimit = 2 * kTicksPerSecond;
-    const bool canGoForward = m_current.valid() && t >= m_current.pts && t - m_current.pts < forwardLimit;
-    if (!canGoForward) {
+    if (!reachesForward(t))
         seek(t);
-    }
 
     while (true) {
         if (!m_lookahead.valid()) {

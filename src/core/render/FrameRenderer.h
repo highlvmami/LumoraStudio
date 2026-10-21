@@ -6,6 +6,7 @@
 #include <list>
 #include <map>
 #include <memory>
+#include <mutex>
 
 #include "media/MediaPool.h"
 #include "timeline/Timeline.h"
@@ -55,6 +56,14 @@ public:
 
     QImage render(Ticks t);
 
+    // Playback hint: the picture moves forward from `t`. Video clips that come
+    // into view within `horizon` get their decoder opened and positioned on a
+    // background thread, so crossing a cut or entering a transition does not
+    // stall on opening and seeking the next file.
+    void prefetch(Ticks t, Ticks horizon);
+    // How many decoders were taken over from prefetching (diagnostics).
+    int prefetchedDecoders() const { return m_prefetchedUsed; }
+
     // When the frame at `t` is exactly one storyline media frame shown at its
     // native size (no transform, fade, transition, layer or title), returns
     // that decoded frame so an exporter can convert it directly without
@@ -70,6 +79,7 @@ public:
 
 private:
     struct Slot;
+    struct Prefetcher;
     struct Layer {
         const Clip* clip = nullptr;
         Ticks sourceTime = 0;
@@ -91,10 +101,13 @@ private:
     QSize m_output{1920, 1080};
     Precision m_precision = Precision::Preview;
     std::map<QUuid, std::unique_ptr<Slot>> m_slots; // per clip
+    std::mutex m_slotMutex;
     std::list<QUuid> m_lru;
     Ticks m_lastTime = 0;
     Ticks m_sampleOffset = 0;
     bool m_subtitles = false;
+    std::unique_ptr<Prefetcher> m_prefetcher; // started on the first prefetch()
+    int m_prefetchedUsed = 0;
     // The subtitle cue under `t` on each visible subtitle track.
     std::vector<std::pair<const Track*, const Clip*>> subtitlesAt(Ticks t) const;
 };

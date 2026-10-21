@@ -107,6 +107,44 @@ static std::optional<MediaInfo> probeImage(const QString& path, QString* error) 
     return info;
 }
 
+VideoStreamInfo videoStreamInfo(const AVStream* st, Ticks containerDuration) {
+    const AVCodecParameters* par = st->codecpar;
+    VideoStreamInfo v;
+    v.index = st->index;
+    v.codecId = par->codec_id;
+    v.codecName = QString::fromUtf8(avcodec_get_name(par->codec_id));
+    if (const char* prof = avcodec_profile_name(par->codec_id, par->profile))
+        v.profile = QString::fromUtf8(prof);
+    v.width = par->width;
+    v.height = par->height;
+    v.sampleAspectRatio = par->sample_aspect_ratio;
+    v.frameRate = st->avg_frame_rate;
+    v.realFrameRate = st->r_frame_rate;
+    if (v.frameRate.num <= 0 || v.frameRate.den <= 0)
+        v.frameRate = v.realFrameRate;
+    if (v.frameRate.num <= 0 || v.frameRate.den <= 0)
+        v.frameRate = AVRational{25, 1};
+    // Phones record variable frame rate: avg and r rates diverge.
+    if (v.realFrameRate.num > 0 && v.realFrameRate.den > 0) {
+        const double a = av_q2d(v.frameRate), r = av_q2d(v.realFrameRate);
+        v.variableFrameRate = std::abs(a - r) > 0.01 * r;
+    }
+    v.timeBase = st->time_base;
+    v.pixelFormat = static_cast<AVPixelFormat>(par->format);
+    v.bitDepth = par->bits_per_raw_sample > 0 ? par->bits_per_raw_sample : bitDepthOf(v.pixelFormat);
+    v.colorPrimaries = par->color_primaries;
+    v.colorTrc = par->color_trc;
+    v.colorSpace = par->color_space;
+    v.colorRange = par->color_range;
+    v.chromaLocation = par->chroma_location;
+    v.bitRate = par->bit_rate;
+    v.hasBFrames = par->video_delay > 0;
+    v.rotation = displayRotation(st);
+    v.startTime = st->start_time != AV_NOPTS_VALUE ? ticksFromStream(st->start_time, st->time_base) : 0;
+    v.duration = st->duration != AV_NOPTS_VALUE ? ticksFromStream(st->duration, st->time_base) : containerDuration;
+    return v;
+}
+
 std::optional<MediaInfo> probeMedia(const QString& path, QString* error) {
     if (isImageFile(path))
         return probeImage(path, error);
@@ -134,40 +172,7 @@ std::optional<MediaInfo> probeMedia(const QString& path, QString* error) {
             ++info.videoStreamCount;
             if (static_cast<int>(i) != bestVideo)
                 continue;
-            VideoStreamInfo v;
-            v.index = static_cast<int>(i);
-            v.codecId = par->codec_id;
-            v.codecName = QString::fromUtf8(avcodec_get_name(par->codec_id));
-            if (const char* prof = avcodec_profile_name(par->codec_id, par->profile))
-                v.profile = QString::fromUtf8(prof);
-            v.width = par->width;
-            v.height = par->height;
-            v.sampleAspectRatio = par->sample_aspect_ratio;
-            v.frameRate = st->avg_frame_rate;
-            v.realFrameRate = st->r_frame_rate;
-            if (v.frameRate.num <= 0 || v.frameRate.den <= 0)
-                v.frameRate = v.realFrameRate;
-            if (v.frameRate.num <= 0 || v.frameRate.den <= 0)
-                v.frameRate = AVRational{25, 1};
-            // Phones record variable frame rate: avg and r rates diverge.
-            if (v.realFrameRate.num > 0 && v.realFrameRate.den > 0) {
-                const double a = av_q2d(v.frameRate), r = av_q2d(v.realFrameRate);
-                v.variableFrameRate = std::abs(a - r) > 0.01 * r;
-            }
-            v.timeBase = st->time_base;
-            v.pixelFormat = static_cast<AVPixelFormat>(par->format);
-            v.bitDepth = par->bits_per_raw_sample > 0 ? par->bits_per_raw_sample : bitDepthOf(v.pixelFormat);
-            v.colorPrimaries = par->color_primaries;
-            v.colorTrc = par->color_trc;
-            v.colorSpace = par->color_space;
-            v.colorRange = par->color_range;
-            v.chromaLocation = par->chroma_location;
-            v.bitRate = par->bit_rate;
-            v.hasBFrames = par->video_delay > 0;
-            v.rotation = displayRotation(st);
-            v.startTime = st->start_time != AV_NOPTS_VALUE ? ticksFromStream(st->start_time, st->time_base) : 0;
-            v.duration = st->duration != AV_NOPTS_VALUE ? ticksFromStream(st->duration, st->time_base) : info.duration;
-            info.video = v;
+            info.video = videoStreamInfo(st, info.duration);
         } else if (par->codec_type == AVMEDIA_TYPE_AUDIO) {
             ++info.audioStreamCount;
             if (static_cast<int>(i) != bestAudio)
