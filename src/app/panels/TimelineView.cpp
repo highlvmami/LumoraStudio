@@ -407,9 +407,10 @@ void TimelineView::paintClip(QPainter& p, const Clip& c, int track, const QRect&
     const bool video = t.type == TrackType::Video;
     const bool title = c.kind == ClipKind::Title;
     const bool subtitle = c.kind == ClipKind::Subtitle;
+    const bool freeze = c.kind == ClipKind::Freeze;
     const bool selected = isSelected(c);
     const ThemeColors& tc = themeColors();
-    const QColor base = subtitle ? tc.accentAlt : title ? tc.titleClip : video ? tc.videoClip : tc.audioClip;
+    const QColor base = subtitle ? tc.accentAlt : title ? tc.titleClip : freeze ? tc.accentCool : video ? tc.videoClip : tc.audioClip;
     auto media = c.hasMedia() ? m_pool->find(c.mediaId) : nullptr;
     QPainterPath path;
     path.addRoundedRect(QRectF(r).adjusted(0.5, 0.5, -0.5, -0.5), 7, 7);
@@ -461,7 +462,7 @@ void TimelineView::paintClip(QPainter& p, const Clip& c, int track, const QRect&
             }
         }
         // Key frame marks: where a lossless cut can start exactly.
-        if (track == 0 && media && media->hasKeyframes()) {
+        if (track == 0 && !freeze && media && media->hasKeyframes()) {
             const auto kf = media->keyframesCopy();
             const double spacing = kf.size() > 1 ? ticksToSeconds(kf[1] - kf[0]) * m_pps : 100;
             if (spacing > 6) {
@@ -531,6 +532,8 @@ void TimelineView::paintClip(QPainter& p, const Clip& c, int track, const QRect&
     f.setWeight(QFont::DemiBold);
     p.setFont(f);
     QString name = title ? tr("Title") : media ? QFileInfo(media->path).fileName() : tr("Missing media");
+    if (freeze)
+        name = tr("Freeze frame") + QStringLiteral("  ·  ") + name;
     name += QStringLiteral("  ·  ") + formatSeconds(c.duration());
     if (!video && c.gainDb != 0.0)
         name += QStringLiteral("  ·  %1%2 dB").arg(c.gainDb > 0 ? QStringLiteral("+") : QString()).arg(c.gainDb, 0, 'f', 1);
@@ -837,7 +840,7 @@ void TimelineView::mouseMoveEvent(QMouseEvent* e) {
         if (!c)
             break;
         auto media = m_pool->find(c->mediaId);
-        const Ticks limit = !c->hasMedia() ? kNoMediaLimit : media ? media->info.duration : c->sourceOut;
+        const Ticks limit = c->kind != ClipKind::Media ? kNoMediaLimit : media ? media->info.duration : c->sourceOut;
         const Ticks delta = snapToFrame(ticksFromSeconds((pos.x() - m_pressPos.x()) / m_pps), m_timeline->frameRate());
         if (m_drag == Drag::TrimIn)
             m_timeline->trimIn(m_dragClip, m_dragSourceStart + delta);

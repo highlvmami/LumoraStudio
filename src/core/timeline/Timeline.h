@@ -18,7 +18,9 @@ namespace lumora {
 
 enum class TrackType { Video, Audio, Subtitle };
 
-enum class ClipKind { Media, Title, Subtitle };
+// Freeze clips hold one frame of a media item (freezeTime) for their whole
+// duration; like titles their "source" range is simply [0, duration).
+enum class ClipKind { Media, Title, Subtitle, Freeze };
 
 // A clip references a range [sourceIn, sourceOut) of a media item and is
 // placed at timelineStart. Clips never own pixels; they are pure edit
@@ -50,14 +52,17 @@ struct Clip {
     AudioEffects audio;          // audio clips
     TitleData title;             // ClipKind::Title
     QString text;                // ClipKind::Subtitle
+    Ticks freezeTime = 0;        // ClipKind::Freeze: media time of the held frame
 
-    bool hasMedia() const { return kind == ClipKind::Media; }
+    bool hasMedia() const { return kind == ClipKind::Media || kind == ClipKind::Freeze; }
 
     Ticks duration() const { return sourceOut - sourceIn; }
     Ticks timelineEnd() const { return timelineStart + duration(); }
     // Source time shown at timeline time `t` (no speed changes in 0.1).
     Ticks toSource(Ticks t) const { return sourceIn + (t - timelineStart); }
     bool contains(Ticks t) const { return t >= timelineStart && t < timelineEnd(); }
+    // Media time whose picture is shown at timeline time `t`.
+    Ticks mediaTime(Ticks t) const { return kind == ClipKind::Freeze ? freezeTime : toSource(t); }
 
     bool operator==(const Clip&) const = default;
 };
@@ -203,6 +208,12 @@ public:
     bool setTitle(const QUuid& clipId, const TitleData& title);
     // Length of a title or subtitle clip.
     bool setDuration(const QUuid& clipId, Ticks duration);
+    // Holds the frame of video clip `clipId` shown at timeline time `at` for
+    // `duration`: the clip is split at `at` and a freeze clip is inserted
+    // between the halves. Everything after it on the clip's track moves
+    // later (with linked audio and connected clips); the audio is silent
+    // while the picture is frozen. Returns the freeze clip's id.
+    QUuid freezeFrame(const QUuid& clipId, Ticks at, Ticks duration);
     // Splits every clip under `t` on unlocked tracks.
     bool splitAt(Ticks t);
     // Removes the clips (and linked clips). Magnetic tracks close the gap.
@@ -232,6 +243,9 @@ private:
     void renameTracks();
     Track* track(int i) { return i >= 0 && i < static_cast<int>(m_state.tracks.size()) ? &m_state.tracks[i] : nullptr; }
     Clip* mutableClip(const QUuid& id);
+    // Cuts `c` at timeline time `t` (inside it); `c` becomes the left part and
+    // the right part is returned with a new id.
+    static Clip splitClip(Clip& c, Ticks t);
     // Clears [from, to) on a non-magnetic track (splitting and trimming the
     // clips that overlap it), ignoring the clips in `keep`.
     void clearRange(int track, Ticks from, Ticks to, const std::vector<QUuid>& keep = {});

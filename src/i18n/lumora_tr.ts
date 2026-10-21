@@ -127,6 +127,10 @@
         <source>The %1 container cannot hold subtitles, so they are saved as .srt next to the video.</source>
         <translation>%1 kabı altyazı taşıyamaz, bu yüzden altyazılar videonun yanına .srt olarak kaydedilir.</translation>
     </message>
+    <message>
+        <source>The timeline has freeze frames. A held frame has to be encoded as new video, which a lossless cut cannot do. Choose &quot;Match source&quot; (untouched frames are converted directly from the source), &quot;Lossless intermediate&quot; or &quot;Custom&quot;.</source>
+        <translation>Zaman çizelgesinde dondurulmuş kare var. Bekletilen kare yeni görüntü olarak kodlanmalıdır; kayıpsız kesim bunu yapamaz. &quot;Kaynakla aynı&quot; (dokunulmayan kareler doğrudan kaynaktan dönüştürülür), &quot;Kayıpsız ara format&quot; ya da &quot;Özel&quot; seçin.</translation>
+    </message>
 </context>
 <context>
     <name>Lut</name>
@@ -1898,6 +1902,26 @@
         <source>Subtitles saved to %1</source>
         <translation>Altyazılar kaydedildi: %1</translation>
     </message>
+    <message>
+        <source>&amp;Freeze frame…</source>
+        <translation>Kareyi &amp;dondur…</translation>
+    </message>
+    <message>
+        <source>Hold the frame under the playhead for a number of seconds; the rest of the clip continues after it</source>
+        <translation>Oynatma imlecinin altındaki kareyi seçtiğiniz saniye kadar bekletir; klibin geri kalanı ardından devam eder</translation>
+    </message>
+    <message>
+        <source>Move the playhead over a video clip to freeze its frame.</source>
+        <translation>Karesini dondurmak için oynatma imlecini bir video klibin üzerine getirin.</translation>
+    </message>
+    <message>
+        <source>Freeze frame</source>
+        <translation>Kareyi dondur</translation>
+    </message>
+    <message>
+        <source>Hold the frame for (seconds):</source>
+        <translation>Kare kaç saniye kalsın:</translation>
+    </message>
 </context>
 <context>
     <name>lumora::MediaBinPanel</name>
@@ -2649,6 +2673,22 @@ Orijinal dosya asla değişmez: düzenlemeler projede saklanır ve dışa aktar�
         <source>Subtitle style</source>
         <translation>Altyazı stili</translation>
     </message>
+    <message>
+        <source>Freeze frame</source>
+        <translation>Dondurulmuş kare</translation>
+    </message>
+    <message>
+        <source>Hold for</source>
+        <translation>Süre</translation>
+    </message>
+    <message>
+        <source>Change freeze length</source>
+        <translation>Dondurma süresini değiştir</translation>
+    </message>
+    <message>
+        <source>Shows the frame at %1 of the source.</source>
+        <translation>Kaynağın %1 anındaki kareyi gösterir.</translation>
+    </message>
 </context>
 <context>
     <name>lumora::ScopesWidget</name>
@@ -2823,6 +2863,10 @@ Orijinal dosya asla değişmez: düzenlemeler projede saklanır ve dışa aktar�
     <message>
         <source>Add subtitle track</source>
         <translation>Altyazı izi ekle</translation>
+    </message>
+    <message>
+        <source>Freeze frame</source>
+        <translation>Dondurulmuş kare</translation>
     </message>
 </context>
 <context>

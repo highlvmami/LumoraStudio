@@ -54,7 +54,10 @@ QByteArray Project::toJson() const {
     root["format"] = "LumoraStudio project";
     const auto& stracks = m_timeline->state().tracks;
     const bool subtitles = std::any_of(stracks.begin(), stracks.end(), [](const Track& t) { return t.isSubtitle(); });
-    root["version"] = subtitles ? kFormatVersion : 2;
+    const bool freezes = std::any_of(stracks.begin(), stracks.end(), [](const Track& t) {
+        return std::any_of(t.clips.begin(), t.clips.end(), [](const Clip& c) { return c.kind == ClipKind::Freeze; });
+    });
+    root["version"] = freezes ? kFormatVersion : subtitles ? 3 : 2;
     root["application"] = QCoreApplication::applicationVersion();
 
     QJsonArray media;
@@ -98,6 +101,10 @@ QByteArray Project::toJson() const {
                 co["kind"] = "subtitle";
                 co["text"] = c.text;
             } else {
+                if (c.kind == ClipKind::Freeze) {
+                    co["kind"] = "freeze";
+                    co["freezeTime"] = ticksToJson(c.freezeTime);
+                }
                 co["media"] = c.mediaId.toString(QUuid::WithoutBraces);
             }
             co["in"] = ticksToJson(c.sourceIn);
@@ -249,6 +256,9 @@ bool Project::fromJson(const QByteArray& json, const QString& baseDir, QString* 
             } else if (co.value("kind").toString() == "subtitle") {
                 c.kind = ClipKind::Subtitle;
                 c.text = co.value("text").toString();
+            } else if (co.value("kind").toString() == "freeze") {
+                c.kind = ClipKind::Freeze;
+                c.freezeTime = ticksFromJson(co.value("freezeTime"));
             }
             c.mediaId = QUuid::fromString(co.value("media").toString());
             c.sourceIn = ticksFromJson(co.value("in"));

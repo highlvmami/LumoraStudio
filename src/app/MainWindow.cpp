@@ -14,6 +14,7 @@
 #include <QFileDialog>
 #include <QFileInfo>
 #include <QFrame>
+#include <QInputDialog>
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QMenu>
@@ -211,10 +212,10 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
         m_actJoin->setEnabled(has && m_project->timeline()->canJoinWithNext(sel.front()));
     });
     connect(m_timelineView, &TimelineView::clipDoubleClicked, this, [this](const QUuid& id) {
-        if (const Clip* c = m_project->timeline()->clip(id); c && c->kind == ClipKind::Media)
+        if (const Clip* c = m_project->timeline()->clip(id); c && c->hasMedia())
             if (auto media = m_project->media()->find(c->mediaId)) {
                 m_monitor->showSource(media);
-                m_engine->seek(c->sourceIn);
+                m_engine->seek(c->kind == ClipKind::Freeze ? c->freezeTime : c->sourceIn);
             }
     });
     connect(m_timelineView, &TimelineView::mediaDropped, this,
@@ -227,6 +228,7 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
         QMenu menu;
         menu.addAction(m_actSplit);
         menu.addAction(m_actJoin);
+        menu.addAction(m_actFreeze);
         if (auto loc = m_project->timeline()->locate(id); loc && loc->track == 0) {
             menu.addSeparator();
             menu.addAction(m_actAddTransition);
@@ -320,6 +322,8 @@ void MainWindow::createActions() {
     m_actDelete->setShortcuts({QKeySequence::Delete, QKeySequence(Qt::Key_Backspace)});
     m_actJoin = make(tr("&Join with next clip"), QKeySequence(Qt::CTRL | Qt::Key_J), &MainWindow::joinSelection, Icons::join());
     m_actJoin->setToolTip(tr("Rejoin a clip with the next one when they are consecutive parts of the same file"));
+    m_actFreeze = make(tr("&Freeze frame…"), QKeySequence(Qt::SHIFT | Qt::Key_F), &MainWindow::freezeFrame, Icons::freeze());
+    m_actFreeze->setToolTip(tr("Hold the frame under the playhead for a number of seconds; the rest of the clip continues after it"));
     m_actPlay = make(tr("Play / pause"), QKeySequence(Qt::Key_Space), [this] { m_engine->togglePlay(); }, Icons::play());
     m_actPrevFrame = make(tr("Previous frame"), QKeySequence(Qt::Key_Left), [this] { m_engine->stepFrames(-1); });
     m_actNextFrame = make(tr("Next frame"), QKeySequence(Qt::Key_Right), [this] { m_engine->stepFrames(1); });
@@ -370,6 +374,7 @@ void MainWindow::createActions() {
     auto* tb = m_timelinePanel->toolBar();
     tb->addAction(m_actSplit);
     tb->addAction(m_actJoin);
+    tb->addAction(m_actFreeze);
     tb->addAction(m_actDelete);
     tb->addSeparator();
     tb->addAction(m_actAddTitle);
@@ -399,6 +404,7 @@ void MainWindow::createMenus() {
     edit->addSeparator();
     edit->addAction(m_actSplit);
     edit->addAction(m_actJoin);
+    edit->addAction(m_actFreeze);
     edit->addAction(m_actDelete);
     edit->addSeparator();
     edit->addAction(m_actAddTitle);
@@ -573,7 +579,7 @@ void MainWindow::setWorkspace(Workspace w) {
     if ((w == Workspace::Color || w == Workspace::Audio) && m_timelineView->selection().isEmpty())
         selectClipAtPlayhead();
     m_undoGroup->setActiveStack(photo ? m_photoUndo : m_videoUndo);
-    for (QAction* a : {m_actSplit, m_actDelete, m_actJoin, m_actPlay, m_actPrevFrame, m_actNextFrame, m_actHome, m_actEnd,
+    for (QAction* a : {m_actSplit, m_actDelete, m_actJoin, m_actFreeze, m_actPlay, m_actPrevFrame, m_actNextFrame, m_actHome, m_actEnd,
                        m_actMarkIn, m_actMarkOut, m_actAddSource, m_actZoomIn, m_actZoomOut, m_actExport, m_actAddTitle,
                        m_actAddTransition, m_actAddVideoTrack, m_actAddAudioTrack, m_actExportFrame, m_actAddSubtitle,
                        m_actAddSubtitleTrack, m_actImportSubtitles, m_actExportSubtitles})
@@ -1109,6 +1115,45 @@ void MainWindow::splitAtPlayhead() {
         statusBar()->showMessage(tr("Move the playhead over a clip to split it."), 4000);
 }
 
+void MainWindow::freezeFrame() {
+    if (m_monitor->mode() != MonitorPanel::Mode::Program)
+        return;
+    Timeline* tl = m_project->timeline();
+    const Ticks t = snapToFrame(m_engine->position(), tl->frameRate());
+    // The selected video clip under the playhead, else the storyline clip.
+    const Clip* target = nullptr;
+    const auto sel = m_timelineView->selection();
+    if (!sel.isEmpty())
+        if (auto loc = tl->locate(sel.front()); loc && tl->tracks()[loc->track].isVideo()) {
+            const Clip* c = tl->clip(sel.front());
+            if (c->hasMedia() && c->contains(t))
+                target = c;
+        }
+    if (!target)
+        if (const Clip* c = tl->clipAt(tl->primaryVideoTrack(), t); c && c->hasMedia())
+            target = c;
+    if (!target) {
+        statusBar()->showMessage(tr("Move the playhead over a video clip to freeze its frame."), 4000);
+        return;
+    }
+    const QUuid clipId = target->id;
+    QSettings settings;
+    bool ok = false;
+    const double seconds = QInputDialog::getDouble(this, tr("Freeze frame"), tr("Hold the frame for (seconds):"),
+                                                   settings.value(QStringLiteral("edit/freezeSeconds"), 2.0).toDouble(),
+                                                   0.04, 3600.0, 2, &ok);
+    if (!ok)
+        return;
+    settings.setValue(QStringLiteral("edit/freezeSeconds"), seconds);
+    QUuid freezeId;
+    runTimelineEdit(m_videoUndo, tl, tr("Freeze frame"), [&] {
+        freezeId = tl->freezeFrame(clipId, t, ticksFromSeconds(seconds));
+        return !freezeId.isNull();
+    });
+    if (!freezeId.isNull())
+        m_timelineView->selectOnly(freezeId);
+}
+
 void MainWindow::deleteSelection() {
     const auto sel = m_timelineView->selection();
     if (sel.isEmpty())
@@ -1155,7 +1200,7 @@ void MainWindow::showShortcuts() {
     auto* browser = new QTextBrowser;
     QString html = QStringLiteral("<table cellspacing=6>");
     for (QAction* a : {m_actPlay, m_actPrevFrame, m_actNextFrame, m_actHome, m_actEnd, m_actSplit, m_actDelete, m_actJoin,
-                       m_actMarkIn, m_actMarkOut, m_actAddSource, m_actSnap, m_actZoomIn, m_actZoomOut, m_actUndo, m_actRedo,
+                       m_actFreeze, m_actMarkIn, m_actMarkOut, m_actAddSource, m_actSnap, m_actZoomIn, m_actZoomOut, m_actUndo, m_actRedo,
                        m_actImport, m_actExport, m_actExportPhoto, m_actSave, m_actOpen}) {
         QStringList keys;
         for (const auto& k : a->shortcuts())

@@ -437,9 +437,17 @@ AVRational ExportPlanner::timelineRate(const TimelineState& tl, const MediaPool&
     return AVRational{25, 1};
 }
 
-ExportPlan ExportPlanner::streamCopyBlocked(const TimelineState&) {
+ExportPlan ExportPlanner::streamCopyBlocked(const TimelineState& tl) {
     ExportPlan plan;
     plan.mode = ExportMode::StreamCopy;
+    for (int ti : tl.trackIndices(TrackType::Video))
+        for (const auto& c : tl.tracks[ti].clips)
+            if (c.kind == ClipKind::Freeze) {
+                plan.blockers << tr("The timeline has freeze frames. A held frame has to be encoded as new video, which a "
+                                    "lossless cut cannot do. Choose \"Match source\" (untouched frames are converted "
+                                    "directly from the source), \"Lossless intermediate\" or \"Custom\".");
+                return plan;
+            }
     plan.blockers << tr("The timeline has titles, transitions, colour grading, effects, audio changes or more than one "
                         "track. These "
                         "have to be drawn into the picture, which a lossless cut cannot do. Choose \"Match source\", "
@@ -464,7 +472,7 @@ ExportPlan ExportPlanner::planRender(const TimelineState& tl, const MediaPool& p
     // Every clip must have its media.
     for (const auto& t : tl.tracks)
         for (const auto& c : t.clips)
-            if (c.kind == ClipKind::Media && !pool.find(c.mediaId)) {
+            if (c.hasMedia() && !pool.find(c.mediaId)) {
                 plan.blockers << tr("A clip refers to media that is missing from the project.");
                 return plan;
             }
@@ -490,7 +498,7 @@ ExportPlan ExportPlanner::planRender(const TimelineState& tl, const MediaPool& p
     std::optional<VideoStreamInfo> src;
     for (int ti : tl.trackIndices(TrackType::Video)) {
         for (const auto& c : tl.tracks[ti].clips)
-            if (auto m = pool.find(c.mediaId); c.kind == ClipKind::Media && m && m->info.video) {
+            if (auto m = pool.find(c.mediaId); c.hasMedia() && m && m->info.video) {
                 src = m->info.video;
                 break;
             }

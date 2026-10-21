@@ -54,7 +54,7 @@ void ClipColorPanel::refresh() {
     const auto loc = c ? tl->locate(m_clip) : std::nullopt;
     if (c && loc && tl->tracks()[loc->track].type == TrackType::Audio)
         c = nullptr;
-    if (!c || c->kind != ClipKind::Media) {
+    if (!c || !c->hasMedia()) {
         m_panel->setGrade({});
         m_panel->setEditable(false);
         m_panel->setHeader(c ? tr("Titles have no colour settings; select a video clip.")
