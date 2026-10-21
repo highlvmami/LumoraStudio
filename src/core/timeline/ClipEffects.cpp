@@ -247,4 +247,166 @@ MotionPath MotionPath::fromJson(const QJsonArray& a) {
     return m;
 }
 
+QString redactionStyleId(RedactionStyle s) {
+    switch (s) {
+    case RedactionStyle::Blur: return QStringLiteral("blur");
+    case RedactionStyle::Pixelate: return QStringLiteral("pixelate");
+    case RedactionStyle::Fill: return QStringLiteral("fill");
+    }
+    return QStringLiteral("blur");
+}
+
+RedactionStyle redactionStyleFromId(const QString& id) {
+    if (id == QLatin1String("pixelate"))
+        return RedactionStyle::Pixelate;
+    if (id == QLatin1String("fill"))
+        return RedactionStyle::Fill;
+    return RedactionStyle::Blur;
+}
+
+namespace {
+
+QString redactionKindId(RedactionKind k) {
+    switch (k) {
+    case RedactionKind::Face: return QStringLiteral("face");
+    case RedactionKind::Plate: return QStringLiteral("plate");
+    case RedactionKind::Manual: return QStringLiteral("manual");
+    }
+    return QStringLiteral("face");
+}
+
+RedactionKind redactionKindFromId(const QString& id) {
+    if (id == QLatin1String("plate"))
+        return RedactionKind::Plate;
+    if (id == QLatin1String("manual"))
+        return RedactionKind::Manual;
+    return RedactionKind::Face;
+}
+
+// Four decimals of a fraction of the picture are well under a pixel at 8K.
+double round4(double v) { return std::round(v * 10000.0) / 10000.0; }
+
+} // namespace
+
+QRectF RedactionTrack::rectAt(Ticks t, Ticks hold) const {
+    if (boxes.empty() || t < boxes.front().time - hold || t > boxes.back().time + hold)
+        return {};
+    if (t <= boxes.front().time)
+        return boxes.front().rect;
+    if (t >= boxes.back().time)
+        return boxes.back().rect;
+    auto it = std::upper_bound(boxes.begin(), boxes.end(), t, [](Ticks v, const RedactionBox& b) { return v < b.time; });
+    const RedactionBox& b = *it;
+    const RedactionBox& a = *(it - 1);
+    const double f = b.time > a.time ? static_cast<double>(t - a.time) / (b.time - a.time) : 0.0;
+    auto lerp = [f](double x, double y) { return x + (y - x) * f; };
+    return {lerp(a.rect.x(), b.rect.x()), lerp(a.rect.y(), b.rect.y()), lerp(a.rect.width(), b.rect.width()),
+            lerp(a.rect.height(), b.rect.height())};
+}
+
+bool Redaction::shows(const RedactionTrack& t) const {
+    if (!t.enabled)
+        return false;
+    switch (t.kind) {
+    case RedactionKind::Face: return faces;
+    case RedactionKind::Plate: return plates;
+    case RedactionKind::Manual: return true;
+    }
+    return true;
+}
+
+bool Redaction::isActive() const {
+    return enabled && std::any_of(tracks.begin(), tracks.end(), [this](const RedactionTrack& t) { return shows(t); });
+}
+
+std::vector<Redaction::Region> Redaction::regionsAt(Ticks t) const {
+    std::vector<Region> out;
+    if (!enabled)
+        return out;
+    // A detection is shown a little before and after the frames it was found
+    // on, so a face is not uncovered for a frame at the start of a track.
+    const Ticks hold = kTicksPerSecond / 8;
+    for (const auto& tr : tracks) {
+        if (!shows(tr))
+            continue;
+        const QRectF r = tr.rectAt(t, hold);
+        if (!r.isEmpty())
+            out.push_back({r, tr.kind == RedactionKind::Face});
+    }
+    return out;
+}
+
+int Redaction::count(RedactionKind kind) const {
+    return static_cast<int>(std::count_if(tracks.begin(), tracks.end(), [kind](const RedactionTrack& t) { return t.kind == kind; }));
+}
+
+QJsonObject Redaction::toJson() const {
+    QJsonObject o;
+    o["enabled"] = enabled;
+    o["faces"] = faces;
+    o["plates"] = plates;
+    o["style"] = redactionStyleId(style);
+    o["strength"] = strength;
+    o["from"] = ticksToJson(analyzedFrom);
+    o["to"] = ticksToJson(analyzedTo);
+    QJsonArray ta;
+    for (const auto& t : tracks) {
+        QJsonObject to;
+        to["kind"] = redactionKindId(t.kind);
+        if (!t.enabled)
+            to["enabled"] = false;
+        QJsonArray ba;
+        for (const auto& b : t.boxes)
+            ba.append(QJsonArray{ticksToJson(b.time), round4(b.rect.x()), round4(b.rect.y()), round4(b.rect.width()),
+                                 round4(b.rect.height())});
+        to["boxes"] = ba;
+        ta.append(to);
+    }
+    o["tracks"] = ta;
+    return o;
+}
+
+Redaction Redaction::fromJson(const QJsonObject& o) {
+    Redaction r;
+    r.enabled = o.value("enabled").toBool();
+    r.faces = o.value("faces").toBool(true);
+    r.plates = o.value("plates").toBool(true);
+    r.style = redactionStyleFromId(o.value("style").toString());
+    r.strength = std::clamp(o.value("strength").toDouble(0.6), 0.0, 1.0);
+    r.analyzedFrom = ticksFromJson(o.value("from"), 0);
+    r.analyzedTo = ticksFromJson(o.value("to"), 0);
+    for (const auto& tv : o.value("tracks").toArray()) {
+        const QJsonObject to = tv.toObject();
+        RedactionTrack t;
+        t.kind = redactionKindFromId(to.value("kind").toString());
+        t.enabled = to.value("enabled").toBool(true);
+        for (const auto& bv : to.value("boxes").toArray()) {
+            const QJsonArray e = bv.toArray();
+            if (e.size() < 5)
+                continue;
+            t.boxes.push_back({ticksFromJson(e[0], 0), QRectF(e[1].toDouble(), e[2].toDouble(), e[3].toDouble(), e[4].toDouble())});
+        }
+        std::sort(t.boxes.begin(), t.boxes.end(), [](const RedactionBox& a, const RedactionBox& b) { return a.time < b.time; });
+        if (!t.boxes.empty())
+            r.tracks.push_back(std::move(t));
+    }
+    return r;
+}
+
+QJsonObject BackgroundRemoval::toJson() const {
+    QJsonObject o;
+    o["enabled"] = enabled;
+    o["model"] = model;
+    o["softness"] = softness;
+    return o;
+}
+
+BackgroundRemoval BackgroundRemoval::fromJson(const QJsonObject& o) {
+    BackgroundRemoval b;
+    b.enabled = o.value("enabled").toBool();
+    b.model = o.value("model").toString(QStringLiteral("fast"));
+    b.softness = std::clamp(o.value("softness").toDouble(0.5), 0.0, 1.0);
+    return b;
+}
+
 } // namespace lumora

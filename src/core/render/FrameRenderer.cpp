@@ -9,6 +9,8 @@
 #include <mutex>
 #include <thread>
 
+#include "ai/Redaction.h"
+#include "ai/Vision.h"
 #include "color/ColorProcessor.h"
 #include "ffmpeg/FFmpeg.h"
 #include "media/VideoDecoder.h"
@@ -54,7 +56,13 @@ struct FrameRenderer::Slot {
     Ticks imagePts = kInvalidTicks;
     QSize imageSize;
     ColorGrade imageGrade;
+    Redaction imageRedaction;
+    BackgroundRemoval imageBackground;
     std::unique_ptr<ColorProcessor> color; // for the clip's current grade
+    // Subject matte of the last frame (background removal is the slow part).
+    QImage matte;
+    Ticks mattePts = kInvalidTicks;
+    QString matteModel;
 };
 
 // Opens decoders for clips that are about to come into view and decodes up
@@ -344,7 +352,7 @@ QImage FrameRenderer::clipImage(const Clip& clip, Ticks sourceTime, QSize* fitSi
     const int tw = std::max(2, static_cast<int>(std::lround(target.width())));
     const int th = std::max(2, static_cast<int>(std::lround(target.height())));
     if (slot->imagePts == pts && slot->imageSize == QSize(tw, th) && slot->imageGrade == clip.color &&
-        !slot->image.isNull())
+        slot->imageRedaction == clip.redaction && slot->imageBackground == clip.background && !slot->image.isNull())
         return slot->image;
 
     const bool final = m_precision == Precision::Final;
@@ -375,13 +383,35 @@ QImage FrameRenderer::clipImage(const Clip& clip, Ticks sourceTime, QSize* fitSi
                 px[x * 4 + 3] = 0xffff;
         }
     }
+    // The subject is found on the picture as shot, before grading, so colour
+    // changes do not move the cut-out edge.
+    QImage matte;
+    if (clip.background.enabled) {
+        // The detailed model takes seconds per frame; the preview uses the
+        // fast one when it is there.
+        QString model = clip.background.model;
+        if (!final && model != QLatin1String("fast") && ai::visionModelReady(ai::backgroundModelId(QStringLiteral("fast"))))
+            model = QStringLiteral("fast");
+        if (slot->mattePts != pts || slot->matteModel != model || slot->matte.isNull()) {
+            slot->matte = ai::subjectMatte(img, model);
+            slot->mattePts = pts;
+            slot->matteModel = model;
+        }
+        matte = slot->matte;
+    }
     if (!clip.color.isIdentity()) {
         if (!slot->color || !(slot->color->grade() == clip.color))
             slot->color = std::make_unique<ColorProcessor>(clip.color);
         slot->color->apply(img);
     }
+    if (clip.redaction.isActive())
+        ai::hideRegions(img, clip.redaction.regionsAt(pts), clip.redaction.style, clip.redaction.strength);
+    if (!matte.isNull())
+        ai::applyMatte(img, matte, clip.background.softness);
     slot->image = img;
     slot->imageGrade = clip.color;
+    slot->imageRedaction = clip.redaction;
+    slot->imageBackground = clip.background;
     slot->imagePts = pts;
     slot->imageSize = QSize(tw, th);
     return img;
@@ -619,7 +649,7 @@ const AVFrame* FrameRenderer::passthroughFrame(Ticks t) {
         if (!c.contains(t))
             continue;
         if (!c.hasMedia() || !c.transform.isIdentity() || !c.color.isIdentity() || fadeFactor(c, t) != 1.0 ||
-            c.stabilization.isActive() || !c.motion.isEmpty())
+            c.stabilization.isActive() || !c.motion.isEmpty() || c.redaction.isActive() || c.background.enabled)
             return nullptr;
         const Ticks dIn = m_state.transitionDuration(k, dur);
         if (dIn > 0 && t < c.timelineStart + dIn / 2)

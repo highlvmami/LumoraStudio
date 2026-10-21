@@ -11,6 +11,7 @@
 #include <QLabel>
 #include <QListWidget>
 #include <QMessageBox>
+#include <QPainter>
 #include <QPushButton>
 #include <QScrollArea>
 #include <QSettings>
@@ -26,7 +27,10 @@
 
 #include "Icons.h"
 #include "MediaCache.h"
+#include "Tasks.h"
 #include "Theme.h"
+#include "ai/Redaction.h"
+#include "ai/Vision.h"
 #include "color/ColorPanel.h"
 #include "color/ScopesWidget.h"
 #include "dialogs/PhotoExportDialog.h"
@@ -35,6 +39,7 @@
 #include "media/MediaInfo.h"
 #include "photo/LayersPanel.h"
 #include "photo/PhotoView.h"
+#include "photo/SmartToolsPanel.h"
 
 namespace lumora {
 
@@ -97,6 +102,8 @@ PhotoWorkspace::PhotoWorkspace(PhotoLibrary* library, QUndoStack* undo, QWidget*
     m_layers = new LayersPanel;
     m_tabs->addTab(scrolled(m_color), tr("Adjust"));
     m_tabs->addTab(scrolled(m_layers), tr("Layers"));
+    m_smart = new SmartToolsPanel;
+    m_tabs->addTab(scrolled(m_smart), tr("Smart"));
     rl->addWidget(m_tabs, 1);
 
     auto* cropBox = new QGroupBox(tr("Crop"));
@@ -179,6 +186,25 @@ PhotoWorkspace::PhotoWorkspace(PhotoLibrary* library, QUndoStack* undo, QWidget*
                 pushChange(a, text, field.isEmpty() ? PhotoAdjustCommand::Other : PhotoAdjustCommand::Layer, field);
             });
     connect(m_layers, &LayersPanel::currentLayerChanged, this, &PhotoWorkspace::updateMaskOverlay);
+    connect(m_smart, &SmartToolsPanel::findRequested, this, &PhotoWorkspace::findRedactions);
+    connect(m_smart, &SmartToolsPanel::redactionEdited, this, [this](const Redaction& r, const QString& text, const QString& field) {
+        if (m_syncing || m_current.isNull())
+            return;
+        PhotoAdjustments a = current();
+        a.redaction = r;
+        pushChange(a, text, PhotoAdjustCommand::Other, field);
+    });
+    connect(m_smart, &SmartToolsPanel::backgroundEdited, this, [this](const BackgroundRemoval& b, const QString& text, const QString& field) {
+        if (m_syncing || m_current.isNull())
+            return;
+        if (b.enabled && !ensureVisionModels(this, {ai::backgroundModelId(b.model)}, tr("Remove the background"))) {
+            syncControls(); // back to how it was
+            return;
+        }
+        PhotoAdjustments a = current();
+        a.background = b;
+        pushChange(a, text, PhotoAdjustCommand::Other, field);
+    });
     m_tabs->setCurrentIndex(QSettings().value(QStringLiteral("photo/tab"), 0).toInt());
     connect(m_tabs, &QTabWidget::currentChanged, this, [this](int i) {
         QSettings().setValue(QStringLiteral("photo/tab"), i);
@@ -334,6 +360,7 @@ void PhotoWorkspace::syncControls() {
     m_color->setGrade(a.color);
     m_color->setEditable(has);
     m_layers->setLayers(a.layers, has);
+    m_smart->setState(a.redaction, a.background, has);
     m_view->setCrop(a.crop);
     for (QWidget* w : std::initializer_list<QWidget*>{m_cropBtn, m_aspect, m_exportBtn, m_compareBtn})
         w->setEnabled(has);
@@ -380,15 +407,59 @@ void PhotoWorkspace::render() {
         return;
     }
     PhotoAdjustments a = current();
-    if (m_compare)
-        a = PhotoAdjustments{.color = {}, .crop = a.crop, .layers = {}};
+    if (m_compare) {
+        PhotoAdjustments before;
+        before.crop = a.crop;
+        a = before;
+    }
     const QImage processed = PhotoProcessor::apply(m_proxy, a, false); // crop is drawn by the view
-    const QImage shown = processed.convertToFormat(QImage::Format_RGBX8888);
+    QImage shown;
+    if (processed.hasAlphaChannel() && a.background.enabled) {
+        // Transparent parts over the usual grey checkerboard.
+        shown = QImage(processed.size(), QImage::Format_RGBX8888);
+        QPainter p(&shown);
+        QImage tile(16, 16, QImage::Format_RGBX8888);
+        tile.fill(QColor(200, 200, 200));
+        QPainter(&tile).fillRect(0, 0, 8, 8, QColor(150, 150, 150));
+        QPainter(&tile).fillRect(8, 8, 8, 8, QColor(150, 150, 150));
+        p.fillRect(shown.rect(), QBrush(tile));
+        p.drawImage(0, 0, processed);
+    } else {
+        shown = processed.convertToFormat(QImage::Format_RGBX8888);
+    }
     m_view->setImage(shown);
-    // The scope shows the result that will be exported, i.e. the cropped part.
-    const QRect crop = a.cropRect(shown.size());
-    m_scope->setImage(crop == shown.rect() ? shown : shown.copy(crop));
+    // The scope shows the result that will be exported, i.e. the cropped part
+    // (without the checkerboard).
+    const QImage measured = a.background.enabled ? processed.convertToFormat(QImage::Format_RGBX8888) : shown;
+    const QRect crop = a.cropRect(measured.size());
+    m_scope->setImage(crop == measured.rect() ? measured : measured.copy(crop));
     m_view->setBadge(m_compare ? tr("Before") : QString());
+}
+
+void PhotoWorkspace::findRedactions() {
+    if (m_current.isNull() || m_working.isNull())
+        return;
+    const QString title = tr("Hide faces and plates");
+    if (!ensureVisionModels(this, {QStringLiteral("face"), QStringLiteral("plate")}, title))
+        return;
+    const QImage image = m_working;
+    const auto result = withProgress<ai::RedactionResult>(this, tr("Looking for faces and number plates…"), [image](const TaskProgress&) {
+        return ai::findRedactions(image, ai::RedactionOptions{});
+    });
+    if (!result || result->cancelled)
+        return;
+    if (!result->error.isEmpty()) {
+        QMessageBox::warning(this, title, result->error);
+        return;
+    }
+    PhotoAdjustments a = current();
+    a.redaction.enabled = true;
+    a.redaction.tracks = result->tracks;
+    pushChange(a, title, PhotoAdjustCommand::Other);
+    emit statusMessage(result->tracks.empty() ? tr("No faces or number plates were found.")
+                                              : tr("Found %1 face(s) and %2 number plate(s).")
+                                                    .arg(a.redaction.count(RedactionKind::Face))
+                                                    .arg(a.redaction.count(RedactionKind::Plate)));
 }
 
 void PhotoWorkspace::exportCurrent() {

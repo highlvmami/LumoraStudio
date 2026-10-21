@@ -336,6 +336,10 @@ QJsonObject PhotoAdjustments::toJson() const {
             arr.append(l.toJson());
         o["layers"] = arr;
     }
+    if (!redaction.tracks.empty() || redaction.enabled)
+        o["redaction"] = redaction.toJson();
+    if (background.enabled)
+        o["background"] = background.toJson();
     return o;
 }
 
@@ -345,6 +349,10 @@ PhotoAdjustments PhotoAdjustments::fromJson(const QJsonObject& o) {
     a.crop = rectFromJson(o.value("crop"), QRectF());
     for (const auto& v : o.value("layers").toArray())
         a.layers.push_back(PhotoLayer::fromJson(v.toObject()));
+    if (o.contains("redaction"))
+        a.redaction = Redaction::fromJson(o.value("redaction").toObject());
+    if (o.contains("background"))
+        a.background = BackgroundRemoval::fromJson(o.value("background").toObject());
     return a;
 }
 

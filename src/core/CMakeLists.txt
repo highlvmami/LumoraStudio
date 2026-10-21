@@ -32,6 +32,9 @@ add_library(lumora_core STATIC
     export/SubtitleStreams.h export/SubtitleStreams.cpp
     motion/Motion.h motion/Motion.cpp
     ai/SpeechToText.h ai/SpeechToText.cpp
+    ai/Onnx.h ai/Onnx.cpp
+    ai/Vision.h ai/Vision.cpp
+    ai/Redaction.h ai/Redaction.cpp
     motion/Analysis.h motion/Analysis.cpp
     image/PhotoAdjustments.h image/PhotoAdjustments.cpp
     image/PhotoProcessor.h image/PhotoProcessor.cpp
@@ -49,6 +52,10 @@ if(TARGET whisper)
     target_link_libraries(lumora_core PRIVATE whisper)
     target_compile_definitions(lumora_core PRIVATE LUMORA_HAVE_WHISPER)
 endif()
+if(TARGET onnxruntime::onnxruntime)
+    target_link_libraries(lumora_core PRIVATE onnxruntime::onnxruntime)
+    target_compile_definitions(lumora_core PRIVATE LUMORA_HAVE_ONNXRUNTIME)
+endif()
 if(TARGET LibRaw::LibRaw)
     target_link_libraries(lumora_core PRIVATE LibRaw::LibRaw)
     target_compile_definitions(lumora_core PRIVATE LUMORA_HAVE_LIBRAW)
@@ -57,6 +64,8 @@ endif()
 # Core sources with user-visible strings, picked up by lupdate.
 set(CORE_TRANSLATABLE_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/ai/SpeechToText.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/ai/Vision.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/ai/Redaction.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/color/Lut.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/export/ExportPlanner.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/export/TimelineExporter.cpp

@@ -12,6 +12,8 @@
 #include <numeric>
 #include <vector>
 
+#include "ai/Redaction.h"
+#include "ai/Vision.h"
 #include "RawDecoder.h"
 
 namespace lumora {
@@ -149,6 +151,28 @@ QImage PhotoProcessor::load(const QString& path, QImage* original, QString* erro
     return working;
 }
 
+namespace {
+
+QImage cachedMatte(const QImage& image, const QString& model) {
+    static std::mutex mutex;
+    static qint64 key = 0;
+    static QString keyModel;
+    static QImage matte;
+    {
+        std::lock_guard lock(mutex);
+        if (key == image.cacheKey() && keyModel == model && matte.size() == image.size())
+            return matte;
+    }
+    QImage m = ai::subjectMatte(image, model);
+    std::lock_guard lock(mutex);
+    key = image.cacheKey();
+    keyModel = model;
+    matte = m;
+    return m;
+}
+
+} // namespace
+
 QImage PhotoProcessor::apply(const QImage& src, const PhotoAdjustments& adj, bool applyCrop) {
     if (src.isNull())
         return {};
@@ -161,15 +185,24 @@ QImage PhotoProcessor::apply(const QImage& src, const PhotoAdjustments& adj, boo
         out.setColorSpace(src.colorSpace());
         return out;
     }
-    // Layer masks and placement are relative to the whole picture, so with
-    // layers the crop comes last; without, only the kept part is processed.
+    // Layer masks and placement, hidden regions and the subject are relative
+    // to the whole picture, so with any of them the crop comes last; without,
+    // only the kept part is processed.
     const bool layers = adj.hasLayerChanges();
-    QImage out = layers ? input.copy() : input.copy(rect);
+    const bool whole = layers || adj.hasAiChanges();
+    // The subject is found on the photo as shot, so tone changes do not move
+    // the cut-out edge (and the matte is reused while sliders move).
+    const QImage matte = adj.background.enabled ? cachedMatte(input, adj.background.model) : QImage();
+    QImage out = whole ? input.copy() : input.copy(rect);
     ColorProcessor(adj.color).apply(out);
-    if (layers) {
+    if (whole) {
         for (const auto& l : adj.layers)
             if (!l.isNoOp())
                 compositeLayer(out, l);
+        if (adj.redaction.isActive())
+            ai::hideRegions(out, adj.redaction.regionsAt(0), adj.redaction.style, adj.redaction.strength);
+        if (!matte.isNull())
+            ai::applyMatte(out, matte, adj.background.softness);
         if (rect != out.rect())
             out = out.copy(rect);
     }
@@ -242,8 +275,15 @@ bool PhotoExporter::save(const QString& path, const QImage& original, const QIma
         if (depth == 8)
             out = out.convertToFormat(out.hasAlphaChannel() ? QImage::Format_RGBA8888 : QImage::Format_RGB888);
     }
-    if (s.format == PhotoFormat::Jpeg && out.hasAlphaChannel())
-        out = out.convertToFormat(depth == 8 ? QImage::Format_RGB888 : QImage::Format_RGBX64);
+    if (s.format == PhotoFormat::Jpeg && out.hasAlphaChannel()) {
+        // JPEG has no transparency: a cut-out subject goes on white.
+        QImage flat(out.size(), depth == 8 ? QImage::Format_RGB888 : QImage::Format_RGBX64);
+        flat.fill(Qt::white);
+        QPainter p(&flat);
+        p.drawImage(0, 0, out);
+        p.end();
+        out = flat;
+    }
     out.setColorSpace(original.colorSpace());
 
     QImageWriter writer(path);

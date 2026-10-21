@@ -60,7 +60,10 @@ QByteArray Project::toJson() const {
     };
     const bool motion = anyClip([](const Clip& c) { return !c.stabilization.path.empty() || c.stabilization.enabled || !c.motion.isEmpty(); });
     const bool freezes = anyClip([](const Clip& c) { return c.kind == ClipKind::Freeze; });
-    root["version"] = motion ? 5 : freezes ? 4 : subtitles ? 3 : 2;
+    const auto& photoEntries = m_photos->entries();
+    const bool ai = anyClip([](const Clip& c) { return !c.redaction.tracks.empty() || c.redaction.enabled || c.background.enabled; }) ||
+                    std::any_of(photoEntries.begin(), photoEntries.end(), [](const auto& p) { return p.adjustments.hasAiChanges(); });
+    root["version"] = ai ? 6 : motion ? 5 : freezes ? 4 : subtitles ? 3 : 2;
     root["application"] = QCoreApplication::applicationVersion();
 
     QJsonArray media;
@@ -127,6 +130,10 @@ QByteArray Project::toJson() const {
                 co["stabilization"] = c.stabilization.toJson();
             if (!c.motion.isEmpty())
                 co["motion"] = c.motion.toJson();
+            if (!c.redaction.tracks.empty() || c.redaction.enabled)
+                co["redaction"] = c.redaction.toJson();
+            if (c.background.enabled)
+                co["background"] = c.background.toJson();
             if (!c.transitionIn.isNone())
                 co["transition"] = c.transitionIn.toJson();
             if (c.fadeIn > 0)
@@ -281,6 +288,10 @@ bool Project::fromJson(const QByteArray& json, const QString& baseDir, QString* 
             if (co.contains("stabilization"))
                 c.stabilization = Stabilization::fromJson(co.value("stabilization").toObject());
             c.motion = MotionPath::fromJson(co.value("motion").toArray());
+            if (co.contains("redaction"))
+                c.redaction = Redaction::fromJson(co.value("redaction").toObject());
+            if (co.contains("background"))
+                c.background = BackgroundRemoval::fromJson(co.value("background").toObject());
             if (co.contains("transition"))
                 c.transitionIn = Transition::fromJson(co.value("transition").toObject());
             c.fadeIn = ticksFromJson(co.value("fadeIn"));

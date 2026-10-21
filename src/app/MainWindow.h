@@ -86,6 +86,8 @@ private:
     void joinSelection();
     void freezeFrame();
     void stabilizeClip(const QUuid& clipId);
+    void redactClip(const QUuid& clipId);
+    void removeBackground(const QUuid& clipId, const QString& model);
     void refreshProgram();
     void showShortcuts();
     void showAbout();

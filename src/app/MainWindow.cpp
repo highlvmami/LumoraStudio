@@ -49,6 +49,7 @@
 #include "Icons.h"
 #include "Theme.h"
 #include "MediaCache.h"
+#include "Tasks.h"
 #include "audio/AudioPanel.h"
 #include "color/ClipColorPanel.h"
 #include "color/ScopesWidget.h"
@@ -64,7 +65,9 @@
 #include "photo/PhotoWorkspace.h"
 #include "playback/PlaybackEngine.h"
 #include "project/Project.h"
+#include "ai/Redaction.h"
 #include "ai/SpeechToText.h"
+#include "ai/Vision.h"
 #include "motion/Analysis.h"
 #include "render/FrameRenderer.h"
 #include "timeline/Subtitles.h"
@@ -111,6 +114,8 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
     m_properties = new PropertiesPanel(m_project, m_videoUndo);
     connect(m_properties, &PropertiesPanel::stabilizeRequested, this, &MainWindow::stabilizeClip);
     connect(m_properties, &PropertiesPanel::trackRequested, this, &MainWindow::trackClip);
+    connect(m_properties, &PropertiesPanel::redactRequested, this, &MainWindow::redactClip);
+    connect(m_properties, &PropertiesPanel::backgroundRequested, this, &MainWindow::removeBackground);
     m_clipColor = new ClipColorPanel(m_project, m_videoUndo);
     m_scopes = new ScopesWidget;
     m_audio = new AudioPanel(m_project, m_videoUndo);
@@ -1176,87 +1181,6 @@ void MainWindow::freezeFrame() {
         m_timelineView->selectOnly(freezeId);
 }
 
-namespace {
-
-// Runs `work` on a worker thread behind a modal progress dialog. Returns
-// nullopt when the user cancels.
-template <class T>
-std::optional<T> withProgress(QWidget* parent, const QString& label, std::function<T(const motion::Progress&)> work) {
-    auto progress = std::make_shared<std::atomic<int>>(0);
-    auto cancel = std::make_shared<std::atomic_bool>(false);
-    QProgressDialog dlg(label, MainWindow::tr("Cancel"), 0, 1000, parent);
-    dlg.setWindowModality(Qt::WindowModal);
-    dlg.setMinimumDuration(0);
-    dlg.setAutoClose(false);
-    dlg.setAutoReset(false);
-    QObject::connect(&dlg, &QProgressDialog::canceled, [cancel] { *cancel = true; });
-    QTimer timer;
-    QObject::connect(&timer, &QTimer::timeout, &dlg, [&] { dlg.setValue(*progress); });
-    timer.start(100);
-    QFutureWatcher<T> watcher;
-    QEventLoop loop;
-    QObject::connect(&watcher, &QFutureWatcher<T>::finished, &loop, &QEventLoop::quit);
-    watcher.setFuture(QtConcurrent::run([work = std::move(work), progress, cancel] {
-        return work([progress, cancel](double p) {
-            *progress = static_cast<int>(std::clamp(p, 0.0, 1.0) * 1000);
-            return !*cancel;
-        });
-    }));
-    loop.exec();
-    if (*cancel)
-        return std::nullopt;
-    return watcher.result();
-}
-
-} // namespace
-
-namespace {
-
-// Downloads `url` to `dest` behind a progress dialog. False when it failed
-// (with `error` set) or was cancelled (`error` empty).
-bool downloadFile(QWidget* parent, const QUrl& url, const QString& dest, const QString& label, QString* error) {
-    QNetworkAccessManager net;
-    QNetworkRequest req(url);
-    req.setAttribute(QNetworkRequest::RedirectPolicyAttribute, QNetworkRequest::NoLessSafeRedirectPolicy);
-    QSaveFile file(dest);
-    if (!file.open(QIODevice::WriteOnly)) {
-        *error = file.errorString();
-        return false;
-    }
-    QProgressDialog dlg(label, MainWindow::tr("Cancel"), 0, 1000, parent);
-    dlg.setWindowModality(Qt::WindowModal);
-    dlg.setMinimumDuration(0);
-    dlg.setAutoClose(false);
-    dlg.setAutoReset(false);
-    QNetworkReply* reply = net.get(req);
-    QObject::connect(reply, &QNetworkReply::readyRead, &dlg, [&] { file.write(reply->readAll()); });
-    QObject::connect(reply, &QNetworkReply::downloadProgress, &dlg, [&](qint64 got, qint64 total) {
-        if (total > 0)
-            dlg.setValue(static_cast<int>(got * 1000 / total));
-        dlg.setLabelText(QStringLiteral("%1\n%2 / %3 MB").arg(label).arg(got / 1000000).arg(total > 0 ? total / 1000000 : 0));
-    });
-    QObject::connect(&dlg, &QProgressDialog::canceled, reply, &QNetworkReply::abort);
-    QEventLoop loop;
-    QObject::connect(reply, &QNetworkReply::finished, &loop, &QEventLoop::quit);
-    loop.exec();
-    file.write(reply->readAll());
-    const bool cancelled = dlg.wasCanceled();
-    const bool ok = reply->error() == QNetworkReply::NoError && !cancelled;
-    if (!ok && !cancelled)
-        *error = reply->errorString();
-    reply->deleteLater();
-    if (!ok) {
-        file.cancelWriting();
-        return false;
-    }
-    if (!file.commit()) {
-        *error = file.errorString();
-        return false;
-    }
-    return true;
-}
-
-} // namespace
 
 void MainWindow::autoSubtitles() {
     if (!speech::available()) {
@@ -1367,6 +1291,62 @@ void MainWindow::stabilizeClip(const QUuid& clipId) {
     s.path = *camera;
     s.zoom = s.requiredZoom(motion::pictureAspect(*m_project->media(), *c));
     runTimelineEdit(m_videoUndo, tl, tr("Stabilise"), [&] { return tl->setStabilization(clipId, s); });
+}
+
+void MainWindow::redactClip(const QUuid& clipId) {
+    Timeline* tl = m_project->timeline();
+    const Clip* c = tl->clip(clipId);
+    auto media = c ? m_project->media()->find(c->mediaId) : nullptr;
+    if (!c || !c->hasMedia() || !media || !media->info.video)
+        return;
+    const QString title = tr("Hide faces and plates");
+    if (!ensureVisionModels(this, {QStringLiteral("face"), QStringLiteral("plate")}, title))
+        return;
+    const QString path = media->path;
+    // A freeze frame only needs its one picture.
+    const Ticks from = c->kind == ClipKind::Freeze ? c->freezeTime : c->sourceIn;
+    const Ticks to = c->kind == ClipKind::Freeze ? c->freezeTime + tl->frameDuration() : c->sourceOut;
+    const auto result = withProgress<ai::RedactionResult>(this, tr("Looking for faces and number plates…"),
+                                                          [path, from, to](const TaskProgress& p) {
+                                                              return ai::findRedactions(path, from, to, ai::RedactionOptions{}, p);
+                                                          });
+    if (!result || result->cancelled)
+        return;
+    if (!result->error.isEmpty()) {
+        QMessageBox::warning(this, title, result->error);
+        return;
+    }
+    c = tl->clip(clipId);
+    if (!c)
+        return;
+    Redaction r = c->redaction;
+    r.enabled = true;
+    r.tracks = result->tracks;
+    r.analyzedFrom = from;
+    r.analyzedTo = to;
+    runTimelineEdit(m_videoUndo, tl, title, [&] { return tl->setRedaction(clipId, r); });
+    statusBar()->showMessage(r.tracks.empty() ? tr("No faces or number plates were found.")
+                                              : tr("Found %1 face(s) and %2 number plate(s). Play the clip back to check.")
+                                                    .arg(r.count(RedactionKind::Face))
+                                                    .arg(r.count(RedactionKind::Plate)),
+                             8000);
+}
+
+void MainWindow::removeBackground(const QUuid& clipId, const QString& model) {
+    // The preview always uses the fast model, so the detailed one brings it along.
+    QStringList ids{ai::backgroundModelId(QStringLiteral("fast"))};
+    if (model != QLatin1String("fast"))
+        ids << ai::backgroundModelId(model);
+    if (!ensureVisionModels(this, ids, tr("Remove the background")))
+        return;
+    Timeline* tl = m_project->timeline();
+    const Clip* c = tl->clip(clipId);
+    if (!c)
+        return;
+    BackgroundRemoval b = c->background;
+    b.enabled = true;
+    b.model = model;
+    runTimelineEdit(m_videoUndo, tl, tr("Remove the background"), [&] { return tl->setBackgroundRemoval(clipId, b); });
 }
 
 void MainWindow::trackClip(const QUuid& id) {

@@ -21,6 +21,7 @@ class PhotoLibrary;
 class PhotoView;
 class ColorPanel;
 class LayersPanel;
+class SmartToolsPanel;
 class ScopesWidget;
 
 // The "Photo" workspace: photo list, preview with crop tool and mask
@@ -50,6 +51,7 @@ private:
     void render();
     void pushChange(const PhotoAdjustments& after, const QString& text, int control, const QString& key = {});
     void updateMaskOverlay();
+    void findRedactions();
     PhotoAdjustments current() const;
 
     PhotoLibrary* m_lib;
@@ -66,6 +68,7 @@ private:
     QTabWidget* m_tabs;
     ColorPanel* m_color;
     LayersPanel* m_layers;
+    SmartToolsPanel* m_smart;
     QToolButton* m_cropBtn;
     QComboBox* m_aspect;
     QPushButton* m_exportBtn;
