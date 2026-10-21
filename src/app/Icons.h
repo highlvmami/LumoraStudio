@@ -25,6 +25,7 @@ QIcon redo();
 QIcon import();
 QIcon exportFile(const QColor& color = {});
 QIcon crop();
+QIcon removeBackground();
 QIcon magnet();
 QIcon zoomIn();
 QIcon zoomOut();

@@ -2450,6 +2450,30 @@ Orijinal dosya asla değişmez: düzenlemeler projede saklanır ve dışa aktar�
         <source>Full screen (F or double-click the photo)</source>
         <translation>Tam ekran (F ya da fotoğrafa çift tıklayın)</translation>
     </message>
+    <message>
+        <source>Remove background</source>
+        <translation>Arka planı sil</translation>
+    </message>
+    <message>
+        <source>Cut the person or object out and make the rest transparent, in one click (B)</source>
+        <translation>Kişiyi ya da nesneyi tek tıkla ayırır, gerisini saydam yapar (B)</translation>
+    </message>
+    <message>
+        <source>Background removed</source>
+        <translation>Arka plan silindi</translation>
+    </message>
+    <message>
+        <source>Keep the background</source>
+        <translation>Arka planı koru</translation>
+    </message>
+    <message>
+        <source>Background removed. Export as PNG to keep the transparency; click again to bring it back.</source>
+        <translation>Arka plan silindi. Saydamlığı korumak için PNG olarak dışa aktarın; geri getirmek için yeniden tıklayın.</translation>
+    </message>
+    <message>
+        <source>Bring the background back</source>
+        <translation>Arka planı geri getir</translation>
+    </message>
 </context>
 <context>
     <name>lumora::Project</name>
