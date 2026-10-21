@@ -140,7 +140,12 @@ bool writeTestVideo(const QString& path, const TestVideoSpec& spec, QString* err
     const std::int64_t totalSamples = static_cast<std::int64_t>(spec.seconds) * 48000;
     for (int i = 0; i < frames; ++i) {
         av_frame_make_writable(vf.get());
-        if (spec.solidLuma >= 0)
+        if (spec.paint) {
+            drawSolid(vf.get(), 128);
+            const QImage img = spec.paint(i).convertToFormat(QImage::Format_Grayscale8);
+            for (int y = 0; y < std::min(img.height(), vf->height); ++y)
+                std::copy_n(img.constScanLine(y), std::min(img.width(), vf->width), vf->data[0] + y * vf->linesize[0]);
+        } else if (spec.solidLuma >= 0)
             drawSolid(vf.get(), spec.solidLuma);
         else
             drawIndex(vf.get(), i);

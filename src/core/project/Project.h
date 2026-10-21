@@ -18,9 +18,9 @@ class Project : public QObject {
 public:
     // 2: multiple tracks, titles, transitions, transforms, fades, gain.
     // 3 adds subtitle tracks; projects without them are still written as 2 so
-    // older versions can open them. 4 adds freeze frames (written only when
-    // the timeline has one).
-    static constexpr int kFormatVersion = 4;
+    // older versions can open them. 4 adds freeze frames, 5 stabilisation and
+    // motion tracking; both are written only when the timeline uses them.
+    static constexpr int kFormatVersion = 5;
     static constexpr const char* kExtension = "lumora";
 
     explicit Project(QObject* parent = nullptr);

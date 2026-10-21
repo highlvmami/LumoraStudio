@@ -14,7 +14,14 @@
 #include <QFileDialog>
 #include <QFileInfo>
 #include <QFrame>
+#include <QEventLoop>
+#include <QFutureWatcher>
 #include <QInputDialog>
+#include <QProgressDialog>
+#include <QTimer>
+#include <QtConcurrent/QtConcurrentRun>
+#include <atomic>
+#include <optional>
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QMenu>
@@ -46,9 +53,12 @@
 #include "panels/PropertiesPanel.h"
 #include "panels/TimelinePanel.h"
 #include "panels/TimelineView.h"
+#include "panels/VideoView.h"
+#include "playback/PlaybackSequence.h"
 #include "photo/PhotoWorkspace.h"
 #include "playback/PlaybackEngine.h"
 #include "project/Project.h"
+#include "motion/Analysis.h"
 #include "render/FrameRenderer.h"
 #include "timeline/Subtitles.h"
 #include "undo/TimelineCommands.h"
@@ -92,6 +102,8 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
     m_timelineView = new TimelineView(m_project->timeline(), m_project->media(), m_cache, m_videoUndo);
     m_timelinePanel = new TimelinePanel(m_timelineView);
     m_properties = new PropertiesPanel(m_project, m_videoUndo);
+    connect(m_properties, &PropertiesPanel::stabilizeRequested, this, &MainWindow::stabilizeClip);
+    connect(m_properties, &PropertiesPanel::trackRequested, this, &MainWindow::trackClip);
     m_clipColor = new ClipColorPanel(m_project, m_videoUndo);
     m_scopes = new ScopesWidget;
     m_audio = new AudioPanel(m_project, m_videoUndo);
@@ -1152,6 +1164,107 @@ void MainWindow::freezeFrame() {
     });
     if (!freezeId.isNull())
         m_timelineView->selectOnly(freezeId);
+}
+
+namespace {
+
+// Runs `work` on a worker thread behind a modal progress dialog. Returns
+// nullopt when the user cancels.
+template <class T>
+std::optional<T> withProgress(QWidget* parent, const QString& label, std::function<T(const motion::Progress&)> work) {
+    auto progress = std::make_shared<std::atomic<int>>(0);
+    auto cancel = std::make_shared<std::atomic_bool>(false);
+    QProgressDialog dlg(label, MainWindow::tr("Cancel"), 0, 1000, parent);
+    dlg.setWindowModality(Qt::WindowModal);
+    dlg.setMinimumDuration(0);
+    dlg.setAutoClose(false);
+    dlg.setAutoReset(false);
+    QObject::connect(&dlg, &QProgressDialog::canceled, [cancel] { *cancel = true; });
+    QTimer timer;
+    QObject::connect(&timer, &QTimer::timeout, &dlg, [&] { dlg.setValue(*progress); });
+    timer.start(100);
+    QFutureWatcher<T> watcher;
+    QEventLoop loop;
+    QObject::connect(&watcher, &QFutureWatcher<T>::finished, &loop, &QEventLoop::quit);
+    watcher.setFuture(QtConcurrent::run([work = std::move(work), progress, cancel] {
+        return work([progress, cancel](double p) {
+            *progress = static_cast<int>(std::clamp(p, 0.0, 1.0) * 1000);
+            return !*cancel;
+        });
+    }));
+    loop.exec();
+    if (*cancel)
+        return std::nullopt;
+    return watcher.result();
+}
+
+} // namespace
+
+void MainWindow::stabilizeClip(const QUuid& clipId) {
+    Timeline* tl = m_project->timeline();
+    const Clip* c = tl->clip(clipId);
+    auto media = c ? m_project->media()->find(c->mediaId) : nullptr;
+    if (!c || c->kind != ClipKind::Media || !media || !media->info.video)
+        return;
+    const QString path = media->path;
+    const Ticks from = c->sourceIn, to = c->sourceOut;
+    const auto camera = withProgress<std::vector<CameraSample>>(
+        this, tr("Measuring the camera movement…"),
+        [path, from, to](const motion::Progress& p) { return motion::analyzeCameraPath(path, from, to, p); });
+    if (!camera)
+        return;
+    c = tl->clip(clipId);
+    if (!c)
+        return;
+    if (camera->size() < 2) {
+        QMessageBox::warning(this, tr("Stabilise"), tr("The camera movement could not be measured in this clip."));
+        return;
+    }
+    Stabilization s = c->stabilization;
+    s.enabled = true;
+    s.path = *camera;
+    s.zoom = s.requiredZoom(motion::pictureAspect(*m_project->media(), *c));
+    runTimelineEdit(m_videoUndo, tl, tr("Stabilise"), [&] { return tl->setStabilization(clipId, s); });
+}
+
+void MainWindow::trackClip(const QUuid& clipId) {
+    const Clip* c = m_project->timeline()->clip(clipId);
+    if (!c)
+        return;
+    // The object is picked on the first frame of the clip.
+    if (m_monitor->mode() != MonitorPanel::Mode::Program)
+        m_monitor->showProgram(PlaybackSequence::fromTimeline(m_project->timeline()->state(), *m_project->media(),
+                                                              m_project->timeline()->frameRate()),
+                               true);
+    m_engine->pause();
+    m_engine->seek(c->timelineStart);
+    VideoView* view = m_monitor->view();
+    auto picked = std::make_shared<QMetaObject::Connection>();
+    auto cancelled = std::make_shared<QMetaObject::Connection>();
+    *picked = connect(view, &VideoView::regionPicked, this, [this, clipId, picked, cancelled](const QRectF& region) {
+        disconnect(*picked);
+        disconnect(*cancelled);
+        Timeline* tl = m_project->timeline();
+        const Clip* c = tl->clip(clipId);
+        if (!c)
+            return;
+        const TimelineState state = tl->state();
+        const MediaPool* pool = m_project->media();
+        const Ticks from = c->timelineStart, to = c->timelineEnd();
+        const AVRational rate = tl->frameRate();
+        const auto path = withProgress<MotionPath>(this, tr("Following the object…"), [state, pool, from, to, region, rate](const motion::Progress& p) {
+            return motion::trackRegion(state, *pool, from, to, region, rate, p);
+        });
+        if (!path || path->isEmpty())
+            return;
+        runTimelineEdit(m_videoUndo, tl, tr("Follow an object"), [&] { return tl->setMotionPath(clipId, *path); });
+        statusBar()->showMessage(tr("The clip now follows the object. Play it back to check."), 5000);
+    });
+    *cancelled = connect(view, &VideoView::regionPickCancelled, this, [picked, cancelled] {
+        disconnect(*picked);
+        disconnect(*cancelled);
+    });
+    view->startRegionPick(tr("Draw a box around the object to follow (Esc cancels)"));
 }
 
 void MainWindow::deleteSelection() {

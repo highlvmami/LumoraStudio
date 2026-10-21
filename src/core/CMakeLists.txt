@@ -30,6 +30,8 @@ add_library(lumora_core STATIC
     export/TimelineExporter.h export/TimelineExporter.cpp
     export/RenderExport.h export/RenderExport.cpp
     export/SubtitleStreams.h export/SubtitleStreams.cpp
+    motion/Motion.h motion/Motion.cpp
+    motion/Analysis.h motion/Analysis.cpp
     image/PhotoAdjustments.h image/PhotoAdjustments.cpp
     image/PhotoProcessor.h image/PhotoProcessor.cpp
     image/PhotoLibrary.h image/PhotoLibrary.cpp

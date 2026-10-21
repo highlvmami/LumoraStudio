@@ -82,6 +82,8 @@ private:
     void deleteSelection();
     void joinSelection();
     void freezeFrame();
+    void stabilizeClip(const QUuid& clipId);
+    void trackClip(const QUuid& clipId);
     void refreshProgram();
     void showShortcuts();
     void showAbout();

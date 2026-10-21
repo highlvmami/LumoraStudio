@@ -45,6 +45,8 @@ struct Clip {
 
     ClipTransform transform;     // video and title clips
     ColorGrade color;            // video clips
+    Stabilization stabilization; // video clips
+    MotionPath motion;           // video and title clips: follows a tracked object
     Transition transitionIn;     // primary storyline: transition from the previous clip
     Ticks fadeIn = 0;            // opacity (video) / volume (audio) ramps
     Ticks fadeOut = 0;
@@ -193,6 +195,8 @@ public:
     // Per-clip settings.
     bool setTransform(const QUuid& clipId, const ClipTransform& t);
     bool setColor(const QUuid& clipId, const ColorGrade& grade);
+    bool setStabilization(const QUuid& clipId, const Stabilization& s);
+    bool setMotionPath(const QUuid& clipId, const MotionPath& path);
     bool setTransition(const QUuid& clipId, const Transition& t);
     bool setFades(const QUuid& clipId, Ticks fadeIn, Ticks fadeOut);
     bool setGain(const QUuid& clipId, double gainDb);

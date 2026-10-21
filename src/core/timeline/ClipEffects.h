@@ -1,8 +1,11 @@
 #pragma once
 
 #include <QColor>
+#include <QJsonArray>
 #include <QJsonObject>
+#include <QPointF>
 #include <QString>
+#include <vector>
 
 #include "TimeBase.h"
 
@@ -87,6 +90,57 @@ struct TitleData {
 
     QJsonObject toJson() const;
     static TitleData fromJson(const QJsonObject& o);
+};
+
+// Camera path of a video clip measured by the stabiliser: for every analysed
+// source frame its media time and how far the picture content has moved since
+// the first frame (shift as a fraction of the picture size, rotation in
+// degrees). Rendering shifts each frame from this path onto a smoothed one.
+struct CameraSample {
+    Ticks time = 0;
+    double x = 0.0, y = 0.0, angle = 0.0;
+    bool operator==(const CameraSample&) const = default;
+};
+
+struct Stabilization {
+    bool enabled = false;
+    double smoothing = 1.0; // seconds of shake averaged away (0.2 .. 5)
+    double zoom = 1.0;      // enlarges the picture so the moving edges stay outside the frame
+    std::vector<CameraSample> path;
+
+    struct Correction {
+        double x = 0.0, y = 0.0, angle = 0.0; // fraction of the picture size, degrees
+    };
+    bool isActive() const { return enabled && path.size() > 1; }
+    // Shift and rotation that move the frame at media time `t` onto the
+    // smoothed camera path.
+    Correction correctionAt(Ticks t) const;
+    // Smallest zoom that keeps the picture edges out of view for the current
+    // smoothing (pictures with `aspect` = width / height), at most 1.5.
+    double requiredZoom(double aspect) const;
+
+    bool operator==(const Stabilization&) const = default;
+    QJsonObject toJson() const;
+    static Stabilization fromJson(const QJsonObject& o);
+};
+
+// A clip that follows a tracked object: its offset from where it is placed,
+// as a fraction of the frame, at times relative to the clip start.
+struct MotionPoint {
+    Ticks time = 0;
+    double x = 0.0, y = 0.0;
+    bool operator==(const MotionPoint&) const = default;
+};
+
+struct MotionPath {
+    std::vector<MotionPoint> points; // sorted by time
+
+    bool isEmpty() const { return points.empty(); }
+    // Linear between the points, held before the first and after the last.
+    QPointF offsetAt(Ticks local) const;
+    bool operator==(const MotionPath&) const = default;
+    QJsonArray toJson() const;
+    static MotionPath fromJson(const QJsonArray& a);
 };
 
 } // namespace lumora

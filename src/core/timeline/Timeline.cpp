@@ -83,7 +83,7 @@ bool TimelineState::hasEffects() const {
             return true;
         for (const auto& c : t.clips) {
             if (c.kind != ClipKind::Media || !c.transform.isIdentity() || !c.color.isIdentity() || !c.transitionIn.isNone() || c.fadeIn > 0 ||
-                c.fadeOut > 0 || c.gainDb != 0.0 || !c.audio.isIdentity())
+                c.fadeOut > 0 || c.gainDb != 0.0 || !c.audio.isIdentity() || c.stabilization.isActive() || !c.motion.isEmpty())
                 return true;
         }
     }
@@ -99,7 +99,7 @@ bool TimelineState::hasVideoEffects() const {
             return true;
         for (const auto& c : t.clips)
             if (c.kind != ClipKind::Media || !c.transform.isIdentity() || !c.color.isIdentity() ||
-                !c.transitionIn.isNone() || c.fadeIn > 0 || c.fadeOut > 0)
+                !c.transitionIn.isNone() || c.fadeIn > 0 || c.fadeOut > 0 || c.stabilization.isActive() || !c.motion.isEmpty())
                 return true;
     }
     return false;
@@ -692,6 +692,24 @@ bool Timeline::setColor(const QUuid& clipId, const ColorGrade& grade) {
     return true;
 }
 
+bool Timeline::setStabilization(const QUuid& clipId, const Stabilization& s) {
+    Clip* c = mutableClip(clipId);
+    if (!c || !c->hasMedia() || c->stabilization == s)
+        return false;
+    c->stabilization = s;
+    emit changed();
+    return true;
+}
+
+bool Timeline::setMotionPath(const QUuid& clipId, const MotionPath& path) {
+    Clip* c = mutableClip(clipId);
+    if (!c || c->kind == ClipKind::Subtitle || c->motion == path)
+        return false;
+    c->motion = path;
+    emit changed();
+    return true;
+}
+
 bool Timeline::setTransition(const QUuid& clipId, const Transition& tr) {
     auto loc = locate(clipId);
     if (!loc || loc->track != primaryVideoTrack() || loc->index == 0)
@@ -866,6 +884,12 @@ Clip Timeline::splitClip(Clip& c, Ticks t) {
     c.fadeOut = 0;
     c.fadeIn = std::min(c.fadeIn, c.duration());
     right.fadeOut = std::min(right.fadeOut, right.duration());
+    // A connected right half stays where it is on its anchor's picture.
+    if (!right.anchorId.isNull())
+        right.anchorSource += t - c.timelineStart;
+    // Motion paths are relative to the clip start.
+    for (auto& p : right.motion.points)
+        p.time -= t - c.timelineStart;
     return right;
 }
 
@@ -888,6 +912,7 @@ QUuid Timeline::freezeFrame(const QUuid& clipId, Ticks at, Ticks duration) {
     freeze.sourceOut = std::max(duration, frameDuration());
     freeze.transform = src.transform;
     freeze.color = src.color;
+    freeze.stabilization = src.stabilization;
 
     // Split the clip and its linked partners; the right halves get their own
     // link so they stay together when they move.
