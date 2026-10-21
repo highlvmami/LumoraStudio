@@ -36,6 +36,8 @@ public:
     // position, otherwise seeks. The returned frame stays owned by the decoder
     // until the next call.
     const AVFrame* frameAt(Ticks t, Ticks* framePts = nullptr, Ticks* frameDur = nullptr);
+    // True when frameAt(t) can get there by decoding forward, without a seek.
+    bool reachesForward(Ticks t) const;
 
     // Sequential access.
     bool seek(Ticks t);

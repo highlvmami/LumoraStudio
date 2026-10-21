@@ -11,6 +11,7 @@
 extern "C" {
 #include <libavutil/pixfmt.h>
 #include <libavcodec/codec_id.h>
+struct AVStream;
 }
 
 namespace lumora {
@@ -86,6 +87,9 @@ struct MediaInfo {
 // Probes a media file with FFmpeg (and Qt's image readers for stills).
 // Returns std::nullopt and sets `error` if the file cannot be opened.
 std::optional<MediaInfo> probeMedia(const QString& path, QString* error = nullptr);
+
+// Description of an already opened video stream (what probeMedia reports).
+VideoStreamInfo videoStreamInfo(const AVStream* stream, Ticks containerDuration);
 
 // Reads all packets of a stream (no decoding) and returns the presentation
 // times of key frames, sorted ascending. Cheap enough to run in the background

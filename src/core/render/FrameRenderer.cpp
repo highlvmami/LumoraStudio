@@ -3,6 +3,11 @@
 #include <QPainter>
 #include <algorithm>
 #include <cmath>
+#include <condition_variable>
+#include <deque>
+#include <future>
+#include <mutex>
+#include <thread>
 
 #include "color/ColorProcessor.h"
 #include "ffmpeg/FFmpeg.h"
@@ -52,6 +57,122 @@ struct FrameRenderer::Slot {
     std::unique_ptr<ColorProcessor> color; // for the clip's current grade
 };
 
+// Opens decoders for clips that are about to come into view and decodes up
+// to their first frame, one at a time on its own thread. The renderer takes
+// a finished decoder over when it reaches the clip.
+struct FrameRenderer::Prefetcher {
+    struct Job {
+        QString path;
+        Ticks sourceTime = 0;
+        ColorGrade grade;
+        std::unique_ptr<VideoDecoder> decoder;
+        std::unique_ptr<ColorProcessor> color;
+        bool started = false;
+        bool done = false;
+    };
+
+    std::mutex mutex;
+    std::condition_variable cv;
+    std::map<QUuid, std::shared_ptr<Job>> jobs; // per clip
+    std::deque<std::shared_ptr<Job>> queue;     // not started yet
+    bool quit = false;
+    std::thread thread;
+
+    ~Prefetcher() {
+        {
+            std::lock_guard lock(mutex);
+            quit = true;
+            queue.clear();
+        }
+        cv.notify_all();
+        if (thread.joinable())
+            thread.join();
+    }
+
+    void request(const QUuid& clip, const QString& path, Ticks sourceTime, const ColorGrade& grade) {
+        {
+            std::lock_guard lock(mutex);
+            if (jobs.count(clip))
+                return;
+            auto job = std::make_shared<Job>();
+            job->path = path;
+            job->sourceTime = sourceTime;
+            job->grade = grade;
+            jobs[clip] = job;
+            queue.push_back(job);
+            if (!thread.joinable())
+                thread = std::thread([this] { run(); });
+        }
+        cv.notify_all();
+    }
+
+    bool has(const QUuid& clip) {
+        std::lock_guard lock(mutex);
+        return jobs.count(clip) > 0;
+    }
+
+    // Forgets the jobs of clips that are no longer coming up.
+    void retain(const std::vector<QUuid>& wanted) {
+        std::lock_guard lock(mutex);
+        for (auto it = jobs.begin(); it != jobs.end();) {
+            if (std::find(wanted.begin(), wanted.end(), it->first) != wanted.end()) {
+                ++it;
+                continue;
+            }
+            queue.erase(std::remove(queue.begin(), queue.end(), it->second), queue.end());
+            it = jobs.erase(it);
+        }
+    }
+
+    // Hands over the job of `clip`. Waits when it is being prepared right
+    // now (it is ahead of the caller); one that has not started is dropped
+    // and the caller opens the decoder itself.
+    std::shared_ptr<Job> take(const QUuid& clip) {
+        std::unique_lock lock(mutex);
+        auto it = jobs.find(clip);
+        if (it == jobs.end())
+            return {};
+        auto job = it->second;
+        jobs.erase(it);
+        if (!job->started) {
+            queue.erase(std::remove(queue.begin(), queue.end(), job), queue.end());
+            return {};
+        }
+        cv.wait(lock, [&] { return job->done; });
+        return job;
+    }
+
+    void run() {
+        while (true) {
+            std::shared_ptr<Job> job;
+            {
+                std::unique_lock lock(mutex);
+                cv.wait(lock, [&] { return quit || !queue.empty(); });
+                if (quit)
+                    return;
+                job = queue.front();
+                queue.pop_front();
+                job->started = true;
+            }
+            auto decoder = std::make_unique<VideoDecoder>();
+            if (decoder->open(job->path))
+                decoder->frameAt(job->sourceTime);
+            else
+                decoder.reset();
+            std::unique_ptr<ColorProcessor> color;
+            if (!job->grade.isIdentity())
+                color = std::make_unique<ColorProcessor>(job->grade);
+            {
+                std::lock_guard lock(mutex);
+                job->decoder = std::move(decoder);
+                job->color = std::move(color);
+                job->done = true;
+            }
+            cv.notify_all();
+        }
+    }
+};
+
 FrameRenderer::FrameRenderer(const MediaPool* pool) : m_pool(pool) {}
 FrameRenderer::~FrameRenderer() = default;
 
@@ -70,6 +191,7 @@ void FrameRenderer::setPrecision(Precision p) {
 void FrameRenderer::clearCache() {
     m_slots.clear();
     m_lru.clear();
+    m_prefetcher.reset();
 }
 
 QSize FrameRenderer::defaultCanvasSize(const TimelineState& state, const MediaPool& pool) {
@@ -112,16 +234,38 @@ double FrameRenderer::fadeFactor(const Clip& c, Ticks t) const {
 }
 
 FrameRenderer::Slot* FrameRenderer::slotFor(const Clip& clip) {
+    std::lock_guard lock(m_slotMutex); // transitions look up two slots at once
+    // A decoder prepared ahead of time for this clip.
+    auto media = m_pool ? m_pool->find(clip.mediaId) : nullptr;
+    std::shared_ptr<Prefetcher::Job> job;
+    if (m_prefetcher && m_prefetcher->has(clip.id))
+        job = m_prefetcher->take(clip.id);
+    if (job && (!job->decoder || !media || job->decoder->path() != media->path))
+        job.reset(); // failed, or the clip now shows another file
+    auto adopt = [&](Slot* slot) {
+        if (!job)
+            return;
+        slot->decoder = std::move(job->decoder);
+        slot->failed = false;
+        slot->image = {};
+        slot->imagePts = kInvalidTicks;
+        if (job->color)
+            slot->color = std::move(job->color);
+        ++m_prefetchedUsed;
+    };
+
     auto it = m_slots.find(clip.id);
     if (it != m_slots.end()) {
         m_lru.remove(clip.id);
         m_lru.push_back(clip.id);
+        adopt(it->second.get());
         return it->second.get();
     }
-    auto media = m_pool ? m_pool->find(clip.mediaId) : nullptr;
     auto slot = std::make_unique<Slot>();
     if (!media || !media->info.video) {
         slot->failed = true;
+    } else if (job) {
+        adopt(slot.get());
     } else {
         slot->decoder = std::make_unique<VideoDecoder>();
         if (!slot->decoder->open(media->path))
@@ -133,6 +277,41 @@ FrameRenderer::Slot* FrameRenderer::slotFor(const Clip& clip) {
     }
     m_lru.push_back(clip.id);
     return (m_slots[clip.id] = std::move(slot)).get();
+}
+
+void FrameRenderer::prefetch(Ticks t, Ticks horizon) {
+    std::vector<QUuid> wanted;
+    auto dur = [this](const QUuid& id) { return mediaDuration(id); };
+    for (int ti : m_state.trackIndices(TrackType::Video)) {
+        const Track& track = m_state.tracks[ti];
+        if (track.hidden)
+            continue;
+        for (int k = 0; k < static_cast<int>(track.clips.size()); ++k) {
+            const Clip& c = track.clips[k];
+            if (!c.hasMedia())
+                continue;
+            // The incoming clip of a storyline transition shows up half the
+            // transition before its cut.
+            Ticks first = c.timelineStart;
+            if (ti == 0)
+                first -= m_state.transitionDuration(k, dur) / 2;
+            if (first <= t || first > t + horizon)
+                continue;
+            auto media = m_pool ? m_pool->find(c.mediaId) : nullptr;
+            if (!media || !media->info.video)
+                continue;
+            const Ticks source = std::max<Ticks>(0, c.mediaTime(first)) + m_sampleOffset;
+            if (auto it = m_slots.find(c.id); it != m_slots.end() &&
+                (it->second->failed || it->second->decoder->reachesForward(source)))
+                continue; // nothing to gain
+            if (!m_prefetcher)
+                m_prefetcher = std::make_unique<Prefetcher>();
+            m_prefetcher->request(c.id, media->path, source, c.color);
+            wanted.push_back(c.id);
+        }
+    }
+    if (m_prefetcher)
+        m_prefetcher->retain(wanted);
 }
 
 QImage FrameRenderer::clipImage(const Clip& clip, Ticks sourceTime, QSize* fitSize, int* rotation) {
@@ -305,8 +484,15 @@ QImage FrameRenderer::renderStoryline(Ticks t) {
     if (a < 0)
         return renderStorylineClip(i, t);
 
+    // Both pictures of a transition are decoded at the same time (each clip
+    // has its own decoder), otherwise transitions of big videos play at half
+    // speed. Slots are made beforehand so the two threads only look them up.
+    for (int k : {a, b})
+        if (v[k].hasMedia())
+            slotFor(v[k]);
+    auto incoming = std::async(std::launch::async, [&] { return renderStorylineClip(b, t); });
     const QImage la = renderStorylineClip(a, t);
-    const QImage lb = renderStorylineClip(b, t);
+    const QImage lb = incoming.get();
     const double p = std::clamp(progress, 0.0, 1.0);
     const double e = smoothstep(p);
     const double w = m_output.width(), h = m_output.height();

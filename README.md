@@ -43,6 +43,10 @@ Tam yol haritası: [docs/ozellikler.md](docs/ozellikler.md). Mimari: [docs/mimar
 - Tanıma bu bilgisayarda yapılır, hiçbir şey dışarı gönderilmez. Model (hızlı / dengeli / en doğru) ilk kullanımda bir kez indirilir.
 - Yazılan satırlar normal altyazıdır: düzeltilebilir, biçimlendirilebilir, videoya gömülebilir ya da .srt olarak kaydedilebilir.
 
+## Sürüm 0.4.2: kesimlerde akıcı önizleme
+
+- Önizleme oynatılırken kesim noktalarından ve geçişlerden geçerken takılma giderildi: sonraki kliplerin çözücüsü arka planda önceden açılıp ilk karesine konumlanır, geçişteki iki klip aynı anda çözülür. Büyük telefon videolarında (ör. 1440x2560) kesimdeki en uzun kare süresi yaklaşık 190 ms'den 35 ms'ye indi.
+
 ## Sürüm 0.4.1: dondurma karesi
 
 ![Dondurulmuş kare](docs/screenshots/dondurma.png)
