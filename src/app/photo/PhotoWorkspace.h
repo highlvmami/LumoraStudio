@@ -52,6 +52,10 @@ private:
     void pushChange(const PhotoAdjustments& after, const QString& text, int control, const QString& key = {});
     void updateMaskOverlay();
     void findRedactions();
+    // One click: cut the subject out with the default settings (or bring
+    // the background back when it is already removed).
+    void toggleBackground();
+    void showViewMenu(const QPoint& pos);
     PhotoAdjustments current() const;
 
     PhotoLibrary* m_lib;
@@ -73,6 +77,7 @@ private:
     QComboBox* m_aspect;
     QPushButton* m_exportBtn;
     QToolButton* m_compareBtn;
+    QToolButton* m_bgBtn;
     QLabel* m_info;
     QTimer* m_renderTimer;
     bool m_syncing = false;

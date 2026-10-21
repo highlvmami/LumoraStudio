@@ -22,6 +22,10 @@ Açık tema ("Gündüz", Görünüm → Tema):
 
 Tam yol haritası: [docs/ozellikler.md](docs/ozellikler.md). Mimari: [docs/mimari.md](docs/mimari.md).
 
+## Sürüm 0.6.1: tek tıkla arka plan silme
+
+- Fotoğraf çalışma alanında **Arka planı sil** düğmesi (ya da fotoğrafa sağ tık, ya da B tuşu): konu ayrılır, gerisi saydam olur. Yeniden tıklamak arka planı geri getirir; geri al ile de dönülür. Model ilk seferde bir kez indirilir (5 MB). PNG olarak dışa aktarınca saydamlık korunur.
+
 ## Sürüm 0.6'da neler var
 
 Yapay zeka araçlarının ilk dilimi. Hepsi bu bilgisayarda çalışır (ONNX Runtime, işlemci üzerinde); hiçbir görüntü dışarı gönderilmez. Her model ilk kullanıldığında bir kez indirilir.
