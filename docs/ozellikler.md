@@ -170,6 +170,7 @@ Hedef: kullanıcı istemedikçe hiçbir aşamada kalite düşmez.
 - ✅ Ortak renk ön ayarları (bir LUT hem fotoğrafta hem videoda kullanılır; her görünüm .cube olarak kaydedilebilir)
 - Koyu / açık tema, özelleştirilebilir panel düzeni
 - Türkçe ve İngilizce arayüz
+- ✅ Uygulama içi "Nasıl kullanılır" kitapçığı: sağda sabit bölüm menüsü, her bölüm adım adım anlatım (F1)
 - Tamamen yerel çalışma: hesap yok, bulut yok, yapay zeka modelleri de bilgisayarda çalışır
 - Otomatik güncelleme (GitHub Releases)
 - Performans paneli: GPU / RAM kullanımı, önbellek temizleme
@@ -182,7 +183,7 @@ Hedef: kullanıcı istemedikçe hiçbir aşamada kalite düşmez.
 - Alt: Zaman çizelgesi (video, ses, başlık izleri)
 - Dosyalar panelinden zaman çizelgesine sürükle-bırak ile ekleme; önizlemeye bırakınca da eklenir. Bırakırken yerleştirme, araya ekleme ve üzerine yazma seçenekleri.
 - Dosyaya çift tıklayınca önizlemede açılır, giriş/çıkış noktası (I/O) seçilip sadece o kısım eklenir.
-- Paneller taşınabilir, boyutlandırılabilir, düzen kaydedilebilir. Üstte Düzenleme / Renk / Ses / Fotoğraf çalışma alanı sekmeleri.
+- Paneller taşınabilir, boyutlandırılabilir, düzen kaydedilebilir. Üstte Düzenleme / Renk / Ses / Fotoğraf / Nasıl kullanılır sekmeleri.
 
 ## 5. Teknik öneri (tartışmaya açık)
 
@@ -199,5 +200,5 @@ Hedef: kullanıcı istemedikçe hiçbir aşamada kalite düşmez.
 3. ✅ **Sürüm 0.3:** Renk paneli, kapsamlar, LUT; fotoğrafta katmanlar ve maskeler.
 4. ✅ **Sürüm 0.4:** Ses araçları, altyazı, RAW desteği; eğriler, HSL ve fırça maskesi. 0.4.1: dondurma karesi.
 5. ✅ **Sürüm 0.5 (ilk dilim):** Görüntü sabitleme, hareket takibi, Whisper ile yerel otomatik altyazı.
-6. ✅ **Sürüm 0.6 (ilk dilim):** Yüz ve plaka bulanıklaştırma (otomatik takip ile), arka plan kaldırma (video ve fotoğraf); hepsi yerel modellerle (ONNX Runtime). 0.6.1: tek tıkla arka plan silme; 0.6.2: tam ekran; 0.6.3: çıkartmalar.
+6. ✅ **Sürüm 0.6 (ilk dilim):** Yüz ve plaka bulanıklaştırma (otomatik takip ile), arka plan kaldırma (video ve fotoğraf); hepsi yerel modellerle (ONNX Runtime). 0.6.1: tek tıkla arka plan silme; 0.6.2: tam ekran; 0.6.3: çıkartmalar; 0.6.4: nasıl kullanılır kitapçığı.
 7. **Sonrası:** Süper çözünürlük, içeriğe duyarlı nesne silme, maske takibi, çoklu kamera (ses ile eşitleme), OpenFX eklentileri, HDR10/HLG ve ton eşleme, OpenColorIO/ACES.

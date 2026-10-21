@@ -18,6 +18,7 @@ set(APP_SOURCES
     panels/TimelineView.h panels/TimelineView.cpp
     panels/TimelinePanel.h panels/TimelinePanel.cpp
     panels/PropertiesPanel.h panels/PropertiesPanel.cpp
+    panels/HelpPage.h panels/HelpPage.cpp
     dialogs/ExportDialog.h dialogs/ExportDialog.cpp
     dialogs/PhotoExportDialog.h dialogs/PhotoExportDialog.cpp
     dialogs/SettingsDialog.h dialogs/SettingsDialog.cpp
@@ -54,6 +55,14 @@ qt_add_resources(LumoraStudio theme
         resources/theme/down-off.png
         resources/theme/check-dark.png
         resources/theme/check-light.png)
+
+# "How to use" pages, one folder per interface language (see panels/HelpPage).
+file(GLOB HELP_PAGES CONFIGURE_DEPENDS RELATIVE ${CMAKE_CURRENT_SOURCE_DIR}/resources resources/help/*/*.html)
+list(TRANSFORM HELP_PAGES PREPEND resources/)
+qt_add_resources(LumoraStudio help
+    PREFIX /
+    BASE resources
+    FILES ${HELP_PAGES})
 
 target_include_directories(LumoraStudio PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 target_link_libraries(LumoraStudio PRIVATE lumora_core Qt6::Widgets Qt6::Multimedia Qt6::Concurrent Qt6::Network)

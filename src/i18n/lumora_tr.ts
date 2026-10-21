@@ -1155,6 +1155,83 @@
     </message>
 </context>
 <context>
+    <name>lumora::HelpPage</name>
+    <message>
+        <extracomment>Folder of the "How to use" pages for this language (resources/help/&lt;code&gt;).</extracomment>
+        <source>en</source>
+        <comment>help language</comment>
+        <translation>tr</translation>
+    </message>
+    <message>
+        <source>Sections</source>
+        <translation>Bölümler</translation>
+    </message>
+    <message>
+        <source>Getting started</source>
+        <translation>Başlarken</translation>
+    </message>
+    <message>
+        <source>Editing video</source>
+        <translation>Video kurgusu</translation>
+    </message>
+    <message>
+        <source>Titles, transitions and fades</source>
+        <translation>Başlıklar, geçişler ve kararmalar</translation>
+    </message>
+    <message>
+        <source>Stickers</source>
+        <translation>Çıkartmalar</translation>
+    </message>
+    <message>
+        <source>Subtitles</source>
+        <translation>Altyazılar</translation>
+    </message>
+    <message>
+        <source>Smart video tools</source>
+        <translation>Akıllı video araçları</translation>
+    </message>
+    <message>
+        <source>Colour</source>
+        <translation>Renk</translation>
+    </message>
+    <message>
+        <source>Sound</source>
+        <translation>Ses</translation>
+    </message>
+    <message>
+        <source>Photos</source>
+        <translation>Fotoğraf</translation>
+    </message>
+    <message>
+        <source>Exporting</source>
+        <translation>Dışa aktarma</translation>
+    </message>
+    <message>
+        <source>Full screen, panels and settings</source>
+        <translation>Tam ekran, paneller ve ayarlar</translation>
+    </message>
+    <message>
+        <source>Keyboard shortcuts</source>
+        <translation>Klavye kısayolları</translation>
+    </message>
+    <message>
+        <source>The same keys are listed in Help → Keyboard shortcuts. Shortcuts work while the main window has the focus.</source>
+        <translation>Aynı tuşlar Yardım → Klavye kısayolları altında da listelenir. Kısayollar ana pencere etkinken çalışır.</translation>
+    </message>
+    <message>
+        <source>How to use LumoraStudio</source>
+        <translation>LumoraStudio nasıl kullanılır</translation>
+    </message>
+    <message>
+        <source>Pick a section on the right.</source>
+        <translation>Sağdan bir bölüm seçin.</translation>
+    </message>
+    <message>
+        <source>Each section explains one part of the program step by step. The menu stays where it is, so you can jump between sections while you read. Go back to Edit, Color, Audio or Photo with the tabs at the top whenever you like.</source>
+        <translation>Her bölüm programın bir kısmını adım adım anlatır. Menü yerinde kalır, okurken bölümler arasında geçebilirsiniz. Kurgu, Renk, Ses ya da Fotoğraf sekmesine üstteki sekmelerle istediğiniz an dönebilirsiniz.</translation>
+    </message>
+</context>
+<context>
     <name>lumora::LayersPanel</name>
     <message>
         <source>Normal</source>
@@ -2170,6 +2247,34 @@
     <message>
         <source>This file has no picture to show as a sticker.</source>
         <translation>Bu dosyada çıkartma olarak gösterilecek bir görüntü yok.</translation>
+    </message>
+    <message>
+        <source>How to use</source>
+        <translation>Nasıl kullanılır</translation>
+    </message>
+    <message>
+        <source>A booklet that explains every part of LumoraStudio step by step (F1)</source>
+        <translation>LumoraStudio&apos;nun her bölümünü adım adım anlatan kitapçık (F1)</translation>
+    </message>
+    <message>
+        <source>&amp;How to use</source>
+        <translation>&amp;Nasıl kullanılır</translation>
+    </message>
+    <message>
+        <source>Open the booklet that explains every part of LumoraStudio (F1)</source>
+        <translation>LumoraStudio&apos;nun her bölümünü anlatan kitapçığı aç (F1)</translation>
+    </message>
+    <message>
+        <source>Crop the photo</source>
+        <translation>Fotoğrafı kırp</translation>
+    </message>
+    <message>
+        <source>Remove the photo&apos;s background</source>
+        <translation>Fotoğrafın arka planını sil</translation>
+    </message>
+    <message>
+        <source>Compare the photo with the original</source>
+        <translation>Fotoğrafı orijinalle karşılaştır</translation>
     </message>
 </context>
 <context>

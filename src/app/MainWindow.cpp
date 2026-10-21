@@ -57,6 +57,7 @@
 #include "ffmpeg/FFmpeg.h"
 #include "panels/MediaBinPanel.h"
 #include "panels/FullScreenViewer.h"
+#include "panels/HelpPage.h"
 #include "panels/MonitorPanel.h"
 #include "panels/PropertiesPanel.h"
 #include "panels/TimelinePanel.h"
@@ -98,8 +99,10 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
     m_tabs->addTab(tr("Color"));
     m_tabs->addTab(tr("Audio"));
     m_tabs->addTab(tr("Photo"));
+    m_tabs->addTab(tr("How to use"));
     m_tabs->setTabToolTip(1, tr("Colour grading: wheels, LUTs and scopes for the selected clip"));
     m_tabs->setTabToolTip(2, tr("Sound: clean up, equalise and level clips, duck music, set the loudness of the mix"));
+    m_tabs->setTabToolTip(4, tr("A booklet that explains every part of LumoraStudio step by step (F1)"));
 
     m_stack = new QStackedWidget;
     m_monitor = new MonitorPanel(m_engine);
@@ -107,6 +110,9 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
     makePanelSurface(m_monitor);
     m_stack->addWidget(m_monitor);
     m_stack->addWidget(m_photo);
+    m_help = new HelpPage;
+    m_help->setShortcutsProvider([this] { return shortcutsHtml(); });
+    m_stack->addWidget(m_help);
     setCentralWidget(m_stack);
 
     m_bin = new MediaBinPanel(m_project->media(), m_cache);
@@ -394,7 +400,7 @@ void MainWindow::createActions() {
     m_actZoomOut = make(tr("Zoom out"), QKeySequence(Qt::Key_Minus),
                         [this] { m_timelineView->setPixelsPerSecond(m_timelineView->pixelsPerSecond() / 1.5); });
     m_actResetLayout = make(tr("Reset panel layout"), {}, [this] {
-        if (m_workspace != Workspace::Photo)
+        if (m_workspace != Workspace::Photo && m_workspace != Workspace::Help)
             applyDefaultLayout(m_workspace);
     });
 
@@ -432,6 +438,8 @@ void MainWindow::createActions() {
     m_actFullScreenWindow->setToolTip(tr("Fill the whole screen with LumoraStudio (F11)"));
     m_actFullScreenWindow->setShortcuts({QKeySequence(Qt::Key_F11), QKeySequence::FullScreen});
     m_actFullScreenWindow->setCheckable(true);
+    m_actHowTo = make(tr("&How to use"), QKeySequence::HelpContents, [this] { setWorkspace(Workspace::Help); });
+    m_actHowTo->setToolTip(tr("Open the booklet that explains every part of LumoraStudio (F1)"));
 
     auto* tb = m_timelinePanel->toolBar();
     tb->addAction(m_actSplit);
@@ -546,6 +554,7 @@ void MainWindow::createMenus() {
     view->addAction(m_actResetLayout);
 
     QMenu* help = menuBar()->addMenu(tr("&Help"));
+    help->addAction(m_actHowTo);
     help->addAction(tr("Keyboard shortcuts"), this, &MainWindow::showShortcuts);
     help->addAction(tr("Feature list (roadmap)"), this, [] {
         QDesktopServices::openUrl(QUrl(QStringLiteral("https://github.com/highlvmami/LumoraStudio/blob/main/docs/ozellikler.md")));
@@ -622,21 +631,27 @@ void MainWindow::restoreSettings() {
 
 void MainWindow::setWorkspace(Workspace w) {
     const bool photo = w == Workspace::Photo;
+    const bool help = w == Workspace::Help;
+    // Photo and the help booklet fill the window without the video panels.
+    const bool fullPage = photo || help;
     const Workspace previous = m_workspace;
     if (w != previous) {
         // Each workspace keeps its own panel arrangement.
-        if (previous != Workspace::Photo)
+        if (previous != Workspace::Photo && previous != Workspace::Help)
             m_dockStates[static_cast<int>(previous)] = saveState();
-        if (photo)
+        if (fullPage)
             m_engine->pause();
+        // The booklet always opens on its "pick a section" page.
+        if (help)
+            m_help->showWelcome();
     }
     m_workspace = w;
     {
         const QSignalBlocker b(m_tabs);
         m_tabs->setCurrentIndex(static_cast<int>(w));
     }
-    m_stack->setCurrentIndex(photo ? 1 : 0);
-    if (photo) {
+    m_stack->setCurrentIndex(help ? 2 : photo ? 1 : 0);
+    if (fullPage) {
         for (QDockWidget* d : {m_binDock, m_propsDock, m_timelineDock, m_colorDock, m_scopesDock, m_audioDock})
             d->hide();
     } else if (w != previous) {
@@ -646,13 +661,19 @@ void MainWindow::setWorkspace(Workspace w) {
     }
     if ((w == Workspace::Color || w == Workspace::Audio) && m_timelineView->selection().isEmpty())
         selectClipAtPlayhead();
-    m_undoGroup->setActiveStack(photo ? m_photoUndo : m_videoUndo);
+    if (!help)
+        m_undoGroup->setActiveStack(photo ? m_photoUndo : m_videoUndo);
     for (QAction* a : {m_actSplit, m_actDelete, m_actJoin, m_actFreeze, m_actPlay, m_actPrevFrame, m_actNextFrame, m_actHome, m_actEnd,
                        m_actMarkIn, m_actMarkOut, m_actAddSource, m_actZoomIn, m_actZoomOut, m_actExport, m_actAddTitle, m_actAddSticker,
                        m_actAddTransition, m_actAddVideoTrack, m_actAddAudioTrack, m_actExportFrame, m_actAddSubtitle,
                        m_actAddSubtitleTrack, m_actImportSubtitles, m_actExportSubtitles, m_actAutoSubtitles})
-        a->setVisible(!photo);
+        a->setVisible(!fullPage);
     m_actExportPhoto->setVisible(photo);
+}
+
+void MainWindow::showHelpSection(const QString& id) {
+    setWorkspace(Workspace::Help);
+    m_help->showSection(id);
 }
 
 void MainWindow::updateTitle() {
@@ -1607,25 +1628,36 @@ void MainWindow::showShortcuts() {
     dlg.resize(460, 520);
     auto* layout = new QVBoxLayout(&dlg);
     auto* browser = new QTextBrowser;
-    QString html = QStringLiteral("<table cellspacing=6>");
-    for (QAction* a : {m_actPlay, m_actPrevFrame, m_actNextFrame, m_actHome, m_actEnd, m_actSplit, m_actDelete, m_actJoin,
-                       m_actFreeze, m_actMarkIn, m_actMarkOut, m_actAddSource, m_actSnap, m_actZoomIn, m_actZoomOut, m_actUndo, m_actRedo,
-                       m_actFullScreenPreview, m_actFullScreenWindow, m_actImport, m_actExport, m_actExportPhoto, m_actSave,
-                       m_actOpen}) {
-        QStringList keys;
-        for (const auto& k : a->shortcuts())
-            keys << k.toString(QKeySequence::NativeText);
-        html += QStringLiteral("<tr><td><b>%1</b></td><td>%2</td></tr>")
-                    .arg(keys.join(QStringLiteral(" / ")).toHtmlEscaped(), a->text().remove(QLatin1Char('&')).toHtmlEscaped());
-    }
-    html += QStringLiteral("<tr><td><b>Ctrl + %1</b></td><td>%2</td></tr>").arg(tr("wheel"), tr("Zoom the timeline"));
-    html += QStringLiteral("</table>");
-    browser->setHtml(html);
+    browser->setHtml(shortcutsHtml());
     layout->addWidget(browser);
     auto* buttons = new QDialogButtonBox(QDialogButtonBox::Close);
     connect(buttons, &QDialogButtonBox::rejected, &dlg, &QDialog::reject);
     layout->addWidget(buttons);
     dlg.exec();
+}
+
+QString MainWindow::shortcutsHtml() const {
+    QString html = QStringLiteral("<table cellspacing=6>");
+    for (QAction* a : {m_actPlay, m_actPrevFrame, m_actNextFrame, m_actHome, m_actEnd, m_actSplit, m_actDelete, m_actJoin,
+                       m_actFreeze, m_actMarkIn, m_actMarkOut, m_actAddSource, m_actSnap, m_actZoomIn, m_actZoomOut, m_actUndo, m_actRedo,
+                       m_actFullScreenPreview, m_actFullScreenWindow, m_actAddTitle, m_actAddSubtitle, m_actAddSticker,
+                       m_actAddTransition, m_actImport, m_actExport, m_actExportFrame, m_actExportPhoto, m_actSave, m_actOpen,
+                       m_actHowTo}) {
+        QStringList keys;
+        for (const auto& k : a->shortcuts())
+            keys << k.toString(QKeySequence::NativeText);
+        keys.removeDuplicates();
+        html += QStringLiteral("<tr><td><b>%1</b></td><td>%2</td></tr>")
+                    .arg(keys.join(QStringLiteral(" / ")).toHtmlEscaped(), a->text().remove(QLatin1Char('&')).toHtmlEscaped());
+    }
+    html += QStringLiteral("<tr><td><b>Ctrl + %1</b></td><td>%2</td></tr>").arg(tr("wheel"), tr("Zoom the timeline"));
+    // Keys of the Photo workspace.
+    for (const auto& [key, text] : {std::pair{QStringLiteral("C"), tr("Crop the photo")},
+                                    std::pair{QStringLiteral("B"), tr("Remove the photo's background")},
+                                    std::pair{QStringLiteral("\\"), tr("Compare the photo with the original")}})
+        html += QStringLiteral("<tr><td><b>%1</b></td><td>%2</td></tr>").arg(key, text.toHtmlEscaped());
+    html += QStringLiteral("</table>");
+    return html;
 }
 
 void MainWindow::showFullScreenPreview() {

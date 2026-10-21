@@ -58,7 +58,7 @@ int main(int argc, char* argv[]) {
     parser.addPositionalArgument(QStringLiteral("files"), QStringLiteral("Project (.lumora) or media files to open"));
     // Used to produce the screenshots in docs/screenshots.
     QCommandLineOption shotOpt(QStringLiteral("screenshot"), QStringLiteral("Save a screenshot and quit"), QStringLiteral("png"));
-    QCommandLineOption workspaceOpt(QStringLiteral("workspace"), QStringLiteral("edit, color, audio or photo"), QStringLiteral("name"));
+    QCommandLineOption workspaceOpt(QStringLiteral("workspace"), QStringLiteral("edit, color, audio, photo or help"), QStringLiteral("name"));
     QCommandLineOption selectOpt(QStringLiteral("select-first-clip"), QStringLiteral("Select the first clip"));
     QCommandLineOption selectClipOpt(QStringLiteral("select-clip"), QStringLiteral("Select clip TRACK:INDEX"), QStringLiteral("clip"));
     QCommandLineOption exportOpt(QStringLiteral("export-dialog"), QStringLiteral("Open the export dialog"));
@@ -67,9 +67,11 @@ int main(int argc, char* argv[]) {
     QCommandLineOption sizeOpt(QStringLiteral("size"), QStringLiteral("Window size WxH"), QStringLiteral("size"));
     QCommandLineOption autoSubsOpt(QStringLiteral("auto-subtitles-dialog"), QStringLiteral("Open the automatic subtitles dialog"));
     QCommandLineOption trackOpt(QStringLiteral("track-selected"), QStringLiteral("Start following an object with the selected clip"));
+    QCommandLineOption helpSectionOpt(QStringLiteral("help-section"), QStringLiteral("Open a page of the How to use booklet"),
+                                      QStringLiteral("id"));
     QCommandLineOption fullScreenOpt(QStringLiteral("full-screen-preview"), QStringLiteral("Open the full-screen preview"));
     for (auto* o : {&shotOpt, &workspaceOpt, &selectOpt, &selectClipOpt, &exportOpt, &exportCustomOpt, &seekOpt, &sizeOpt,
-                    &autoSubsOpt, &trackOpt, &fullScreenOpt}) {
+                    &autoSubsOpt, &trackOpt, &fullScreenOpt, &helpSectionOpt}) {
         o->setFlags(QCommandLineOption::HiddenFromHelp);
         parser.addOption(*o);
     }
@@ -89,6 +91,10 @@ int main(int argc, char* argv[]) {
         w.setWorkspace(MainWindow::Workspace::Color);
     if (parser.value(workspaceOpt) == QLatin1String("audio"))
         w.setWorkspace(MainWindow::Workspace::Audio);
+    if (parser.value(workspaceOpt) == QLatin1String("help"))
+        w.setWorkspace(MainWindow::Workspace::Help);
+    if (parser.isSet(helpSectionOpt))
+        w.showHelpSection(parser.value(helpSectionOpt));
     if (parser.isSet(selectOpt))
         w.selectFirstClip();
     if (parser.isSet(selectClipOpt)) {
