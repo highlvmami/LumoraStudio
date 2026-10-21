@@ -43,7 +43,8 @@ Hedef: kullanıcı istemedikçe hiçbir aşamada kalite düşmez.
 
 ### 2.3 Hız ve zaman
 
-- Sabit hız değiştirme, ters oynatma, dondurma karesi
+- ✅ Dondurma karesi (0.4.1: oynatma imlecindeki kare seçilen saniye kadar bekletilir)
+- Sabit hız değiştirme, ters oynatma
 - Hız rampası (eğri ile)
 - Optik akışla yumuşak ağır çekim (ara kare üretme)
 - Kare hızı dönüştürme
@@ -194,5 +195,5 @@ Hedef: kullanıcı istemedikçe hiçbir aşamada kalite düşmez.
 1. ✅ **Sürüm 0.1:** Video aç, kes, birleştir, kayıpsız dışa aktar (yeniden kodlamasız). Fotoğraf aç, kırp, temel ayarlar, kayıpsız kaydet.
 2. ✅ **Sürüm 0.2:** Çok izli zaman çizelgesi, yazı, geçişler, dışa aktarma ayarları, donanım hızlandırma.
 3. ✅ **Sürüm 0.3:** Renk paneli, kapsamlar, LUT; fotoğrafta katmanlar ve maskeler.
-4. ✅ **Sürüm 0.4:** Ses araçları, altyazı, RAW desteği; eğriler, HSL ve fırça maskesi.
+4. ✅ **Sürüm 0.4:** Ses araçları, altyazı, RAW desteği; eğriler, HSL ve fırça maskesi. 0.4.1: dondurma karesi.
 5. **Sonrası:** Yapay zeka araçları, takip, çoklu kamera, eklentiler, HDR.

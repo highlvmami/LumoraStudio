@@ -685,7 +685,7 @@ bool Timeline::setTransform(const QUuid& clipId, const ClipTransform& tr) {
 
 bool Timeline::setColor(const QUuid& clipId, const ColorGrade& grade) {
     Clip* c = mutableClip(clipId);
-    if (!c || c->kind != ClipKind::Media || c->color == grade)
+    if (!c || !c->hasMedia() || c->color == grade)
         return false;
     c->color = grade;
     emit changed();
@@ -854,6 +854,80 @@ bool Timeline::setDuration(const QUuid& clipId, Ticks duration) {
     return true;
 }
 
+Clip Timeline::splitClip(Clip& c, Ticks t) {
+    Clip right = c;
+    right.id = QUuid::createUuid();
+    const Ticks splitSource = c.toSource(t);
+    right.sourceIn = splitSource;
+    right.timelineStart = t;
+    right.transitionIn = {};
+    right.fadeIn = 0;
+    c.sourceOut = splitSource;
+    c.fadeOut = 0;
+    c.fadeIn = std::min(c.fadeIn, c.duration());
+    right.fadeOut = std::min(right.fadeOut, right.duration());
+    return right;
+}
+
+QUuid Timeline::freezeFrame(const QUuid& clipId, Ticks at, Ticks duration) {
+    auto loc = locate(clipId);
+    if (!loc || duration <= 0)
+        return {};
+    const int ti = loc->track;
+    if (!m_state.tracks[ti].isVideo() || m_state.tracks[ti].locked)
+        return {};
+    const Clip src = m_state.tracks[ti].clips[loc->index];
+    if (!src.hasMedia() || !src.contains(at))
+        return {};
+
+    Clip freeze;
+    freeze.id = QUuid::createUuid();
+    freeze.kind = ClipKind::Freeze;
+    freeze.mediaId = src.mediaId;
+    freeze.freezeTime = src.mediaTime(at);
+    freeze.sourceOut = std::max(duration, frameDuration());
+    freeze.transform = src.transform;
+    freeze.color = src.color;
+
+    // Split the clip and its linked partners; the right halves get their own
+    // link so they stay together when they move.
+    if (at > src.timelineStart) {
+        const QUuid newLink = QUuid::createUuid();
+        for (const auto& id : linkedClips(clipId)) {
+            auto l = locate(id);
+            Track& tr = m_state.tracks[l->track];
+            Clip& c = tr.clips[l->index];
+            if (tr.locked || at <= c.timelineStart || at >= c.timelineEnd())
+                continue;
+            Clip right = splitClip(c, at);
+            if (!c.linkId.isNull())
+                right.linkId = newLink;
+            tr.clips.insert(tr.clips.begin() + l->index + 1, right);
+        }
+        // Connected clips over the right half re-anchor to it, so they move
+        // with it below.
+        normalize();
+    }
+
+    Track& t = m_state.tracks[ti];
+    if (t.magnetic) {
+        auto it = std::find_if(t.clips.begin(), t.clips.end(), [&](const Clip& c) { return c.timelineStart >= at; });
+        t.clips.insert(it, freeze);
+    } else {
+        for (auto& c : t.clips)
+            if (c.timelineStart >= at) {
+                c.timelineStart += freeze.duration();
+                anchor(c);
+            }
+        freeze.timelineStart = at;
+        anchor(freeze);
+        t.clips.push_back(freeze);
+    }
+    normalize();
+    emit changed();
+    return freeze.id;
+}
+
 bool Timeline::splitAt(Ticks t) {
     bool any = false;
     std::map<QUuid, QUuid> newLinks;
@@ -864,17 +938,7 @@ bool Timeline::splitAt(Ticks t) {
             Clip& c = tr.clips[i];
             if (t <= c.timelineStart || t >= c.timelineEnd())
                 continue;
-            Clip right = c;
-            right.id = QUuid::createUuid();
-            const Ticks splitSource = c.toSource(t);
-            right.sourceIn = splitSource;
-            right.timelineStart = t;
-            right.transitionIn = {};
-            right.fadeIn = 0;
-            c.sourceOut = splitSource;
-            c.fadeOut = 0;
-            c.fadeIn = std::min(c.fadeIn, c.duration());
-            right.fadeOut = std::min(right.fadeOut, right.duration());
+            Clip right = splitClip(c, t);
             if (!c.linkId.isNull()) {
                 auto [it, inserted] = newLinks.try_emplace(c.linkId, QUuid());
                 if (inserted)

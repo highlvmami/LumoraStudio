@@ -19,6 +19,7 @@ QIcon add();
 QIcon split();
 QIcon remove();
 QIcon join();
+QIcon freeze();
 QIcon undo();
 QIcon redo();
 QIcon import();

@@ -77,7 +77,7 @@ QSize FrameRenderer::defaultCanvasSize(const TimelineState& state, const MediaPo
         return state.resolution;
     for (int ti : state.trackIndices(TrackType::Video))
         for (const auto& c : state.tracks[ti].clips) {
-            if (c.kind != ClipKind::Media)
+            if (!c.hasMedia())
                 continue;
             auto m = pool.find(c.mediaId);
             if (!m || !m->info.video)
@@ -255,7 +255,7 @@ QImage FrameRenderer::renderStorylineClip(int index, Ticks t) {
     QImage canvas = newCanvas(Qt::black);
     const Clip& c = m_state.tracks[0].clips[index];
     QPainter p(&canvas);
-    drawLayer(p, c, t, c.toSource(t), fadeFactor(c, t));
+    drawLayer(p, c, t, c.mediaTime(t), fadeFactor(c, t));
     return canvas;
 }
 
@@ -380,7 +380,7 @@ QImage FrameRenderer::render(Ticks t) {
             continue;
         for (const auto& c : track.clips)
             if (c.contains(t))
-                drawLayer(p, c, t, c.toSource(t), fadeFactor(c, t));
+                drawLayer(p, c, t, c.mediaTime(t), fadeFactor(c, t));
     }
     for (const auto& [track, clip] : subtitlesAt(t))
         drawSubtitle(p, canvas.size(), track->subtitleStyle, clip->text);
@@ -418,7 +418,7 @@ const AVFrame* FrameRenderer::passthroughFrame(Ticks t) {
         const Clip& c = v[k];
         if (!c.contains(t))
             continue;
-        if (c.kind != ClipKind::Media || !c.transform.isIdentity() || !c.color.isIdentity() || fadeFactor(c, t) != 1.0)
+        if (!c.hasMedia() || !c.transform.isIdentity() || !c.color.isIdentity() || fadeFactor(c, t) != 1.0)
             return nullptr;
         const Ticks dIn = m_state.transitionDuration(k, dur);
         if (dIn > 0 && t < c.timelineStart + dIn / 2)
@@ -431,7 +431,7 @@ const AVFrame* FrameRenderer::passthroughFrame(Ticks t) {
         Slot* slot = slotFor(c);
         if (slot->failed || slot->decoder->info().rotation != 0)
             return nullptr;
-        const AVFrame* f = slot->decoder->frameAt(c.toSource(t) + m_sampleOffset);
+        const AVFrame* f = slot->decoder->frameAt(c.mediaTime(t) + m_sampleOffset);
         if (!f || f->width != m_output.width() || f->height != m_output.height())
             return nullptr;
         if (f->sample_aspect_ratio.num > 0 && f->sample_aspect_ratio.num != f->sample_aspect_ratio.den)
