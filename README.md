@@ -22,6 +22,12 @@ Açık tema ("Gündüz", Görünüm → Tema):
 
 Tam yol haritası: [docs/ozellikler.md](docs/ozellikler.md). Mimari: [docs/mimari.md](docs/mimari.md).
 
+## Sürüm 0.6.5: iPhone fotoğrafları (HEIC)
+
+- **HEIC / HEIF** (iPhone'un varsayılan fotoğraf biçimi) ve **AVIF** dosyaları artık hem Kurgu'da zaman çizelgesine hem Fotoğraf çalışma alanına sürüklenebilir. Daha önce bu dosyalar video sanılıyor ve bozuk görünüyordu.
+- iPhone fotoğrafı dosyada küçük karolar halinde durur; karolar kayıpsız birleştirilir, fotoğraf doğru yöne çevrilir, renk profili (Display P3) korunur, 10 bit fotoğraflar 16 bit işlenir.
+- Açılamayan ya da bozuk bir dosya programı bozmaz; hangi dosyanın neden açılamadığını söyleyen bir uyarı çıkar.
+
 ## Sürüm 0.6.4: nasıl kullanılır
 
 ![Nasıl kullanılır sekmesi](docs/screenshots/nasil-kullanilir.png)

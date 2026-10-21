@@ -2488,14 +2488,6 @@
         <translation>Fotoğraf aç…</translation>
     </message>
     <message>
-        <source>Open a photo (JPEG, PNG, TIFF, WebP) with &quot;Open photos…&quot; or drag it here.
-
-The original file is never changed: edits are stored in the project and applied when you export.</source>
-        <translation>&quot;Fotoğraf aç…&quot; ile bir fotoğraf (JPEG, PNG, TIFF, WebP) açın ya da buraya sürükleyin.
-
-Orijinal dosya asla değişmez: düzenlemeler projede saklanır ve dışa aktarırken uygulanır.</translation>
-    </message>
-    <message>
         <source>Crop</source>
         <translation>Kırp</translation>
     </message>
@@ -2638,6 +2630,14 @@ Orijinal dosya asla değişmez: düzenlemeler projede saklanır ve dışa aktar�
     <message>
         <source>Move sticker</source>
         <translation>Çıkartmayı taşı</translation>
+    </message>
+    <message>
+        <source>Open a photo (JPEG, PNG, HEIC, TIFF, WebP) with &quot;Open photos…&quot; or drag it here.
+
+The original file is never changed: edits are stored in the project and applied when you export.</source>
+        <translation>&quot;Fotoğraf aç…&quot; ile bir fotoğraf (JPEG, PNG, HEIC, TIFF, WebP) açın ya da buraya sürükleyin.
+
+Orijinal dosya asla değişmez: düzenlemeler projede saklanır ve dışa aktarırken uygulanır.</translation>
     </message>
 </context>
 <context>
@@ -3805,6 +3805,37 @@ Orijinal dosya asla değişmez: düzenlemeler projede saklanır ve dışa aktar�
     <message>
         <source>The video cannot be read.</source>
         <translation>Video okunamıyor.</translation>
+    </message>
+</context>
+<context>
+    <name>lumora::heif</name>
+    <message>
+        <source>The photo&apos;s tile layout is damaged.</source>
+        <translation>Fotoğrafın karo düzeni bozuk.</translation>
+    </message>
+    <message>
+        <source>This photo is stored in tiles, which needs FFmpeg 7.1 or newer.</source>
+        <translation>Bu fotoğraf karolar halinde saklanmış; açmak için FFmpeg 7.1 ya da daha yenisi gerekir.</translation>
+    </message>
+    <message>
+        <source>The file holds no picture.</source>
+        <translation>Dosyada resim yok.</translation>
+    </message>
+    <message>
+        <source>Not enough memory for the photo.</source>
+        <translation>Fotoğraf için yeterli bellek yok.</translation>
+    </message>
+    <message>
+        <source>The photo&apos;s tiles do not match.</source>
+        <translation>Fotoğrafın karoları birbirini tutmuyor.</translation>
+    </message>
+    <message>
+        <source>Unsupported picture format.</source>
+        <translation>Desteklenmeyen resim biçimi.</translation>
+    </message>
+    <message>
+        <source>This photo format cannot be opened.</source>
+        <translation>Bu fotoğraf biçimi açılamıyor.</translation>
     </message>
 </context>
 <context>

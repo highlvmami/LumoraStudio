@@ -16,6 +16,7 @@
 #include "media/MediaInfo.h"
 #include "media/VideoDecoder.h"
 #include "ai/Vision.h"
+#include "HeifDecoder.h"
 #include "RawDecoder.h"
 
 namespace lumora {
@@ -143,6 +144,10 @@ QImage PhotoProcessor::load(const QString& path, QImage* original, QString* erro
     QImage img;
     if (raw::isRawFile(path)) {
         img = raw::decode(path, error);
+        if (img.isNull())
+            return {};
+    } else if (heif::isHeifFile(path)) {
+        img = heif::decode(path, error);
         if (img.isNull())
             return {};
     } else {

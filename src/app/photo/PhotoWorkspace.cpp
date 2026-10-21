@@ -72,7 +72,7 @@ PhotoWorkspace::PhotoWorkspace(PhotoLibrary* library, QUndoStack* undo, QWidget*
 
     // Center: view.
     m_view = new PhotoView;
-    m_view->setPlaceholder(tr("Open a photo (JPEG, PNG, TIFF, WebP) with \"Open photos…\" or drag it here.\n\n"
+    m_view->setPlaceholder(tr("Open a photo (JPEG, PNG, HEIC, TIFF, WebP) with \"Open photos…\" or drag it here.\n\n"
                               "The original file is never changed: edits are stored in the project and applied "
                               "when you export."));
     split->addWidget(m_view);

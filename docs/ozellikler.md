@@ -115,7 +115,7 @@ Hedef: kullanıcı istemedikçe hiçbir aşamada kalite düşmez.
 
 ### 3.1 Dosya ve iş akışı
 
-- Biçimler: ✅ JPEG, PNG, WebP, TIFF, ✅ RAW (CR2/CR3, NEF, ARW, RAF, ORF, RW2, DNG …); AVIF, HEIC, PSD (okuma) sonra
+- Biçimler: ✅ JPEG, PNG, WebP, TIFF, ✅ HEIC/HEIF (iPhone) ve AVIF okuma, ✅ RAW (CR2/CR3, NEF, ARW, RAF, ORF, RW2, DNG …); PSD (okuma) sonra
 - Tahribatsız düzenleme: orijinal dosya hiç değişmez, ayarlar ayrı saklanır
 - Geçmiş paneli, anlık görüntüler (snapshot), önce/sonra karşılaştırma
 - Toplu düzenleme: bir fotoğrafın ayarını yüzlercesine uygulama, toplu yeniden boyutlandırma ve adlandırma
@@ -200,5 +200,5 @@ Hedef: kullanıcı istemedikçe hiçbir aşamada kalite düşmez.
 3. ✅ **Sürüm 0.3:** Renk paneli, kapsamlar, LUT; fotoğrafta katmanlar ve maskeler.
 4. ✅ **Sürüm 0.4:** Ses araçları, altyazı, RAW desteği; eğriler, HSL ve fırça maskesi. 0.4.1: dondurma karesi.
 5. ✅ **Sürüm 0.5 (ilk dilim):** Görüntü sabitleme, hareket takibi, Whisper ile yerel otomatik altyazı.
-6. ✅ **Sürüm 0.6 (ilk dilim):** Yüz ve plaka bulanıklaştırma (otomatik takip ile), arka plan kaldırma (video ve fotoğraf); hepsi yerel modellerle (ONNX Runtime). 0.6.1: tek tıkla arka plan silme; 0.6.2: tam ekran; 0.6.3: çıkartmalar; 0.6.4: nasıl kullanılır kitapçığı.
+6. ✅ **Sürüm 0.6 (ilk dilim):** Yüz ve plaka bulanıklaştırma (otomatik takip ile), arka plan kaldırma (video ve fotoğraf); hepsi yerel modellerle (ONNX Runtime). 0.6.1: tek tıkla arka plan silme; 0.6.2: tam ekran; 0.6.3: çıkartmalar; 0.6.4: nasıl kullanılır kitapçığı; 0.6.5: HEIC/HEIF (iPhone) ve AVIF fotoğraflar.
 7. **Sonrası:** Süper çözünürlük, içeriğe duyarlı nesne silme, maske takibi, çoklu kamera (ses ile eşitleme), OpenFX eklentileri, HDR10/HLG ve ton eşleme, OpenColorIO/ACES.
