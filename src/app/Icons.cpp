@@ -225,6 +225,26 @@ QIcon crop() {
     });
 }
 
+QIcon removeBackground() {
+    return draw([](QPainter& p, QColor c) {
+        // A person in front of a checkerboard (the transparent background).
+        QColor faint = c;
+        faint.setAlphaF(0.35);
+        for (int y = 0; y < 3; ++y)
+            for (int x = 0; x < 3; ++x)
+                if ((x + y) % 2 == 0)
+                    p.fillRect(QRectF(3 + x * 6, 3 + y * 6, 6, 6), faint);
+        p.setPen(Qt::NoPen);
+        p.setBrush(c);
+        p.drawEllipse(QPointF(14, 10), 3.6, 3.6);
+        QPainterPath body;
+        body.moveTo(6.5, 22);
+        body.cubicTo(6.5, 15.5, 21.5, 15.5, 21.5, 22);
+        body.closeSubpath();
+        p.drawPath(body);
+    });
+}
+
 QIcon magnet() {
     return draw([](QPainter& p, QColor c) {
         p.setPen(pen(c, 3));
