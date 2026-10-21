@@ -170,7 +170,7 @@ Hedef: kullanıcı istemedikçe hiçbir aşamada kalite düşmez.
 - ✅ Ortak renk ön ayarları (bir LUT hem fotoğrafta hem videoda kullanılır; her görünüm .cube olarak kaydedilebilir)
 - Koyu / açık tema, özelleştirilebilir panel düzeni
 - Türkçe ve İngilizce arayüz
-- ✅ Uygulama içi "Nasıl kullanılır" kitapçığı: sağda sabit bölüm menüsü, her bölüm adım adım anlatım (F1)
+- ✅ Uygulama içi "Nasıl kullanılır" kitapçığı: solda sabit bölüm menüsü, her bölüm adım adım anlatım (F1)
 - Tamamen yerel çalışma: hesap yok, bulut yok, yapay zeka modelleri de bilgisayarda çalışır
 - Otomatik güncelleme (GitHub Releases)
 - Performans paneli: GPU / RAM kullanımı, önbellek temizleme

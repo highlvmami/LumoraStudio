@@ -57,7 +57,7 @@ qt_add_resources(LumoraStudio theme
         resources/theme/check-light.png)
 
 # "How to use" pages, one folder per interface language (see panels/HelpPage).
-file(GLOB HELP_PAGES CONFIGURE_DEPENDS RELATIVE ${CMAKE_CURRENT_SOURCE_DIR}/resources resources/help/*/*.html)
+file(GLOB HELP_PAGES CONFIGURE_DEPENDS RELATIVE ${CMAKE_CURRENT_SOURCE_DIR}/resources resources/help/*/*.html resources/help/*/img/*.png)
 list(TRANSFORM HELP_PAGES PREPEND resources/)
 qt_add_resources(LumoraStudio help
     PREFIX /
