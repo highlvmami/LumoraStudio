@@ -6,6 +6,7 @@
 #include <cmath>
 
 #include "ffmpeg/FFmpeg.h"
+#include "image/HeifDecoder.h"
 #include "image/RawDecoder.h"
 
 extern "C" {
@@ -28,7 +29,7 @@ QStringList videoFileExtensions() {
 }
 
 QStringList imageFileExtensions() {
-    return QStringList{"jpg", "jpeg", "png", "tif", "tiff", "webp", "bmp"} + raw::fileExtensions();
+    return QStringList{"jpg", "jpeg", "png", "tif", "tiff", "webp", "bmp"} + heif::fileExtensions() + raw::fileExtensions();
 }
 
 bool isImageFile(const QString& path) {
@@ -64,6 +65,21 @@ static std::optional<MediaInfo> probeImage(const QString& path, QString* error) 
         info.imageWidth = ri.size.width();
         info.imageHeight = ri.size.height();
         info.imageBitDepth = ri.bitDepth;
+        info.fileSize = QFileInfo(path).size();
+        return info;
+    }
+    if (heif::isHeifFile(path)) {
+        heif::Info hi;
+        if (!heif::probe(path, &hi, error))
+            return std::nullopt;
+        MediaInfo info;
+        info.path = path;
+        info.kind = MediaKind::Image;
+        info.formatName = QFileInfo(path).suffix().toLower();
+        info.formatLongName = QStringLiteral("%1 (%2)").arg(info.formatName.toUpper(), hi.codec.toUpper());
+        info.imageWidth = hi.size.width();
+        info.imageHeight = hi.size.height();
+        info.imageBitDepth = hi.bitDepth;
         info.fileSize = QFileInfo(path).size();
         return info;
     }

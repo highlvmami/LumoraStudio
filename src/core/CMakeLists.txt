@@ -40,6 +40,7 @@ add_library(lumora_core STATIC
     image/PhotoProcessor.h image/PhotoProcessor.cpp
     image/PhotoLibrary.h image/PhotoLibrary.cpp
     image/RawDecoder.h image/RawDecoder.cpp
+    image/HeifDecoder.h image/HeifDecoder.cpp
     project/Project.h project/Project.cpp
     update/UpdateManifest.h update/UpdateManifest.cpp
 )
@@ -69,6 +70,7 @@ set(CORE_TRANSLATABLE_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/color/Lut.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/export/ExportPlanner.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/export/TimelineExporter.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/image/HeifDecoder.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/project/Project.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/timeline/Subtitles.cpp
     PARENT_SCOPE)
