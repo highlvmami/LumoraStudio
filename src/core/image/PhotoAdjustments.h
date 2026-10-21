@@ -6,6 +6,7 @@
 #include <vector>
 
 #include "color/ColorGrade.h"
+#include "timeline/ClipEffects.h"
 
 namespace lumora {
 
@@ -94,10 +95,15 @@ struct PhotoAdjustments {
     // source image. A null rectangle means "no crop".
     QRectF crop;
     std::vector<PhotoLayer> layers; // bottom first
+    // Applied after the layers: faces and plates hidden (one box per track,
+    // time 0), then the background cut away (transparent).
+    Redaction redaction;
+    BackgroundRemoval background;
 
     bool hasLayerChanges() const;
+    bool hasAiChanges() const { return redaction.isActive() || background.enabled; }
     // Anything that changes pixel values (as opposed to only cropping).
-    bool hasToneChanges() const { return !color.isIdentity() || hasLayerChanges(); }
+    bool hasToneChanges() const { return !color.isIdentity() || hasLayerChanges() || hasAiChanges(); }
     bool hasCrop() const { return !crop.isNull() && crop != QRectF(0, 0, 1, 1); }
     bool isIdentity() const { return !hasToneChanges() && !hasCrop(); }
 

@@ -11,6 +11,7 @@
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QLineEdit>
+#include <QListWidget>
 #include <QLocale>
 #include <QPlainTextEdit>
 #include <QPushButton>
@@ -22,6 +23,7 @@
 #include <cmath>
 
 #include "Theme.h"
+#include "ai/Vision.h"
 #include "export/ExportPlanner.h"
 #include "motion/Analysis.h"
 #include "project/Project.h"
@@ -303,6 +305,60 @@ PropertiesPanel::PropertiesPanel(Project* project, QUndoStack* undo, QWidget* pa
     f->addRow(trackRow);
     layout->addWidget(m_trackSection);
 
+    // --- faces and number plates ---
+    m_redactSection = makeSection(tr("Hide faces and plates"), &f);
+    m_redactInfo = new QLabel;
+    m_redactInfo->setWordWrap(true);
+    m_redactInfo->setStyleSheet(QStringLiteral("color: palette(placeholder-text);"));
+    f->addRow(m_redactInfo);
+    m_redactFind = new QPushButton(tr("Find faces and plates"));
+    m_redactFind->setToolTip(tr("Looks through the clip on this computer and follows every face and number plate"));
+    m_redactClear = new QPushButton(tr("Remove"));
+    auto* redactRow = new QHBoxLayout;
+    redactRow->addWidget(m_redactFind, 1);
+    redactRow->addWidget(m_redactClear);
+    f->addRow(redactRow);
+    m_redactFaces = new QCheckBox(tr("Faces"));
+    m_redactPlates = new QCheckBox(tr("Number plates"));
+    auto* kindRow = new QHBoxLayout;
+    kindRow->addWidget(m_redactFaces);
+    kindRow->addWidget(m_redactPlates);
+    kindRow->addStretch();
+    f->addRow(tr("Hide"), kindRow);
+    m_redactStyle = new QComboBox;
+    m_redactStyle->addItem(tr("Blur"), static_cast<int>(RedactionStyle::Blur));
+    m_redactStyle->addItem(tr("Pixelate"), static_cast<int>(RedactionStyle::Pixelate));
+    m_redactStyle->addItem(tr("Black box"), static_cast<int>(RedactionStyle::Fill));
+    f->addRow(tr("Look"), m_redactStyle);
+    m_redactStrength = new QSpinBox;
+    m_redactStrength->setRange(0, 100);
+    m_redactStrength->setSuffix(QStringLiteral(" %"));
+    f->addRow(tr("Strength"), m_redactStrength);
+    m_redactList = new QListWidget;
+    m_redactList->setToolTip(tr("Untick what should stay visible"));
+    f->addRow(m_redactList);
+    layout->addWidget(m_redactSection);
+
+    // --- background removal ---
+    m_bgSection = makeSection(tr("Background"), &f);
+    m_bgOn = new QCheckBox(tr("Remove the background"));
+    m_bgOn->setToolTip(tr("Keeps the person or object in front and makes the rest transparent"));
+    f->addRow(m_bgOn);
+    m_bgModel = new QComboBox;
+    m_bgModel->addItem(tr("Fast"), QStringLiteral("fast"));
+    m_bgModel->addItem(tr("Detailed (slow)"), QStringLiteral("quality"));
+    m_bgModel->setToolTip(tr("The detailed model finds hair and fine edges better; the preview uses the fast one"));
+    f->addRow(tr("Model"), m_bgModel);
+    m_bgSoftness = new QSpinBox;
+    m_bgSoftness->setRange(0, 100);
+    m_bgSoftness->setSuffix(QStringLiteral(" %"));
+    f->addRow(tr("Edge softness"), m_bgSoftness);
+    m_bgInfo = new QLabel;
+    m_bgInfo->setWordWrap(true);
+    m_bgInfo->setStyleSheet(QStringLiteral("color: palette(placeholder-text);"));
+    f->addRow(m_bgInfo);
+    layout->addWidget(m_bgSection);
+
     // --- fades ---
     m_fadeSection = makeSection(tr("Fades"), &f);
     m_fadeIn = dspin(0, 600, 0.1, 2, sec);
@@ -416,6 +472,91 @@ PropertiesPanel::PropertiesPanel(Project* project, QUndoStack* undo, QWidget* pa
             Stabilization s = c.stabilization;
             s.zoom = v / 100.0;
             return m_project->timeline()->setStabilization(c.id, s);
+        });
+    });
+    connect(m_redactFind, &QPushButton::clicked, this, [this] {
+        if (!m_clip.isNull())
+            emit redactRequested(m_clip);
+    });
+    connect(m_redactClear, &QPushButton::clicked, this, [this] {
+        edit(tr("Remove hidden regions"), {}, [&](const Clip& c) {
+            Redaction r;
+            r.style = c.redaction.style;
+            r.strength = c.redaction.strength;
+            return m_project->timeline()->setRedaction(c.id, r);
+        });
+    });
+    for (QCheckBox* cb : {m_redactFaces, m_redactPlates})
+        connect(cb, &QCheckBox::toggled, this, [this] {
+            edit(tr("Hide faces and plates"), {}, [&](const Clip& c) {
+                Redaction r = c.redaction;
+                r.faces = m_redactFaces->isChecked();
+                r.plates = m_redactPlates->isChecked();
+                return m_project->timeline()->setRedaction(c.id, r);
+            });
+        });
+    connect(m_redactStyle, &QComboBox::currentIndexChanged, this, [this] {
+        edit(tr("Change how regions are hidden"), {}, [&](const Clip& c) {
+            Redaction r = c.redaction;
+            r.style = static_cast<RedactionStyle>(m_redactStyle->currentData().toInt());
+            return m_project->timeline()->setRedaction(c.id, r);
+        });
+    });
+    connect(m_redactStrength, &QSpinBox::valueChanged, this, [this](int v) {
+        edit(tr("Change hiding strength"), QStringLiteral("redact-strength"), [&](const Clip& c) {
+            Redaction r = c.redaction;
+            r.strength = v / 100.0;
+            return m_project->timeline()->setRedaction(c.id, r);
+        });
+    });
+    connect(m_redactList, &QListWidget::itemChanged, this, [this](QListWidgetItem* item) {
+        const int i = item->data(Qt::UserRole).toInt();
+        const bool on = item->checkState() == Qt::Checked;
+        edit(on ? tr("Hide region") : tr("Show region"), {}, [&](const Clip& c) {
+            Redaction r = c.redaction;
+            if (i < 0 || i >= static_cast<int>(r.tracks.size()))
+                return false;
+            r.tracks[i].enabled = on;
+            return m_project->timeline()->setRedaction(c.id, r);
+        });
+    });
+    connect(m_bgOn, &QCheckBox::toggled, this, [this](bool on) {
+        if (m_updating || m_clip.isNull())
+            return;
+        const QString model = m_bgModel->currentData().toString();
+        if (on && !ai::visionModelReady(ai::backgroundModelId(model))) {
+            emit backgroundRequested(m_clip, model); // downloads the model first
+            refresh();
+            return;
+        }
+        edit(on ? tr("Remove the background") : tr("Keep the background"), {}, [&](const Clip& c) {
+            BackgroundRemoval b = c.background;
+            b.enabled = on;
+            b.model = model;
+            return m_project->timeline()->setBackgroundRemoval(c.id, b);
+        });
+    });
+    connect(m_bgModel, &QComboBox::currentIndexChanged, this, [this] {
+        if (m_updating || m_clip.isNull())
+            return;
+        const QString model = m_bgModel->currentData().toString();
+        const Clip* c = m_project->timeline()->clip(m_clip);
+        if (c && c->background.enabled && !ai::visionModelReady(ai::backgroundModelId(model))) {
+            emit backgroundRequested(m_clip, model);
+            refresh();
+            return;
+        }
+        edit(tr("Change background model"), {}, [&](const Clip& c) {
+            BackgroundRemoval b = c.background;
+            b.model = model;
+            return m_project->timeline()->setBackgroundRemoval(c.id, b);
+        });
+    });
+    connect(m_bgSoftness, &QSpinBox::valueChanged, this, [this](int v) {
+        edit(tr("Change edge softness"), QStringLiteral("bg-softness"), [&](const Clip& c) {
+            BackgroundRemoval b = c.background;
+            b.softness = v / 100.0;
+            return m_project->timeline()->setBackgroundRemoval(c.id, b);
         });
     });
     connect(m_trackStart, &QPushButton::clicked, this, [this] {
@@ -681,6 +822,69 @@ void PropertiesPanel::refreshEditors(const Clip* clip) {
         m_stabInfo->setText(s.path.size() > 1 ? QString() : tr("The camera movement is measured once when you turn it on."));
         m_stabInfo->setVisible(s.path.size() < 2);
     }
+    const bool ai = video && clip->hasMedia();
+    m_redactSection->setVisible(ai);
+    m_bgSection->setVisible(ai);
+    if (ai) {
+        const Redaction& r = clip->redaction;
+        const int faces = r.count(RedactionKind::Face), plates = r.count(RedactionKind::Plate);
+        const bool found = !r.tracks.empty();
+        QString info;
+        if (!r.enabled)
+            info = tr("Blurs every face and number plate in the clip and follows them as they move. Runs on this computer.");
+        else if (!found)
+            info = tr("No faces or number plates were found in this clip.");
+        else
+            info = tr("Found %1 face(s) and %2 number plate(s).").arg(faces).arg(plates);
+        const bool partial = r.enabled && clip->kind == ClipKind::Media &&
+                             (clip->sourceIn < r.analyzedFrom - tl->frameDuration() || clip->sourceOut > r.analyzedTo + tl->frameDuration());
+        if (partial)
+            info += QLatin1Char(' ') + tr("The clip was lengthened since: search again to cover the new part.");
+        m_redactInfo->setText(info);
+        m_redactFind->setText(r.enabled ? tr("Search again") : tr("Find faces and plates"));
+        m_redactClear->setEnabled(r.enabled);
+        for (QWidget* w : std::initializer_list<QWidget*>{m_redactFaces, m_redactPlates, m_redactStyle, m_redactStrength})
+            w->setEnabled(found);
+        m_redactFaces->setChecked(r.faces);
+        m_redactPlates->setChecked(r.plates);
+        m_redactStyle->setCurrentIndex(std::max(0, m_redactStyle->findData(static_cast<int>(r.style))));
+        m_redactStrength->setValue(qRound(r.strength * 100));
+        m_redactList->setVisible(found);
+        m_redactList->clear();
+        int faceNo = 0, plateNo = 0;
+        const Ticks origin = clip->kind == ClipKind::Media ? clip->sourceIn : clip->freezeTime;
+        for (int i = 0; i < static_cast<int>(r.tracks.size()); ++i) {
+            const RedactionTrack& t = r.tracks[i];
+            const bool face = t.kind != RedactionKind::Plate;
+            QString label = face ? tr("Face %1").arg(++faceNo) : tr("Plate %1").arg(++plateNo);
+            if (clip->kind == ClipKind::Media)
+                label += QStringLiteral(" · %1 – %2")
+                             .arg(formatTimecode(std::max<Ticks>(0, t.start() - origin), tl->frameRate()),
+                                  formatTimecode(std::max<Ticks>(0, t.end() - origin), tl->frameRate()));
+            auto* item = new QListWidgetItem(label, m_redactList);
+            item->setFlags(Qt::ItemIsEnabled | Qt::ItemIsUserCheckable);
+            item->setCheckState(t.enabled ? Qt::Checked : Qt::Unchecked);
+            item->setData(Qt::UserRole, i);
+        }
+        m_redactList->setFixedHeight(std::min(130, m_redactList->count() * m_redactList->fontMetrics().height() * 3 / 2 + 8));
+
+        const BackgroundRemoval& b = clip->background;
+        m_bgOn->setChecked(b.enabled);
+        m_bgModel->setCurrentIndex(std::max(0, m_bgModel->findData(b.model)));
+        m_bgSoftness->setValue(qRound(b.softness * 100));
+        m_bgModel->setEnabled(b.enabled);
+        m_bgSoftness->setEnabled(b.enabled);
+        QString bgInfo;
+        if (b.enabled && !ai::visionModelReady(ai::backgroundModelId(b.model)))
+            bgInfo = tr("The model is not on this computer yet: turn this off and on again to download it.");
+        else if (b.enabled && track == 0)
+            bgInfo = tr("On the main track the background turns black. Put the clip on a track above another clip to show that clip behind it.");
+        else if (!b.enabled)
+            bgInfo = tr("Cuts the person or object out of every frame. Playback gets slower.");
+        m_bgInfo->setText(bgInfo);
+        m_bgInfo->setVisible(!bgInfo.isEmpty());
+    }
+
     const bool follow = video && track != 0 && (clip->kind == ClipKind::Media || clip->kind == ClipKind::Title);
     m_trackSection->setVisible(follow);
     if (follow) {

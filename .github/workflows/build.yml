@@ -61,6 +61,25 @@ jobs:
         shell: pwsh
         run: '"FFMPEG_ROOT=$env:RUNNER_TEMP\ffmpeg\$env:FFMPEG_ZIP" | Out-File -FilePath $env:GITHUB_ENV -Append'
 
+      # ONNX Runtime for the local AI tools (face / plate blur, background
+      # removal). Cached like FFmpeg so its DLL stays the same between releases.
+      - name: Cache ONNX Runtime
+        id: ort-cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ runner.temp }}/onnxruntime
+          key: onnxruntime-win-x64-1.22.0-v1
+
+      - name: Download ONNX Runtime
+        if: steps.ort-cache.outputs.cache-hit != 'true'
+        shell: pwsh
+        run: |
+          $url = "https://github.com/microsoft/onnxruntime/releases/download/v1.22.0/onnxruntime-win-x64-1.22.0.zip"
+          Invoke-WebRequest -Uri $url -OutFile ort.zip
+          Expand-Archive ort.zip -DestinationPath "$env:RUNNER_TEMP\onnxruntime"
+          # The debug symbols are most of the archive and not needed.
+          Remove-Item "$env:RUNNER_TEMP\onnxruntime\onnxruntime-win-x64-1.22.0\lib\*.pdb"
+
       - name: Cache LibRaw (vcpkg)
         id: libraw-cache
         uses: actions/cache@v4
@@ -85,6 +104,7 @@ jobs:
           $env:PATH = "C:\vcpkg\installed\x64-windows\bin;$env:PATH"
           cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release `
             -DCMAKE_TOOLCHAIN_FILE=C:/vcpkg/scripts/buildsystems/vcpkg.cmake -DVCPKG_TARGET_TRIPLET=x64-windows -DLUMORA_REQUIRE_LIBRAW=ON `
+            "-DLUMORA_ONNXRUNTIME_ROOT=$env:RUNNER_TEMP/onnxruntime/onnxruntime-win-x64-1.22.0" `
             -DCMAKE_C_COMPILER_LAUNCHER=sccache -DCMAKE_CXX_COMPILER_LAUNCHER=sccache
 
       - name: Build
@@ -125,6 +145,7 @@ jobs:
           windeployqt --release --no-compiler-runtime --dir $dist "$dist\LumoraStudio.exe"
           Copy-Item "$env:FFMPEG_ROOT\bin\*.dll" $dist
           Copy-Item C:\vcpkg\installed\x64-windows\bin\*.dll $dist
+          Copy-Item build\src\app\onnxruntime*.dll $dist
           # The Visual C++ runtime goes in the folder too, so the app starts on
           # a PC without the redistributable installed.
           Copy-Item "$env:VCToolsRedistDir\x64\Microsoft.VC*.CRT\*.dll" $dist
@@ -132,6 +153,7 @@ jobs:
             if (-not (Test-Path "$dist\$dll")) { throw "$dll is missing from the package" }
           }
           if (-not (Test-Path "$dist\raw*.dll")) { throw "LibRaw is missing from the package" }
+          if (-not (Test-Path "$dist\onnxruntime.dll")) { throw "ONNX Runtime is missing from the package" }
           # Turkish strings for Qt's own buttons (OK, Close, Cancel...).
           if (-not (Test-Path "$dist\translations\qt_tr.qm")) { throw "translations\qt_tr.qm is missing from the package" }
           Copy-Item README.md, docs\ozellikler.md $dist
@@ -184,6 +206,26 @@ jobs:
           espeak-ng -v en-us -s 140 -w "$RUNNER_TEMP/speech.wav" "Hello world. This is a test of automatic subtitles."
           echo "LUMORA_WHISPER_MODEL=$HOME/whisper-models/ggml-tiny.bin" >> "$GITHUB_ENV"
           echo "LUMORA_SPEECH_WAV=$RUNNER_TEMP/speech.wav" >> "$GITHUB_ENV"
+
+      # The small picture models and a test photo for the face, number plate
+      # and background removal tests.
+      - name: Vision test data
+        uses: actions/cache@v4
+        with:
+          path: ~/vision-models
+          key: vision-models-v1
+
+      - name: Prepare vision tests
+        run: |
+          mkdir -p ~/vision-models
+          cd ~/vision-models
+          get() { [ -f "$1" ] || curl -sSfL -o "$1" "$2"; }
+          get face_detection_yunet_2023mar.onnx https://media.githubusercontent.com/media/opencv/opencv_zoo/main/models/face_detection_yunet/face_detection_yunet_2023mar.onnx
+          get yolo-v9-t-640-license-plates-end2end.onnx https://github.com/ankandrew/open-image-models/releases/download/assets/yolo-v9-t-640-license-plates-end2end.onnx
+          get u2netp.onnx https://github.com/danielgatis/rembg/releases/download/v0.0.0/u2netp.onnx
+          get face.jpg https://raw.githubusercontent.com/opencv/opencv/4.x/samples/data/lena.jpg
+          echo "LUMORA_VISION_MODELS=$HOME/vision-models" >> "$GITHUB_ENV"
+          echo "LUMORA_FACE_IMAGE=$HOME/vision-models/face.jpg" >> "$GITHUB_ENV"
 
       - name: Set up sccache
         uses: mozilla-actions/sccache-action@v0.0.9

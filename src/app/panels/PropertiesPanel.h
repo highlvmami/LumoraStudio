@@ -18,6 +18,7 @@ class QToolButton;
 class QPushButton;
 class QFormLayout;
 class QLineEdit;
+class QListWidget;
 
 namespace lumora {
 
@@ -44,6 +45,10 @@ signals:
     // Long analyses run by the main window (progress dialog, playhead).
     void stabilizeRequested(const QUuid& clipId);
     void trackRequested(const QUuid& clipId);
+    void redactRequested(const QUuid& clipId);
+    // Background removal needs its model: the main window downloads it and
+    // turns the removal on.
+    void backgroundRequested(const QUuid& clipId, const QString& model);
 
 private:
     QWidget* makeSection(const QString& title, QFormLayout** form);
@@ -94,6 +99,22 @@ private:
     QDoubleSpinBox* m_stabSmoothing;
     QSpinBox* m_stabZoom;
     QLabel* m_stabInfo;
+
+    QWidget* m_redactSection;
+    QLabel* m_redactInfo;
+    QPushButton* m_redactFind;
+    QPushButton* m_redactClear;
+    QCheckBox* m_redactFaces;
+    QCheckBox* m_redactPlates;
+    QComboBox* m_redactStyle;
+    QSpinBox* m_redactStrength;
+    QListWidget* m_redactList;
+
+    QWidget* m_bgSection;
+    QCheckBox* m_bgOn;
+    QComboBox* m_bgModel;
+    QSpinBox* m_bgSoftness;
+    QLabel* m_bgInfo;
 
     QWidget* m_trackSection;
     QPushButton* m_trackStart;

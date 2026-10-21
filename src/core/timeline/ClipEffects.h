@@ -4,6 +4,7 @@
 #include <QJsonArray>
 #include <QJsonObject>
 #include <QPointF>
+#include <QRectF>
 #include <QString>
 #include <vector>
 
@@ -141,6 +142,72 @@ struct MotionPath {
     bool operator==(const MotionPath&) const = default;
     QJsonArray toJson() const;
     static MotionPath fromJson(const QJsonArray& a);
+};
+
+// Faces and number plates hidden in the picture. The regions are found once
+// by the detectors (see ai/Redaction.h) and stored here, so rendering needs
+// no neural network. Each found face or plate is one track: its box at the
+// analysed source frames (media time, fraction of the decoded picture),
+// linear in between.
+enum class RedactionKind { Face, Plate, Manual };
+enum class RedactionStyle { Blur, Pixelate, Fill };
+
+QString redactionStyleId(RedactionStyle s);
+RedactionStyle redactionStyleFromId(const QString& id);
+
+struct RedactionBox {
+    Ticks time = 0;
+    QRectF rect;
+    bool operator==(const RedactionBox&) const = default;
+};
+
+struct RedactionTrack {
+    RedactionKind kind = RedactionKind::Face;
+    bool enabled = true;
+    std::vector<RedactionBox> boxes; // sorted by time
+
+    Ticks start() const { return boxes.empty() ? 0 : boxes.front().time; }
+    Ticks end() const { return boxes.empty() ? 0 : boxes.back().time; }
+    // The box at media time `t`; empty outside [start - hold, end + hold].
+    QRectF rectAt(Ticks t, Ticks hold) const;
+    bool operator==(const RedactionTrack&) const = default;
+};
+
+struct Redaction {
+    bool enabled = false;
+    bool faces = true;   // hide the face tracks
+    bool plates = true;  // hide the number plate tracks
+    RedactionStyle style = RedactionStyle::Blur;
+    double strength = 0.6; // 0 .. 1: how little of the region stays recognisable
+    std::vector<RedactionTrack> tracks;
+    // Media range that was searched; media outside it (after the clip is
+    // lengthened) has not been checked.
+    Ticks analyzedFrom = 0, analyzedTo = 0;
+
+    bool isActive() const;
+    bool shows(const RedactionTrack& t) const;
+    struct Region {
+        QRectF rect; // fraction of the picture
+        bool ellipse = false;
+    };
+    // What to hide at media time `t`.
+    std::vector<Region> regionsAt(Ticks t) const;
+    int count(RedactionKind kind) const;
+
+    bool operator==(const Redaction&) const = default;
+    QJsonObject toJson() const;
+    static Redaction fromJson(const QJsonObject& o);
+};
+
+// Cuts the subject out of the picture with a segmentation model; the rest
+// becomes transparent so the tracks below show through.
+struct BackgroundRemoval {
+    bool enabled = false;
+    QString model = QStringLiteral("fast"); // ai::vision background model id
+    double softness = 0.5;                  // 0 = hard edge .. 1 = soft edge
+    bool operator==(const BackgroundRemoval&) const = default;
+    QJsonObject toJson() const;
+    static BackgroundRemoval fromJson(const QJsonObject& o);
 };
 
 } // namespace lumora

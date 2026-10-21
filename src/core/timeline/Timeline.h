@@ -47,6 +47,8 @@ struct Clip {
     ColorGrade color;            // video clips
     Stabilization stabilization; // video clips
     MotionPath motion;           // video and title clips: follows a tracked object
+    Redaction redaction;         // video clips: hidden faces and number plates
+    BackgroundRemoval background; // video clips: subject cut out of its background
     Transition transitionIn;     // primary storyline: transition from the previous clip
     Ticks fadeIn = 0;            // opacity (video) / volume (audio) ramps
     Ticks fadeOut = 0;
@@ -197,6 +199,8 @@ public:
     bool setColor(const QUuid& clipId, const ColorGrade& grade);
     bool setStabilization(const QUuid& clipId, const Stabilization& s);
     bool setMotionPath(const QUuid& clipId, const MotionPath& path);
+    bool setRedaction(const QUuid& clipId, const Redaction& r);
+    bool setBackgroundRemoval(const QUuid& clipId, const BackgroundRemoval& b);
     bool setTransition(const QUuid& clipId, const Transition& t);
     bool setFades(const QUuid& clipId, Ticks fadeIn, Ticks fadeOut);
     bool setGain(const QUuid& clipId, double gainDb);

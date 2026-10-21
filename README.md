@@ -22,6 +22,23 @@ Açık tema ("Gündüz", Görünüm → Tema):
 
 Tam yol haritası: [docs/ozellikler.md](docs/ozellikler.md). Mimari: [docs/mimari.md](docs/mimari.md).
 
+## Sürüm 0.6'da neler var
+
+Yapay zeka araçlarının ilk dilimi. Hepsi bu bilgisayarda çalışır (ONNX Runtime, işlemci üzerinde); hiçbir görüntü dışarı gönderilmez. Her model ilk kullanıldığında bir kez indirilir.
+
+**Yüz ve plaka bulanıklaştırma (otomatik takip ile)**
+- Video klibi seçin, Özellikler panelinde **Yüzleri ve plakaları gizle → Yüzleri ve plakaları bul**. Klip kare kare taranır, her yüz ve araç plakası bulunup hareket ettikçe takip edilir; kısa süre kaybolan (dönen, bulanıklaşan) bir yüzün arası doldurulur.
+- **Görünüm:** bulanıklaştır, pikselleştir ya da siyah kutu; **Güç** ne kadar iri olacağını ayarlar. Yüzler elips, plakalar dikdörtgen kapatılır.
+- Bulunan her yüz ve plaka listede ayrı bir satırdır; görünür kalması gerekeni (örneğin röportaj yapılan kişi) işaretini kaldırarak açın. Yüzler ve plakalar ayrı ayrı da kapatılabilir.
+- Bölgeler projede saklanır, çizim sırasında model çalışmaz: önizleme ve dışa aktarma aynı sonucu verir. Klip sonradan uzatılırsa panel yeniden aramayı önerir.
+- Fotoğrafta da aynısı: Fotoğraf çalışma alanında yeni **Akıllı** sekmesi. Büyük fotoğraflar parçalara bölünerek taranır, küçük yüzler de bulunur.
+
+**Arka planı kaldırma**
+- Video klibinde **Arka plan → Arka planı kaldır**: kişi ya da nesne her karede arka plandan ayrılır, gerisi saydam olur. Klibi bir üst ize (V2) koyarsanız alttaki klip arkada görünür. **Hızlı** (U²-Net, 5 MB) ya da **Ayrıntılı** (IS-Net, 179 MB, saç ve ince kenarlarda daha iyi) model, **Kenar yumuşaklığı** ayarı. Önizleme her zaman hızlı modeli kullanır, dışa aktarma seçileni.
+- Fotoğrafta **Akıllı → Arka planı kaldır**; saydam kısımlar dama deseni üzerinde gösterilir. PNG, TIFF ve WebP saydamlığı korur; JPEG'de konu beyaz zemine konur.
+
+Modeller: yüz için YuNet (OpenCV Zoo, MIT), plaka için YOLOv9-t (open-image-models, MIT), arka plan için U²-Net (Apache 2.0) ve IS-Net (Apache 2.0).
+
 ## Sürüm 0.5'te neler var
 
 ![Sabitleme](docs/screenshots/sabitleme.png)
@@ -244,7 +261,7 @@ cmake --build build
 QT_QPA_PLATFORM=offscreen ctest --test-dir build --output-on-failure
 ```
 
-Testler kendi deneme videolarını üretir (her kare kendi numarasını taşır) ve şunları doğrular: kayıpsız kesimde paketlerin bit bit aynı olması, "kaynakla aynı"da kare hassasiyeti, FFV1'de piksel piksel eşitlik, B-kareli H.264 kesimlerinde hiç çözme hatası olmaması, zaman çizelgesi işlemleri, fotoğraf işleme ve proje dosyasının gidiş-dönüşü. 0.2 ile eklenenler: başlık, geçiş ve karıştırılmış sesli zaman çizelgesinin işlenmesi, özel ayarlarda her karenin korunması, ölçekleme ve kare hızı değişimi, bit hızı modlarının hedefi tutturması, ProRes/DNxHR çıktısı, her hazır ayarın planlanabilmesi ve diğer kodlayıcıların tek ve iki geçişte çalışması. 0.3 ile eklenenler: renk ayarlarının her birinin doğru aralığa etki etmesi, .cube okuma (3B/1B, hatalı dosyalar) ve yazma, kaydedilen LUT'un aynı görünümü vermesi, kapsamlar, maskeli ayar katmanları ve resim katmanlarında karışım modları, klip renginin önizlemede ve dışa aktarmada aynı işlenmesi. 0.4 ile eklenenler: EBU referans tonlarıyla ses yüksekliği ölçümü, limitleyicinin tavanı hiç aşmaması, gürültü azaltmanın sinyale dokunmayıp gürültüyü düşürmesi ve gecikmesinin tam olması, ekolayzer, kısma, eşitlemenin hedefi tutturması, ses efektleriyle dışa aktarmada görüntünün bit bit kopyalanması, altyazının gömülmesi/yakılması/.srt olarak kaydedilmesi, SRT/VTT okuma-yazma, eğriler, HSL, fırça maskesi ve RAW (üretilen bir DNG ile) açma.
+Testler kendi deneme videolarını üretir (her kare kendi numarasını taşır) ve şunları doğrular: kayıpsız kesimde paketlerin bit bit aynı olması, "kaynakla aynı"da kare hassasiyeti, FFV1'de piksel piksel eşitlik, B-kareli H.264 kesimlerinde hiç çözme hatası olmaması, zaman çizelgesi işlemleri, fotoğraf işleme ve proje dosyasının gidiş-dönüşü. 0.2 ile eklenenler: başlık, geçiş ve karıştırılmış sesli zaman çizelgesinin işlenmesi, özel ayarlarda her karenin korunması, ölçekleme ve kare hızı değişimi, bit hızı modlarının hedefi tutturması, ProRes/DNxHR çıktısı, her hazır ayarın planlanabilmesi ve diğer kodlayıcıların tek ve iki geçişte çalışması. 0.3 ile eklenenler: renk ayarlarının her birinin doğru aralığa etki etmesi, .cube okuma (3B/1B, hatalı dosyalar) ve yazma, kaydedilen LUT'un aynı görünümü vermesi, kapsamlar, maskeli ayar katmanları ve resim katmanlarında karışım modları, klip renginin önizlemede ve dışa aktarmada aynı işlenmesi. 0.4 ile eklenenler: EBU referans tonlarıyla ses yüksekliği ölçümü, limitleyicinin tavanı hiç aşmaması, gürültü azaltmanın sinyale dokunmayıp gürültüyü düşürmesi ve gecikmesinin tam olması, ekolayzer, kısma, eşitlemenin hedefi tutturması, ses efektleriyle dışa aktarmada görüntünün bit bit kopyalanması, altyazının gömülmesi/yakılması/.srt olarak kaydedilmesi, SRT/VTT okuma-yazma, eğriler, HSL, fırça maskesi ve RAW (üretilen bir DNG ile) açma. 0.6 ile eklenenler: yüz/plaka bölgelerinin kareler arasında doğru doldurulması ve proje dosyasında korunması, takipçinin kareden kareye eşleştirmesi (kısa kayıplar dahil), bulanıklaştırma/pikselleştirme/siyah kutunun bölge dışına dokunmaması, çizicinin bölgeleri önizlemede ve dışa aktarmada aynı gizlemesi, saydamlık maskesi; modeller varken (`LUMORA_VISION_MODELS`) gerçek bir fotoğrafta ve hareket eden bir videoda yüz bulma, plaka bulma ve arka plan kaldırma.
 
 ## Proje yapısı
 
@@ -259,6 +276,8 @@ src/core/        Arayüzden bağımsız çekirdek (lumora_core kütüphanesi)
   color/           Renk ayarları (ColorGrade, eğriler, HSL), renk hattı (ColorProcessor), .cube LUT okuma/yazma, kapsamlar
   undo/            Geri al / yinele komutları
   export/          Dışa aktarma planlayıcı (ne kopyalanır, ne kodlanır), kodlayıcı tablosu ve hazır ayarlar, kopyalayan ve işleyen dışa aktarıcılar
+  ai/              Yerel yapay zeka: Whisper konuşma tanıma, ONNX Runtime ile yüz/plaka bulma ve takip, arka plan kaldırma
+  motion/          Hareket analizi: sabitleme ve nesne takibi
   image/           Fotoğraf ayarları ve katmanları, işleme hattı, fotoğraf kütüphanesi, RAW okuyucu (LibRaw)
   project/         .lumora proje dosyası
 src/app/         Qt Widgets arayüzü: ana pencere, paneller, oynatma motoru, pencereler
@@ -270,6 +289,8 @@ docs/            Özellik listesi, mimari, ekran görüntüleri
 Çeviriyi güncellemek için: `cmake --build build --target update_translations`, sonra `src/i18n/lumora_tr.ts` dosyasını Qt Linguist ile düzenleyin.
 
 ## Lisans notu
+
+Yapay zeka araçları ONNX Runtime (MIT) ile çalışır; Windows paketinde onnxruntime.dll olarak gelir. Modeller programla dağıtılmaz, ilk kullanımda kendi yayınlandıkları yerden indirilir (lisansları yukarıda).
 
 Arayüzde kullanılan Inter yazı tipi programın içine gömülüdür ve SIL Open Font License 1.1 ile dağıtılır (`src/app/resources/fonts/OFL.txt`).
 

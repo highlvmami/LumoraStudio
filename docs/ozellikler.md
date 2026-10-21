@@ -77,7 +77,7 @@ Hedef: kullanıcı istemedikçe hiçbir aşamada kalite düşmez.
 - ✅ Geçişler: yumuşak geçiş, kaydırma, yakınlaştırma, bulanık, özel
 - Bulanıklaştırma, keskinleştirme, gürültü azaltma (zamansal + uzamsal)
 - Vinyet, film grenı, kromatik sapma, glitch
-- Yüz / plaka bulanıklaştırma (otomatik takip ile)
+- ✅ Yüz / plaka bulanıklaştırma (otomatik takip ile)
 - Efekt ön ayarları kaydetme ve paylaşma
 - Eklenti sistemi (OpenFX desteği)
 
@@ -140,7 +140,7 @@ Hedef: kullanıcı istemedikçe hiçbir aşamada kalite düşmez.
 - ✅ Katman maskeleri: dikdörtgen, elips, degrade; yumuşak kenar, ters çevirme
 - ✅ Fırçayla maske boyama (boyut, sertlik, akış, silgi)
 - Seçim araçları: dikdörtgen, kement, sihirli değnek, renk aralığı
-- Otomatik konu seçimi ve arka plan kaldırma (yerel model)
+- ✅ Otomatik konu seçimi ve arka plan kaldırma (yerel model; videoda da)
 - Fırça, silgi, damga (klonlama), iyileştirme fırçası
 - İçeriğe duyarlı doldurma / nesne silme
 - Yazı, şekil, degrade
@@ -197,4 +197,5 @@ Hedef: kullanıcı istemedikçe hiçbir aşamada kalite düşmez.
 3. ✅ **Sürüm 0.3:** Renk paneli, kapsamlar, LUT; fotoğrafta katmanlar ve maskeler.
 4. ✅ **Sürüm 0.4:** Ses araçları, altyazı, RAW desteği; eğriler, HSL ve fırça maskesi. 0.4.1: dondurma karesi.
 5. ✅ **Sürüm 0.5 (ilk dilim):** Görüntü sabitleme, hareket takibi, Whisper ile yerel otomatik altyazı.
-6. **Sonrası:** Arka plan kaldırma ve diğer yapay zeka araçları, maske takibi ve yüz bulanıklaştırma, çoklu kamera, eklentiler, HDR.
+6. ✅ **Sürüm 0.6 (ilk dilim):** Yüz ve plaka bulanıklaştırma (otomatik takip ile), arka plan kaldırma (video ve fotoğraf); hepsi yerel modellerle (ONNX Runtime).
+7. **Sonrası:** Süper çözünürlük, içeriğe duyarlı nesne silme, maske takibi, çoklu kamera (ses ile eşitleme), OpenFX eklentileri, HDR10/HLG ve ton eşleme, OpenColorIO/ACES.

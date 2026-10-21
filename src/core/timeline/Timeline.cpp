@@ -83,7 +83,8 @@ bool TimelineState::hasEffects() const {
             return true;
         for (const auto& c : t.clips) {
             if (c.kind != ClipKind::Media || !c.transform.isIdentity() || !c.color.isIdentity() || !c.transitionIn.isNone() || c.fadeIn > 0 ||
-                c.fadeOut > 0 || c.gainDb != 0.0 || !c.audio.isIdentity() || c.stabilization.isActive() || !c.motion.isEmpty())
+                c.fadeOut > 0 || c.gainDb != 0.0 || !c.audio.isIdentity() || c.stabilization.isActive() || !c.motion.isEmpty() ||
+                c.redaction.isActive() || c.background.enabled)
                 return true;
         }
     }
@@ -99,7 +100,8 @@ bool TimelineState::hasVideoEffects() const {
             return true;
         for (const auto& c : t.clips)
             if (c.kind != ClipKind::Media || !c.transform.isIdentity() || !c.color.isIdentity() ||
-                !c.transitionIn.isNone() || c.fadeIn > 0 || c.fadeOut > 0 || c.stabilization.isActive() || !c.motion.isEmpty())
+                !c.transitionIn.isNone() || c.fadeIn > 0 || c.fadeOut > 0 || c.stabilization.isActive() || !c.motion.isEmpty() ||
+                c.redaction.isActive() || c.background.enabled)
                 return true;
     }
     return false;
@@ -710,6 +712,24 @@ bool Timeline::setMotionPath(const QUuid& clipId, const MotionPath& path) {
     return true;
 }
 
+bool Timeline::setRedaction(const QUuid& clipId, const Redaction& r) {
+    Clip* c = mutableClip(clipId);
+    if (!c || !c->hasMedia() || c->redaction == r)
+        return false;
+    c->redaction = r;
+    emit changed();
+    return true;
+}
+
+bool Timeline::setBackgroundRemoval(const QUuid& clipId, const BackgroundRemoval& b) {
+    Clip* c = mutableClip(clipId);
+    if (!c || !c->hasMedia() || c->background == b)
+        return false;
+    c->background = b;
+    emit changed();
+    return true;
+}
+
 bool Timeline::setTransition(const QUuid& clipId, const Transition& tr) {
     auto loc = locate(clipId);
     if (!loc || loc->track != primaryVideoTrack() || loc->index == 0)
@@ -913,6 +933,8 @@ QUuid Timeline::freezeFrame(const QUuid& clipId, Ticks at, Ticks duration) {
     freeze.transform = src.transform;
     freeze.color = src.color;
     freeze.stabilization = src.stabilization;
+    freeze.redaction = src.redaction;
+    freeze.background = src.background;
 
     // Split the clip and its linked partners; the right halves get their own
     // link so they stay together when they move.

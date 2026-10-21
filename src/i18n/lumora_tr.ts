@@ -2048,6 +2048,26 @@
         <source>Draw a box around the object to follow (Esc cancels)</source>
         <translation>Takip edilecek nesnenin çevresine bir kutu çizin (Esc: vazgeç)</translation>
     </message>
+    <message>
+        <source>Hide faces and plates</source>
+        <translation>Yüzleri ve plakaları gizle</translation>
+    </message>
+    <message>
+        <source>Looking for faces and number plates…</source>
+        <translation>Yüzler ve plakalar aranıyor…</translation>
+    </message>
+    <message>
+        <source>No faces or number plates were found.</source>
+        <translation>Yüz ya da plaka bulunamadı.</translation>
+    </message>
+    <message>
+        <source>Found %1 face(s) and %2 number plate(s). Play the clip back to check.</source>
+        <translation>%1 yüz ve %2 plaka bulundu. Kontrol etmek için klibi oynatın.</translation>
+    </message>
+    <message>
+        <source>Remove the background</source>
+        <translation>Arka planı kaldır</translation>
+    </message>
 </context>
 <context>
     <name>lumora::MediaBinPanel</name>
@@ -2350,6 +2370,30 @@ Orijinal dosya asla değişmez: düzenlemeler projede saklanır ve dışa aktar�
     <message>
         <source>Paint mask</source>
         <translation>Maske boya</translation>
+    </message>
+    <message>
+        <source>Smart</source>
+        <translation>Akıllı</translation>
+    </message>
+    <message>
+        <source>Remove the background</source>
+        <translation>Arka planı kaldır</translation>
+    </message>
+    <message>
+        <source>Hide faces and plates</source>
+        <translation>Yüzleri ve plakaları gizle</translation>
+    </message>
+    <message>
+        <source>Looking for faces and number plates…</source>
+        <translation>Yüzler ve plakalar aranıyor…</translation>
+    </message>
+    <message>
+        <source>No faces or number plates were found.</source>
+        <translation>Yüz ya da plaka bulunamadı.</translation>
+    </message>
+    <message>
+        <source>Found %1 face(s) and %2 number plate(s).</source>
+        <translation>%1 yüz ve %2 plaka bulundu.</translation>
     </message>
 </context>
 <context>
@@ -2879,6 +2923,154 @@ Orijinal dosya asla değişmez: düzenlemeler projede saklanır ve dışa aktar�
         <source>This clip follows a tracked object (%1 positions).</source>
         <translation>Bu klip takip edilen bir nesneyi izliyor (%1 konum).</translation>
     </message>
+    <message>
+        <source>Hide faces and plates</source>
+        <translation>Yüzleri ve plakaları gizle</translation>
+    </message>
+    <message>
+        <source>Find faces and plates</source>
+        <translation>Yüzleri ve plakaları bul</translation>
+    </message>
+    <message>
+        <source>Looks through the clip on this computer and follows every face and number plate</source>
+        <translation>Klibi bu bilgisayarda tarar, her yüzü ve plakayı hareket ettikçe takip eder</translation>
+    </message>
+    <message>
+        <source>Remove</source>
+        <translation>Kaldır</translation>
+    </message>
+    <message>
+        <source>Faces</source>
+        <translation>Yüzler</translation>
+    </message>
+    <message>
+        <source>Number plates</source>
+        <translation>Plakalar</translation>
+    </message>
+    <message>
+        <source>Hide</source>
+        <translation>Gizle</translation>
+    </message>
+    <message>
+        <source>Pixelate</source>
+        <translation>Pikselleştir</translation>
+    </message>
+    <message>
+        <source>Black box</source>
+        <translation>Siyah kutu</translation>
+    </message>
+    <message>
+        <source>Look</source>
+        <translation>Görünüm</translation>
+    </message>
+    <message>
+        <source>Strength</source>
+        <translation>Güç</translation>
+    </message>
+    <message>
+        <source>Untick what should stay visible</source>
+        <translation>Görünür kalması gerekenlerin işaretini kaldırın</translation>
+    </message>
+    <message>
+        <source>Remove the background</source>
+        <translation>Arka planı kaldır</translation>
+    </message>
+    <message>
+        <source>Keeps the person or object in front and makes the rest transparent</source>
+        <translation>Öndeki kişiyi ya da nesneyi bırakır, gerisini saydam yapar</translation>
+    </message>
+    <message>
+        <source>Fast</source>
+        <translation>Hızlı</translation>
+    </message>
+    <message>
+        <source>Detailed (slow)</source>
+        <translation>Ayrıntılı (yavaş)</translation>
+    </message>
+    <message>
+        <source>The detailed model finds hair and fine edges better; the preview uses the fast one</source>
+        <translation>Ayrıntılı model saçı ve ince kenarları daha iyi bulur; önizlemede hızlı model kullanılır</translation>
+    </message>
+    <message>
+        <source>Model</source>
+        <translation>Model</translation>
+    </message>
+    <message>
+        <source>Edge softness</source>
+        <translation>Kenar yumuşaklığı</translation>
+    </message>
+    <message>
+        <source>Remove hidden regions</source>
+        <translation>Gizlenen bölgeleri kaldır</translation>
+    </message>
+    <message>
+        <source>Change how regions are hidden</source>
+        <translation>Gizleme biçimini değiştir</translation>
+    </message>
+    <message>
+        <source>Change hiding strength</source>
+        <translation>Gizleme gücünü değiştir</translation>
+    </message>
+    <message>
+        <source>Hide region</source>
+        <translation>Bölgeyi gizle</translation>
+    </message>
+    <message>
+        <source>Show region</source>
+        <translation>Bölgeyi göster</translation>
+    </message>
+    <message>
+        <source>Keep the background</source>
+        <translation>Arka planı koru</translation>
+    </message>
+    <message>
+        <source>Change background model</source>
+        <translation>Arka plan modelini değiştir</translation>
+    </message>
+    <message>
+        <source>Change edge softness</source>
+        <translation>Kenar yumuşaklığını değiştir</translation>
+    </message>
+    <message>
+        <source>Blurs every face and number plate in the clip and follows them as they move. Runs on this computer.</source>
+        <translation>Klipteki her yüzü ve plakayı bulanıklaştırır, hareket ettikçe takip eder. Bu bilgisayarda çalışır.</translation>
+    </message>
+    <message>
+        <source>No faces or number plates were found in this clip.</source>
+        <translation>Bu klipte yüz ya da plaka bulunamadı.</translation>
+    </message>
+    <message>
+        <source>Found %1 face(s) and %2 number plate(s).</source>
+        <translation>%1 yüz ve %2 plaka bulundu.</translation>
+    </message>
+    <message>
+        <source>The clip was lengthened since: search again to cover the new part.</source>
+        <translation>Klip o zamandan beri uzatıldı: yeni kısmı da kapsamak için yeniden arayın.</translation>
+    </message>
+    <message>
+        <source>Search again</source>
+        <translation>Yeniden ara</translation>
+    </message>
+    <message>
+        <source>Face %1</source>
+        <translation>Yüz %1</translation>
+    </message>
+    <message>
+        <source>Plate %1</source>
+        <translation>Plaka %1</translation>
+    </message>
+    <message>
+        <source>The model is not on this computer yet: turn this off and on again to download it.</source>
+        <translation>Model henüz bu bilgisayarda yok: indirmek için kapatıp yeniden açın.</translation>
+    </message>
+    <message>
+        <source>On the main track the background turns black. Put the clip on a track above another clip to show that clip behind it.</source>
+        <translation>Ana izde arka plan siyah olur. Arkada başka bir klibin görünmesi için klibi onun üstündeki bir ize koyun.</translation>
+    </message>
+    <message>
+        <source>Cuts the person or object out of every frame. Playback gets slower.</source>
+        <translation>Kişiyi ya da nesneyi her karede arka plandan ayırır. Oynatma yavaşlar.</translation>
+    </message>
 </context>
 <context>
     <name>lumora::ScopesWidget</name>
@@ -2935,6 +3127,160 @@ Orijinal dosya asla değişmez: düzenlemeler projede saklanır ve dışa aktar�
     <message>
         <source>Double-click to reset</source>
         <translation>Sıfırlamak için çift tıklayın</translation>
+    </message>
+</context>
+<context>
+    <name>lumora::SmartToolsPanel</name>
+    <message>
+        <source>Hide faces and plates</source>
+        <translation>Yüzleri ve plakaları gizle</translation>
+    </message>
+    <message>
+        <source>Find faces and plates</source>
+        <translation>Yüzleri ve plakaları bul</translation>
+    </message>
+    <message>
+        <source>Remove</source>
+        <translation>Kaldır</translation>
+    </message>
+    <message>
+        <source>Faces</source>
+        <translation>Yüzler</translation>
+    </message>
+    <message>
+        <source>Number plates</source>
+        <translation>Plakalar</translation>
+    </message>
+    <message>
+        <source>Hide</source>
+        <translation>Gizle</translation>
+    </message>
+    <message>
+        <source>Blur</source>
+        <translation>Bulanıklaştır</translation>
+    </message>
+    <message>
+        <source>Pixelate</source>
+        <translation>Pikselleştir</translation>
+    </message>
+    <message>
+        <source>Black box</source>
+        <translation>Siyah kutu</translation>
+    </message>
+    <message>
+        <source>Look</source>
+        <translation>Görünüm</translation>
+    </message>
+    <message>
+        <source>Strength</source>
+        <translation>Güç</translation>
+    </message>
+    <message>
+        <source>Untick what should stay visible</source>
+        <translation>Görünür kalması gerekenlerin işaretini kaldırın</translation>
+    </message>
+    <message>
+        <source>Background</source>
+        <translation>Arka plan</translation>
+    </message>
+    <message>
+        <source>Remove the background</source>
+        <translation>Arka planı kaldır</translation>
+    </message>
+    <message>
+        <source>Keeps the person or object in front and makes the rest transparent</source>
+        <translation>Öndeki kişiyi ya da nesneyi bırakır, gerisini saydam yapar</translation>
+    </message>
+    <message>
+        <source>Fast</source>
+        <translation>Hızlı</translation>
+    </message>
+    <message>
+        <source>Detailed (slow)</source>
+        <translation>Ayrıntılı (yavaş)</translation>
+    </message>
+    <message>
+        <source>Model</source>
+        <translation>Model</translation>
+    </message>
+    <message>
+        <source>Edge softness</source>
+        <translation>Kenar yumuşaklığı</translation>
+    </message>
+    <message>
+        <source>Export as PNG, TIFF or WebP to keep the transparency; JPEG puts the subject on white.</source>
+        <translation>Saydamlığı korumak için PNG, TIFF ya da WebP olarak dışa aktarın; JPEG&apos;de konu beyaz zemine konur.</translation>
+    </message>
+    <message>
+        <source>Remove hidden regions</source>
+        <translation>Gizlenen bölgeleri kaldır</translation>
+    </message>
+    <message>
+        <source>Change how regions are hidden</source>
+        <translation>Gizleme biçimini değiştir</translation>
+    </message>
+    <message>
+        <source>Change hiding strength</source>
+        <translation>Gizleme gücünü değiştir</translation>
+    </message>
+    <message>
+        <source>Hide region</source>
+        <translation>Bölgeyi gizle</translation>
+    </message>
+    <message>
+        <source>Show region</source>
+        <translation>Bölgeyi göster</translation>
+    </message>
+    <message>
+        <source>Keep the background</source>
+        <translation>Arka planı koru</translation>
+    </message>
+    <message>
+        <source>Change background model</source>
+        <translation>Arka plan modelini değiştir</translation>
+    </message>
+    <message>
+        <source>Change edge softness</source>
+        <translation>Kenar yumuşaklığını değiştir</translation>
+    </message>
+    <message>
+        <source>Blurs every face and number plate in the photo. Runs on this computer.</source>
+        <translation>Fotoğraftaki her yüzü ve plakayı bulanıklaştırır. Bu bilgisayarda çalışır.</translation>
+    </message>
+    <message>
+        <source>Found %1 face(s) and %2 number plate(s).</source>
+        <translation>%1 yüz ve %2 plaka bulundu.</translation>
+    </message>
+    <message>
+        <source>No faces or number plates were found in this photo.</source>
+        <translation>Bu fotoğrafta yüz ya da plaka bulunamadı.</translation>
+    </message>
+    <message>
+        <source>Search again</source>
+        <translation>Yeniden ara</translation>
+    </message>
+    <message>
+        <source>Plate %1</source>
+        <translation>Plaka %1</translation>
+    </message>
+    <message>
+        <source>Face %1</source>
+        <translation>Yüz %1</translation>
+    </message>
+</context>
+<context>
+    <name>lumora::Tasks</name>
+    <message>
+        <source>This build of LumoraStudio has no AI tools.</source>
+        <translation>LumoraStudio&apos;nun bu sürümünde yapay zeka araçları yok.</translation>
+    </message>
+    <message>
+        <source>Downloading the %1 model (%2 MB, once)…</source>
+        <translation>%1 modeli indiriliyor (%2 MB, bir kez)…</translation>
+    </message>
+    <message>
+        <source>The %1 model could not be downloaded: %2</source>
+        <translation>%1 modeli indirilemedi: %2</translation>
     </message>
 </context>
 <context>
@@ -3140,6 +3486,49 @@ Orijinal dosya asla değişmez: düzenlemeler projede saklanır ve dışa aktar�
     <message>
         <source>Preparing the update…</source>
         <translation>Güncelleme hazırlanıyor…</translation>
+    </message>
+</context>
+<context>
+    <name>lumora::ai</name>
+    <message>
+        <source>This build of LumoraStudio has no AI tools.</source>
+        <translation>LumoraStudio&apos;nun bu sürümünde yapay zeka araçları yok.</translation>
+    </message>
+    <message>
+        <source>The %1 model has not been downloaded yet.</source>
+        <translation>%1 modeli henüz indirilmedi.</translation>
+    </message>
+    <message>
+        <source>The %1 model cannot be read (%2). Download it again.</source>
+        <translation>%1 modeli okunamıyor (%2). Yeniden indirin.</translation>
+    </message>
+    <message>
+        <source>face detection</source>
+        <translation>Yüz algılama</translation>
+    </message>
+    <message>
+        <source>number plate detection</source>
+        <translation>Plaka algılama</translation>
+    </message>
+    <message>
+        <source>fast background removal</source>
+        <translation>Hızlı arka plan kaldırma</translation>
+    </message>
+    <message>
+        <source>detailed background removal</source>
+        <translation>Ayrıntılı arka plan kaldırma</translation>
+    </message>
+    <message>
+        <source>The face detection model has not been downloaded yet.</source>
+        <translation>Yüz algılama modeli henüz indirilmedi.</translation>
+    </message>
+    <message>
+        <source>The number plate detection model has not been downloaded yet.</source>
+        <translation>Plaka algılama modeli henüz indirilmedi.</translation>
+    </message>
+    <message>
+        <source>The video cannot be read.</source>
+        <translation>Video okunamıyor.</translation>
     </message>
 </context>
 <context>
