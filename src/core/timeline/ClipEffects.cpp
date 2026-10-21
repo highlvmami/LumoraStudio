@@ -157,9 +157,12 @@ Stabilization::Correction Stabilization::correctionAt(Ticks t) const {
     // Gaussian average of the path around frame i (sigma = smoothing / 2).
     const double sigma = std::max(0.05, smoothing / 2.0);
     const double step = std::max(1e-6, ticksToSeconds(path.back().time - path.front().time) / (path.size() - 1));
-    const long radius = std::max<long>(1, static_cast<long>(std::ceil(2.5 * sigma / step)));
+    // A window that stays centred near the ends, so a steady pan is not
+    // mistaken for shake there.
+    const long last = static_cast<long>(path.size()) - 1;
+    const long radius = std::min({std::max<long>(1, static_cast<long>(std::ceil(2.5 * sigma / step))), i, last - i});
     double wsum = 0, sx = 0, sy = 0, sa = 0;
-    for (long k = std::max<long>(0, i - radius); k <= std::min<long>(static_cast<long>(path.size()) - 1, i + radius); ++k) {
+    for (long k = i - radius; k <= i + radius; ++k) {
         const double d = (k - i) * step;
         const double w = std::exp(-0.5 * d * d / (sigma * sigma));
         wsum += w;

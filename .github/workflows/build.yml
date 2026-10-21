@@ -137,7 +137,24 @@ jobs:
             qt6-base-dev qt6-multimedia-dev qt6-tools-dev qt6-tools-dev-tools qt6-l10n-tools \
             qt6-image-formats-plugins libgl-dev \
             libavformat-dev libavcodec-dev libavutil-dev libswscale-dev libswresample-dev \
-            libraw-dev
+            libraw-dev espeak-ng
+
+      # A spoken sentence and the smallest Whisper model for the end-to-end
+      # speech recognition test.
+      - name: Speech test data
+        uses: actions/cache@v4
+        with:
+          path: ~/whisper-models
+          key: whisper-ggml-tiny-v1
+
+      - name: Prepare speech test
+        run: |
+          mkdir -p ~/whisper-models
+          [ -f ~/whisper-models/ggml-tiny.bin ] || curl -sSfL -o ~/whisper-models/ggml-tiny.bin \
+            https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-tiny.bin
+          espeak-ng -v en-us -s 140 -w "$RUNNER_TEMP/speech.wav" "Hello world. This is a test of automatic subtitles."
+          echo "LUMORA_WHISPER_MODEL=$HOME/whisper-models/ggml-tiny.bin" >> "$GITHUB_ENV"
+          echo "LUMORA_SPEECH_WAV=$RUNNER_TEMP/speech.wav" >> "$GITHUB_ENV"
 
       - name: Configure
         run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DLUMORA_REQUIRE_LIBRAW=ON

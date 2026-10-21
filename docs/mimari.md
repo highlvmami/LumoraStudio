@@ -1,6 +1,6 @@
 # Mimari
 
-Bu belge 0.1, 0.2, 0.3 ve 0.4'ün nasıl kurulduğunu ve [özellik listesindeki](ozellikler.md) her şeyin ileride nereye oturacağını anlatır.
+Bu belge 0.1'den 0.5'e kadarki sürümlerin nasıl kurulduğunu ve [özellik listesindeki](ozellikler.md) her şeyin ileride nereye oturacağını anlatır.
 
 ## Katmanlar
 
@@ -49,6 +49,10 @@ Bu belge 0.1, 0.2, 0.3 ve 0.4'ün nasıl kurulduğunu ve [özellik listesindeki]
 
 **Dondurulmuş kare bir klip türüdür.** `ClipKind::Freeze` tek bir kareyi (`freezeTime`, kaynak zamanı) kendi süresi boyunca gösterir; başlıklar gibi "kaynak" aralığı [0, süre)'dir, bu yüzden bölme, kırpma ve süre değiştirme aynı kodla çalışır. `Timeline::freezeFrame` klibi (ve bağlı parçalarını) imleçte böler, araya dondurulmuş klibi koyar; V1'de mıknatıs, diğer izlerde o izdeki sonraki klipler kayar. `Clip::mediaTime` çizicinin hangi kaynak karesini okuyacağını verir; efektsiz dondurulmuş kare `passthroughFrame` ile kaynağın YUV karesi olarak kodlayıcıya gider. Planlayıcı kayıpsız kesimi nedenini söyleyerek engeller. Proje dosyası dondurulmuş kare varsa sürüm 4 yazılır.
 
+**Hareket analizi kendi modülündedir.** `motion/Motion` küçük gri kopyalar üzerinde çalışır: Shi–Tomasi köşeleri, piramitli Lucas–Kanade izleme ve RANSAC ile benzerlik (kaydırma, döndürme, ölçek) uydurma. `RegionTracker` bir bölgeyi kareden kareye izler ve konumu nesnenin şablonuna (NCC, yavaşça güncellenen) göre düzeltir, böylece hata birikmez. `motion/Analysis` iki iş yapar: `analyzeCameraPath` bir klibin kamera yolunu kaynak zamanına göre ölçer (`Clip::stabilization`), `trackRegion` ana izi ekranda göründüğü gibi çizip bir bölgeyi takip eder ve izleyen klibe göreli bir yol (`Clip::motion`) verir. Çizici sabitlemede kareyi kaynağın kendi eksenlerinde Gauss ile yumuşatılmış yola kaydırır ve yakınlaştırır; takipte klibin merkezine yolu ekler. İkisi de `hasVideoEffects` sayılır. Proje dosyası bunlar varsa sürüm 5 yazılır.
+
+**Konuşma tanıma yereldir.** `ai/SpeechToText` whisper.cpp'yi (CMake ile kaynaktan, statik, yalnızca CPU; `-march=native` yok) kullanır. Zaman çizelgesinin ses miksi `AudioMixer` ile 16 kHz tek kanal alınır, Whisper'ın kelime zaman damgalarıyla 42 karakterlik satırlara bölünür ve `Timeline::addSubtitleTrack` ile yeni bir altyazı izi olur. Modeller ilk kullanımda uygulama veri klasörüne indirilir. `LUMORA_WITH_WHISPER=OFF` ile özellik derlemeden çıkarılabilir.
+
 **Altyazılar ayrı bir iz türüdür.** `TrackType::Subtitle` izleri medya taşımayan `ClipKind::Subtitle` klipleri tutar; düzenleme işlemleri başlıklarla aynıdır. Dışa aktarma planı satırları çıktı zamanına çevirir (kayıpsız kesimde anahtar kare kaymaları dahil) ve üç yoldan birini seçer: kabın desteklediği metin kodeğiyle (mov_text / SubRip / WebVTT) ayrı akış, `FrameRenderer` ile görüntüye yakma (o zaman `Render`) ya da yanına .srt. Proje dosyası altyazı izi varsa sürüm 3 yazılır; yoksa 2 kalır, böylece 0.3 o projeleri açabilir.
 
 **RAW.** `image/RawDecoder` LibRaw ile (isteğe bağlı derleme bağımlılığı) kameranın beyaz dengesi ve renk matrisiyle 16 bit sRGB'ye geliştirir; `PhotoProcessor::load`, `probeMedia` ve küçük resimler bunu kullanır. Dosya Qt ile okunup LibRaw'a bellekten verilir, böylece Türkçe karakterli yollar her sistemde açılır.
@@ -71,7 +75,6 @@ Bu belge 0.1, 0.2, 0.3 ve 0.4'ün nasıl kurulduğunu ve [özellik listesindeki]
 | Efektler, anahtar kareler | `ClipEffects` (başlık, dönüşüm, geçiş, ses, renk) bir efekt yığınına ve anahtar karelere genişler; `FrameRenderer` GPU üzerinde 32-bit float işleyen bir render grafiğine dönüşür. |
 | Renk yönetimi, HDR, OCIO/ACES | `VideoStreamInfo` renk alanı, aktarım ve HDR bilgisini zaten taşır; dışa aktarma bunları korur. Dönüşümler render grafiğine düğüm olarak gelir. |
 | Eko azaltma, seslendirme kaydı, sessiz kısımları silme | `dsp::ClipChain`'e yeni adım; kayıt `QAudioSource` ile yeni bir medya dosyası üretir; sessizlik tespiti `Loudness` bloklarını kullanır. |
-| Otomatik altyazı | `src/ai` (Whisper) satırları üretir, `Timeline::addSubtitleTrack` ile iz olarak eklenir. |
 | Proxy düzenleme | `MediaItem`'a proxy yolu; oynatma proxy'yi, dışa aktarma asıl dosyayı okur (önizleme/çıktı ayrımı zaten var). |
 | Fotoğraf: seçim araçları, HEIC/AVIF | Sihirli değnek ve konu seçimi `LayerMask`'a bitmap maske türü olarak eklenir (fırça darbeleriyle birleşir); okuyucular `PhotoProcessor::load` arkasına RAW gibi eklenir. |
 | EXIF / meta veri koruma | Video meta verisi ve yan veriler (HDR, döndürme) şimdiden kopyalanıyor; fotoğraf EXIF'i 0.2'de `PhotoExporter`'a eklenecek. |

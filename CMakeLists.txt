@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.21)
 
 project(LumoraStudio
-    VERSION 0.4.1
+    VERSION 0.5.0
     DESCRIPTION "Free video and photo editor that never loses quality unless asked to"
     LANGUAGES CXX)
 
@@ -13,6 +13,9 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 
 option(LUMORA_BUILD_TESTS "Build unit tests" ON)
+
+# Third-party code is configured before our warning flags are set.
+include(Whisper)
 
 if(MSVC)
     add_compile_options(/W4 /permissive- /Zc:__cplusplus /utf-8 /wd4251)

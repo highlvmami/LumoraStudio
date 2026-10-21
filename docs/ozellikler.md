@@ -57,8 +57,8 @@ Hedef: kullanıcı istemedikçe hiçbir aşamada kalite düşmez.
 - Maskeler (dikdörtgen, elips, serbest çizim), maske takibi
 - Yeşil perde (chroma key), luma key
 - ✅ Resim içinde resim, bölünmüş ekran şablonları
-- Sabitleme (stabilizasyon)
-- Hareket takibi (nesneye yazı/efekt yapıştırma)
+- ✅ Sabitleme (stabilizasyon)
+- ✅ Hareket takibi (nesneye yazı/klip yapıştırma; efekt yapıştırma sonra)
 - Dikey / kare / yatay formata otomatik yeniden çerçeveleme
 
 ### 2.5 Renk
@@ -87,7 +87,7 @@ Hedef: kullanıcı istemedikçe hiçbir aşamada kalite düşmez.
 - Hazır başlık şablonları, alt bilgi bantları
 - Şekiller, oklar, vurgular
 - ✅ Altyazı: SRT/VTT içe-dışa aktarma, videoya gömme, görüntüye yakma veya ayrı .srt
-- Otomatik altyazı (yerel konuşma tanıma, ör. Whisper), Türkçe destekli
+- ✅ Otomatik altyazı (yerel konuşma tanıma, Whisper), Türkçe destekli
 
 ### 2.8 Ses
 
@@ -196,4 +196,5 @@ Hedef: kullanıcı istemedikçe hiçbir aşamada kalite düşmez.
 2. ✅ **Sürüm 0.2:** Çok izli zaman çizelgesi, yazı, geçişler, dışa aktarma ayarları, donanım hızlandırma.
 3. ✅ **Sürüm 0.3:** Renk paneli, kapsamlar, LUT; fotoğrafta katmanlar ve maskeler.
 4. ✅ **Sürüm 0.4:** Ses araçları, altyazı, RAW desteği; eğriler, HSL ve fırça maskesi. 0.4.1: dondurma karesi.
-5. **Sonrası:** Yapay zeka araçları, takip, çoklu kamera, eklentiler, HDR.
+5. ✅ **Sürüm 0.5 (ilk dilim):** Görüntü sabitleme, hareket takibi, Whisper ile yerel otomatik altyazı.
+6. **Sonrası:** Arka plan kaldırma ve diğer yapay zeka araçları, maske takibi ve yüz bulanıklaştırma, çoklu kamera, eklentiler, HDR.
