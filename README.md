@@ -22,6 +22,16 @@ Açık tema ("Gündüz", Görünüm → Tema):
 
 Tam yol haritası: [docs/ozellikler.md](docs/ozellikler.md). Mimari: [docs/mimari.md](docs/mimari.md).
 
+## Sürüm 0.6.2: tam ekran
+
+![Tam ekran önizleme](docs/screenshots/tam-ekran.png)
+
+- **Uygulama tam ekran:** üst çubuktaki köşeli düğme, **Görünüm → Tam ekran pencere** ya da **F11**. LumoraStudio tüm ekranı kaplar; aynı yolla geri dönülür.
+- **Tam ekran önizleme:** önizlemenin altındaki düğme, görüntüye çift tıklama ya da **F**. Video ya da fotoğraf siyah zemin üzerinde tüm ekranı kaplar; video ekran boyutunda çözülür, yani keskin görünür.
+- Oynatma kontrolleri (oynat/duraklat, kare kare, sürükleme çubuğu, zaman kodu) altta durur, fare durunca kaybolur, kıpırdayınca geri gelir. Boşluk oynatır, sol/sağ ok kare kare (Shift ile saniye saniye) ilerler, tek tıklama oynatır/duraklatır.
+- Fotoğrafta sol/sağ ok ya da tekerlek önceki/sonraki fotoğrafa geçer; kırpılmış, ayarlanmış hali gösterilir.
+- **Esc**, **F** ya da çift tıklama tam ekrandan çıkar.
+
 ## Sürüm 0.6'da neler var
 
 Yapay zeka araçlarının ilk dilimi. Hepsi bu bilgisayarda çalışır (ONNX Runtime, işlemci üzerinde); hiçbir görüntü dışarı gönderilmez. Her model ilk kullanıldığında bir kez indirilir.

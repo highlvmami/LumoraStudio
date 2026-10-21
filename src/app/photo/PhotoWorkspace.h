@@ -35,6 +35,11 @@ public:
     void openFiles(const QStringList& paths);
     void showPhoto(const QUuid& id);
     QUuid currentPhoto() const { return m_current; }
+    // The edited, cropped photo as shown in the preview, and its file name.
+    QImage previewImage() const;
+    QString currentTitle() const;
+    // Moves to the photo `delta` places away in the list.
+    void stepPhoto(int delta);
 
 public slots:
     void openDialog();
@@ -43,6 +48,8 @@ public slots:
 
 signals:
     void statusMessage(const QString& msg);
+    void previewChanged();
+    void fullScreenRequested();
 
 private:
     void loadCurrent();
@@ -61,6 +68,8 @@ private:
     QImage m_working;  // RGBA64 full resolution
     QImage m_proxy;    // RGBA64 preview resolution
     bool m_compare = false;
+    QImage m_shown; // last preview, uncropped
+    QRect m_shownCrop;
 
     QListWidget* m_list;
     PhotoView* m_view;
@@ -73,6 +82,7 @@ private:
     QComboBox* m_aspect;
     QPushButton* m_exportBtn;
     QToolButton* m_compareBtn;
+    QToolButton* m_fullScreenBtn;
     QLabel* m_info;
     QTimer* m_renderTimer;
     bool m_syncing = false;

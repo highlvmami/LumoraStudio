@@ -70,6 +70,7 @@ signals:
     void addToTimelineRequested(const QUuid& media, lumora::Ticks in, lumora::Ticks out);
     void filesDropped(const QStringList& paths);
     void mediaDropped(const QList<QUuid>& ids);
+    void fullScreenRequested();
 
 private:
     void setMode(Mode m);

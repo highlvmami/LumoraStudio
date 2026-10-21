@@ -12,6 +12,7 @@ set(APP_SOURCES
     panels/MimeTypes.h
     panels/VideoView.h panels/VideoView.cpp
     panels/MonitorPanel.h panels/MonitorPanel.cpp
+    panels/FullScreenViewer.h panels/FullScreenViewer.cpp
     panels/MediaBinPanel.h panels/MediaBinPanel.cpp
     panels/TimelineView.h panels/TimelineView.cpp
     panels/TimelinePanel.h panels/TimelinePanel.cpp
