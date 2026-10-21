@@ -23,13 +23,15 @@ if(LUMORA_WITH_WHISPER)
         set(GGML_FMA ON CACHE BOOL "" FORCE)
         set(GGML_F16C ON CACHE BOOL "" FORCE)
     endif()
-    set(_lumora_shared ${BUILD_SHARED_LIBS})
-    set(BUILD_SHARED_LIBS OFF)
+    # Static, so the app and the tests need no whisper/ggml DLLs next to
+    # them. whisper.cpp declares BUILD_SHARED_LIBS with option() under an old
+    # policy that can ignore a plain variable, so the cache entry is set.
+    set(CMAKE_POLICY_DEFAULT_CMP0077 NEW)
+    set(BUILD_SHARED_LIBS OFF CACHE BOOL "Build shared libraries" FORCE)
     FetchContent_Declare(whisper
         GIT_REPOSITORY https://github.com/ggml-org/whisper.cpp.git
         GIT_TAG v1.9.5
         GIT_SHALLOW TRUE
         EXCLUDE_FROM_ALL)
     FetchContent_MakeAvailable(whisper)
-    set(BUILD_SHARED_LIBS ${_lumora_shared})
 endif()

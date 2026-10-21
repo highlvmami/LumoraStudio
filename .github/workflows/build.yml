@@ -109,6 +109,7 @@ jobs:
               if ($code -ne 0) {
                 Write-Host "::group::$($t.BaseName) exited with $code"
                 Get-Content "$($t.BaseName).log" -ErrorAction SilentlyContinue
+                dumpbin /nologo /dependents $t.FullName
                 Write-Host "::endgroup::"
               }
             }
