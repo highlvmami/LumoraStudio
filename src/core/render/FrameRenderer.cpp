@@ -288,7 +288,7 @@ void FrameRenderer::prefetch(Ticks t, Ticks horizon) {
             continue;
         for (int k = 0; k < static_cast<int>(track.clips.size()); ++k) {
             const Clip& c = track.clips[k];
-            if (c.kind != ClipKind::Media)
+            if (!c.hasMedia())
                 continue;
             // The incoming clip of a storyline transition shows up half the
             // transition before its cut.
@@ -300,7 +300,7 @@ void FrameRenderer::prefetch(Ticks t, Ticks horizon) {
             auto media = m_pool ? m_pool->find(c.mediaId) : nullptr;
             if (!media || !media->info.video)
                 continue;
-            const Ticks source = std::max<Ticks>(0, c.toSource(first)) + m_sampleOffset;
+            const Ticks source = std::max<Ticks>(0, c.mediaTime(first)) + m_sampleOffset;
             if (auto it = m_slots.find(c.id); it != m_slots.end() &&
                 (it->second->failed || it->second->decoder->reachesForward(source)))
                 continue; // nothing to gain
@@ -474,7 +474,7 @@ QImage FrameRenderer::renderStoryline(Ticks t) {
     // has its own decoder), otherwise transitions of big videos play at half
     // speed. Slots are made beforehand so the two threads only look them up.
     for (int k : {a, b})
-        if (v[k].kind == ClipKind::Media)
+        if (v[k].hasMedia())
             slotFor(v[k]);
     auto incoming = std::async(std::launch::async, [&] { return renderStorylineClip(b, t); });
     const QImage la = renderStorylineClip(a, t);
