@@ -133,6 +133,39 @@ private slots:
         QCOMPARE(q.timeline()->clip(f)->freezeTime, ticksFromSeconds(2));
     }
 
+    void stickersSurviveSaving() {
+        QTemporaryDir dir;
+        QImage png(40, 20, QImage::Format_ARGB32);
+        png.fill(Qt::transparent);
+        QVERIFY(png.save(dir.filePath("sticker.png")));
+        Project p;
+        Timeline* tl = p.timeline();
+        tl->setFrameRate({25, 1});
+        tl->insertMedia(QUuid::createUuid(), 0, ticksFromSeconds(4), true, false);
+        const QUuid video = tl->tracks()[0].clips[0].id;
+        QVERIFY(tl->setLoop(video, true, ticksFromSeconds(4)));
+        auto item = p.media()->import(dir.filePath("sticker.png"));
+        QVERIFY(item);
+        const int v2 = tl->addTrack(TrackType::Video);
+        const QUuid still = tl->addStill(item->id, ticksFromSeconds(5), v2, ticksFromSeconds(1), {0.3, -0.2, 0.35, 15.0, 1.0});
+        QVERIFY(!still.isNull());
+        const QByteArray json = p.toJson();
+        QVERIFY(json.contains("\"version\": 7"));
+        Project q;
+        QString err;
+        QVERIFY2(q.fromJson(json, {}, &err), qPrintable(err));
+        QCOMPARE(q.timeline()->state(), tl->state());
+        QVERIFY(q.timeline()->clip(video)->loops());
+
+        PhotoLayer l;
+        l.id = QUuid::createUuid();
+        l.kind = LayerKind::Image;
+        l.imagePath = QStringLiteral("clip.mp4");
+        l.frameTime = ticksFromSeconds(1.5);
+        l.rotation = -30;
+        QCOMPARE(PhotoLayer::fromJson(l.toJson()), l);
+    }
+
 };
 
 QTEST_GUILESS_MAIN(ProjectTest)

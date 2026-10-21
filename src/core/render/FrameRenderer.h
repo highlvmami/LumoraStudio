@@ -87,6 +87,7 @@ private:
     };
 
     Slot* slotFor(const Clip& clip);
+    QImage convertFrame(Slot& slot, const AVFrame* f, QSize size);
     QImage clipImage(const Clip& clip, Ticks sourceTime, QSize* fitSize, int* rotation);
     void drawLayer(QPainter& p, const Clip& clip, Ticks t, Ticks sourceTime, double opacity);
     QImage renderStoryline(Ticks t);

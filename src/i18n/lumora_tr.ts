@@ -1201,14 +1201,6 @@
         <translation>Ayar katmanı ekle: bir maske üzerinden uygulanan renk ayarları</translation>
     </message>
     <message>
-        <source>Picture…</source>
-        <translation>Resim…</translation>
-    </message>
-    <message>
-        <source>Add another picture as a layer on top</source>
-        <translation>Üste katman olarak başka bir resim ekle</translation>
-    </message>
-    <message>
         <source>Move the layer up</source>
         <translation>Katmanı yukarı taşı</translation>
     </message>
@@ -1362,7 +1354,7 @@
     </message>
     <message>
         <source>picture</source>
-        <translation>resim</translation>
+        <translation>çıkartma</translation>
     </message>
     <message>
         <source>adjustment</source>
@@ -1375,14 +1367,6 @@
     <message>
         <source>Add adjustment layer</source>
         <translation>Ayar katmanı ekle</translation>
-    </message>
-    <message>
-        <source>Add picture layer</source>
-        <translation>Resim katmanı ekle</translation>
-    </message>
-    <message>
-        <source>Pictures (%1)</source>
-        <translation>Resimler (%1)</translation>
     </message>
     <message>
         <source>Delete layer</source>
@@ -1431,6 +1415,42 @@
     <message>
         <source>Clear brush strokes</source>
         <translation>Fırça darbelerini temizle</translation>
+    </message>
+    <message>
+        <source>Sticker…</source>
+        <translation>Çıkartma…</translation>
+    </message>
+    <message>
+        <source>Put another picture, or a frame of a video, on top of the photo as a sticker</source>
+        <translation>Fotoğrafın üstüne çıkartma olarak başka bir resim ya da bir videodan kare koy</translation>
+    </message>
+    <message>
+        <source>Rotation (°)</source>
+        <translation>Döndürme (°)</translation>
+    </message>
+    <message>
+        <source>Video frame (s)</source>
+        <translation>Video karesi (sn)</translation>
+    </message>
+    <message>
+        <source>Drag the sticker on the photo to move it, a corner to resize it, the round knob to turn it.</source>
+        <translation>Taşımak için çıkartmayı fotoğrafın üstünde sürükleyin; boyutlandırmak için bir köşesini, döndürmek için yuvarlak tutamağı sürükleyin.</translation>
+    </message>
+    <message>
+        <source>Turn picture</source>
+        <translation>Resmi döndür</translation>
+    </message>
+    <message>
+        <source>Sticker frame</source>
+        <translation>Çıkartma karesi</translation>
+    </message>
+    <message>
+        <source>Add sticker</source>
+        <translation>Çıkartma ekle</translation>
+    </message>
+    <message>
+        <source>Pictures and videos (%1)</source>
+        <translation>Resimler ve videolar (%1)</translation>
     </message>
 </context>
 <context>
@@ -1706,10 +1726,6 @@
         <translation>
             <numerusform>%n dosya içe aktarıldı</numerusform>
         </translation>
-    </message>
-    <message>
-        <source>Photos are edited in the Photo workspace; photo-to-video arrives in a later version.</source>
-        <translation>Fotoğraflar Fotoğraf çalışma alanında düzenlenir; fotoğraftan videoya sonraki bir sürümde geliyor.</translation>
     </message>
     <message>
         <source>Add clip</source>
@@ -2115,6 +2131,46 @@
         <source>Leave full screen (F11)</source>
         <translation>Tam ekrandan çık (F11)</translation>
     </message>
+    <message>
+        <source>Move picture</source>
+        <translation>Resmi taşı</translation>
+    </message>
+    <message>
+        <source>Add stic&amp;ker…</source>
+        <translation>Çı&amp;kartma ekle…</translation>
+    </message>
+    <message>
+        <source>Put a picture, animated GIF or video on top of the video at the playhead (Shift+K)</source>
+        <translation>Oynatma imlecindeki videonun üstüne resim, hareketli GIF ya da video koy (Shift+K)</translation>
+    </message>
+    <message>
+        <source>Pictures go on a video track.</source>
+        <translation>Resimler bir video izine konur.</translation>
+    </message>
+    <message>
+        <source>Add picture</source>
+        <translation>Resim ekle</translation>
+    </message>
+    <message>
+        <source>Add sticker</source>
+        <translation>Çıkartma ekle</translation>
+    </message>
+    <message>
+        <source>Pictures and videos (%1);;All files (*)</source>
+        <translation>Resimler ve videolar (%1);;Tüm dosyalar (*)</translation>
+    </message>
+    <message>
+        <source>The file could not be opened:
+
+%1</source>
+        <translation>Dosya açılamadı:
+
+%1</translation>
+    </message>
+    <message>
+        <source>This file has no picture to show as a sticker.</source>
+        <translation>Bu dosyada çıkartma olarak gösterilecek bir görüntü yok.</translation>
+    </message>
 </context>
 <context>
     <name>lumora::MediaBinPanel</name>
@@ -2473,6 +2529,10 @@ Orijinal dosya asla değişmez: düzenlemeler projede saklanır ve dışa aktar�
     <message>
         <source>Bring the background back</source>
         <translation>Arka planı geri getir</translation>
+    </message>
+    <message>
+        <source>Move sticker</source>
+        <translation>Çıkartmayı taşı</translation>
     </message>
 </context>
 <context>
@@ -3149,6 +3209,38 @@ Orijinal dosya asla değişmez: düzenlemeler projede saklanır ve dışa aktar�
     <message>
         <source>Cuts the person or object out of every frame. Playback gets slower.</source>
         <translation>Kişiyi ya da nesneyi her karede arka plandan ayırır. Oynatma yavaşlar.</translation>
+    </message>
+    <message>
+        <source>Picture</source>
+        <translation>Resim</translation>
+    </message>
+    <message>
+        <source>Repeat</source>
+        <translation>Tekrarla</translation>
+    </message>
+    <message>
+        <source>Play over and over</source>
+        <translation>Durmadan tekrar oynat</translation>
+    </message>
+    <message>
+        <source>Repeat the clip, e.g. an animated sticker; drag its end on the timeline to make it longer</source>
+        <translation>Klibi tekrarla (ör. hareketli bir çıkartma); uzatmak için zaman çizelgesinde sonunu sürükleyin</translation>
+    </message>
+    <message>
+        <source>Drag the end of the clip on the timeline to make it as long as you like. The sound is not repeated.</source>
+        <translation>Klibi istediğiniz kadar uzatmak için zaman çizelgesinde sonunu sürükleyin. Ses tekrarlanmaz.</translation>
+    </message>
+    <message>
+        <source>Change picture length</source>
+        <translation>Resim süresini değiştir</translation>
+    </message>
+    <message>
+        <source>Repeat clip</source>
+        <translation>Klibi tekrarla</translation>
+    </message>
+    <message>
+        <source>Stop repeating clip</source>
+        <translation>Klibi tekrarlamayı bırak</translation>
     </message>
 </context>
 <context>

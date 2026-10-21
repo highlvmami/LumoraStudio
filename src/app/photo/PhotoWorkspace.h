@@ -91,6 +91,7 @@ private:
     QLabel* m_info;
     QTimer* m_renderTimer;
     bool m_syncing = false;
+    int m_pictureDrags = 0; // keeps each drag of a sticker its own undo step
 };
 
 } // namespace lumora

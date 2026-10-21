@@ -34,6 +34,7 @@ QIcon compare();
 QIcon keyframe();
 QIcon title();
 QIcon transition();
+QIcon sticker();
 QIcon close(const QColor& color = {});
 QIcon popOut();
 QIcon fullScreen(const QColor& color = {});

@@ -4,6 +4,7 @@
 #include <QUndoStack>
 #include <QtTest>
 
+#include "TestMedia.h"
 #include "image/PhotoLibrary.h"
 #include "image/PhotoProcessor.h"
 #include "image/RawDecoder.h"
@@ -129,6 +130,37 @@ private slots:
     void initTestCase() {
         m_src = m_dir.filePath("photo.png");
         QVERIFY(makePhoto(200, 100).save(m_src));
+    }
+
+    void stickerLayersTurnAndShowVideoFrames() {
+        // A bright video frame as a sticker over a black photo.
+        test::TestVideoSpec spec;
+        spec.seconds = 1;
+        spec.audio = false;
+        spec.solidLuma = 220;
+        QString err;
+        const QString video = m_dir.filePath("bright.mp4");
+        QVERIFY2(test::writeTestVideo(video, spec, &err), qPrintable(err));
+        QImage black(400, 300, QImage::Format_RGBX64);
+        black.fill(Qt::black);
+        PhotoAdjustments adj;
+        PhotoLayer l;
+        l.id = QUuid::createUuid();
+        l.kind = LayerKind::Image;
+        l.imagePath = video;
+        l.frameTime = ticksFromSeconds(0.5);
+        l.scale = 0.5; // 200 x 150 in the middle
+        adj.layers.push_back(l);
+        QCOMPARE(PhotoProcessor::layerPictureSize(l), QSize(320, 240));
+        QImage out = PhotoProcessor::apply(black, adj).convertToFormat(QImage::Format_RGB32);
+        QVERIFY(qGray(out.pixel(200, 150)) > 200);
+        QVERIFY(qGray(out.pixel(120, 150)) > 200);
+        QVERIFY(qGray(out.pixel(80, 150)) < 10);
+        // Turned a quarter: now tall instead of wide.
+        adj.layers[0].rotation = 90;
+        out = PhotoProcessor::apply(black, adj).convertToFormat(QImage::Format_RGB32);
+        QVERIFY(qGray(out.pixel(120, 150)) < 10);
+        QVERIFY(qGray(out.pixel(200, 90)) > 200);
     }
 
     void neutralSettingsAreBitExact() {

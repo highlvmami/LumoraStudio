@@ -265,6 +265,7 @@ void PhotoView::paintEvent(QPaintEvent*) {
         p.drawImage(ir, m_image);
         p.restore();
         paintMask(p, ir);
+        m_gizmo.paint(p, ir, themeColors().accent);
     }
     if (!m_badge.isEmpty()) {
         QFont f = font();
@@ -323,7 +324,15 @@ void PhotoView::applyAspect(QRectF& r, Handle h) const {
     r = out;
 }
 
+void PhotoView::setPictureBox(const std::optional<TransformGizmo::Box>& box) {
+    m_gizmo.setBox(box);
+    update();
+}
+
 void PhotoView::mousePressEvent(QMouseEvent* e) {
+    if (!m_cropMode && !brushMode() && e->button() == Qt::LeftButton && !m_image.isNull() &&
+        m_gizmo.press(e->position(), imageRect()))
+        return;
     if (brushMode()) {
         if (e->button() != Qt::LeftButton)
             return;
@@ -351,6 +360,17 @@ void PhotoView::mousePressEvent(QMouseEvent* e) {
 }
 
 void PhotoView::mouseMoveEvent(QMouseEvent* e) {
+    if (m_gizmo.move(e->position(), imageRect(), e->modifiers())) {
+        update();
+        emit pictureMoved(*m_gizmo.box(), false);
+        return;
+    }
+    if (!m_cropMode && !brushMode() && !m_maskDrag) {
+        if (auto c = m_gizmo.cursorAt(e->position(), imageRect())) {
+            setCursor(*c);
+            return;
+        }
+    }
     if (brushMode()) {
         setCursor(Qt::CrossCursor);
         m_hover = e->position();
@@ -421,6 +441,10 @@ void PhotoView::mouseMoveEvent(QMouseEvent* e) {
 }
 
 void PhotoView::mouseReleaseEvent(QMouseEvent*) {
+    if (m_gizmo.release()) {
+        emit pictureMoved(*m_gizmo.box(), true);
+        return;
+    }
     if (m_stroke) {
         const BrushStroke s = *m_stroke;
         m_stroke.reset();

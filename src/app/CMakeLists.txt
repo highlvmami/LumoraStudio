@@ -11,6 +11,7 @@ set(APP_SOURCES
     playback/PlaybackEngine.h playback/PlaybackEngine.cpp
     panels/MimeTypes.h
     panels/VideoView.h panels/VideoView.cpp
+    panels/TransformGizmo.h panels/TransformGizmo.cpp
     panels/MonitorPanel.h panels/MonitorPanel.cpp
     panels/FullScreenViewer.h panels/FullScreenViewer.cpp
     panels/MediaBinPanel.h panels/MediaBinPanel.cpp

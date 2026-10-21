@@ -232,6 +232,20 @@ PhotoWorkspace::PhotoWorkspace(PhotoLibrary* library, QUndoStack* undo, QWidget*
                 l.mask.strokes.push_back(stroke);
         pushChange(a, stroke.erase ? tr("Erase from mask") : tr("Paint mask"), PhotoAdjustCommand::Other);
     });
+    connect(m_view, &PhotoView::pictureMoved, this, [this](const TransformGizmo::Box& b, bool finished) {
+        PhotoAdjustments a = current();
+        for (auto& l : a.layers)
+            if (l.id == m_layers->currentLayer()) {
+                l.x = b.x;
+                l.y = b.y;
+                l.scale = b.scale;
+                l.rotation = b.rotation;
+            }
+        // One undo step per drag.
+        pushChange(a, tr("Move sticker"), PhotoAdjustCommand::Layer, QStringLiteral("sticker:%1").arg(m_pictureDrags));
+        if (finished)
+            ++m_pictureDrags;
+    });
     connect(m_view, &PhotoView::maskMoved, this, [this](const QRectF& r) {
         PhotoAdjustments a = current();
         for (auto& l : a.layers)
@@ -405,6 +419,18 @@ void PhotoWorkspace::updateMaskOverlay() {
     const PhotoLayer* l = m_layers->current();
     const bool show = l && m_tabs->currentIndex() == 1 && l->mask.shape != MaskShape::None && !m_compare;
     m_view->setMaskOverlay(show ? std::optional<LayerMask>(l->mask) : std::nullopt);
+    // Picture layers (stickers) get handles on the photo.
+    std::optional<TransformGizmo::Box> box;
+    if (l && l->kind == LayerKind::Image && l->visible && m_tabs->currentIndex() == 1 && !m_compare && !m_working.isNull()) {
+        const QSizeF pic(PhotoProcessor::layerPictureSize(*l));
+        const QSizeF photo(m_working.size());
+        if (!pic.isEmpty()) {
+            const QSizeF fit = pic.scaled(photo, Qt::KeepAspectRatio);
+            box = TransformGizmo::Box{QSizeF(fit.width() / photo.width(), fit.height() / photo.height()), l->x, l->y,
+                                      l->scale, l->rotation, {}};
+        }
+    }
+    m_view->setPictureBox(box);
 }
 
 void PhotoWorkspace::pushChange(const PhotoAdjustments& after, const QString& text, int control, const QString& key) {

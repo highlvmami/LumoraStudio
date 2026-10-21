@@ -13,6 +13,8 @@
 #include <vector>
 
 #include "ai/Redaction.h"
+#include "media/MediaInfo.h"
+#include "media/VideoDecoder.h"
 #include "ai/Vision.h"
 #include "RawDecoder.h"
 
@@ -45,20 +47,23 @@ inline float blendChannel(BlendMode m, float b, float s) {
 std::mutex g_layerMutex;
 std::map<QString, QImage> g_layerImages;
 
-QImage layerImage(const QString& path) {
+QImage layerImage(const QString& path, Ticks frameTime) {
+    const QString key = path + QLatin1Char('@') + QString::number(frameTime);
     {
         std::lock_guard lock(g_layerMutex);
-        auto it = g_layerImages.find(path);
+        auto it = g_layerImages.find(key);
         if (it != g_layerImages.end())
             return it->second;
     }
-    QImage img = PhotoProcessor::load(path);
+    // Pictures load through the photo loader (RAW, orientation); anything
+    // else is a video and shows one frame.
+    QImage img = isImageFile(path) ? PhotoProcessor::load(path) : decodeVideoFrame(path, frameTime);
     if (!img.isNull())
         img = img.convertToFormat(QImage::Format_RGBA64_Premultiplied);
     std::lock_guard lock(g_layerMutex);
     if (g_layerImages.size() >= 8)
         g_layerImages.clear();
-    g_layerImages[path] = img;
+    g_layerImages[key] = img;
     return img;
 }
 
@@ -70,7 +75,7 @@ void compositeLayer(QImage& base, const PhotoLayer& layer) {
     if (layer.kind == LayerKind::Adjustment) {
         source = ColorProcessor(layer.grade).applied(base);
     } else {
-        const QImage pic = layerImage(layer.imagePath);
+        const QImage pic = layerImage(layer.imagePath, layer.frameTime);
         if (pic.isNull())
             return;
         coverage = QImage(base.size(), QImage::Format_RGBA64_Premultiplied);
@@ -79,8 +84,9 @@ void compositeLayer(QImage& base, const PhotoLayer& layer) {
         p.setRenderHint(QPainter::SmoothPixmapTransform);
         const QSizeF size = QSizeF(pic.size()).scaled(QSizeF(base.size()), Qt::KeepAspectRatio) *
                             std::clamp(layer.scale, 0.01, 100.0);
-        const QPointF centre(w / 2.0 + layer.x * w, h / 2.0 + layer.y * h);
-        p.drawImage(QRectF(centre - QPointF(size.width() / 2, size.height() / 2), size), pic);
+        p.translate(w / 2.0 + layer.x * w, h / 2.0 + layer.y * h);
+        p.rotate(layer.rotation);
+        p.drawImage(QRectF(QPointF(-size.width() / 2, -size.height() / 2), size), pic);
     }
     const bool masked = layer.mask.shape != MaskShape::None || layer.mask.invert;
     const std::vector<float> mask = masked ? layer.mask.render(w, h) : std::vector<float>{};
@@ -126,6 +132,12 @@ void compositeLayer(QImage& base, const PhotoLayer& layer) {
 }
 
 } // namespace
+
+QSize PhotoProcessor::layerPictureSize(const PhotoLayer& layer) {
+    if (layer.kind != LayerKind::Image || layer.imagePath.isEmpty())
+        return {};
+    return layerImage(layer.imagePath, layer.frameTime).size();
+}
 
 QImage PhotoProcessor::load(const QString& path, QImage* original, QString* error) {
     QImage img;

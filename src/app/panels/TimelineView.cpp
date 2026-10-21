@@ -407,11 +407,13 @@ void TimelineView::paintClip(QPainter& p, const Clip& c, int track, const QRect&
     const bool video = t.type == TrackType::Video;
     const bool title = c.kind == ClipKind::Title;
     const bool subtitle = c.kind == ClipKind::Subtitle;
-    const bool freeze = c.kind == ClipKind::Freeze;
+    auto media = c.hasMedia() ? m_pool->find(c.mediaId) : nullptr;
+    // Pictures (stickers) are held like a freeze frame but are not one.
+    const bool still = c.kind == ClipKind::Freeze && media && media->info.kind == MediaKind::Image;
+    const bool freeze = c.kind == ClipKind::Freeze && !still;
     const bool selected = isSelected(c);
     const ThemeColors& tc = themeColors();
     const QColor base = subtitle ? tc.accentAlt : title ? tc.titleClip : freeze ? tc.accentCool : video ? tc.videoClip : tc.audioClip;
-    auto media = c.hasMedia() ? m_pool->find(c.mediaId) : nullptr;
     QPainterPath path;
     path.addRoundedRect(QRectF(r).adjusted(0.5, 0.5, -0.5, -0.5), 7, 7);
     p.save();
@@ -462,7 +464,7 @@ void TimelineView::paintClip(QPainter& p, const Clip& c, int track, const QRect&
             }
         }
         // Key frame marks: where a lossless cut can start exactly.
-        if (track == 0 && !freeze && media && media->hasKeyframes()) {
+        if (track == 0 && c.kind == ClipKind::Media && media && media->hasKeyframes()) {
             const auto kf = media->keyframesCopy();
             const double spacing = kf.size() > 1 ? ticksToSeconds(kf[1] - kf[0]) * m_pps : 100;
             if (spacing > 6) {
@@ -535,6 +537,8 @@ void TimelineView::paintClip(QPainter& p, const Clip& c, int track, const QRect&
     if (freeze)
         name = tr("Freeze frame") + QStringLiteral("  ·  ") + name;
     name += QStringLiteral("  ·  ") + formatSeconds(c.duration());
+    if (c.loops())
+        name += QStringLiteral("  ·  ↻");
     if (!video && c.gainDb != 0.0)
         name += QStringLiteral("  ·  %1%2 dB").arg(c.gainDb > 0 ? QStringLiteral("+") : QString()).arg(c.gainDb, 0, 'f', 1);
     if (!c.transform.isIdentity())

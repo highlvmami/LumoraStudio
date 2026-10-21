@@ -82,7 +82,7 @@ bool TimelineState::hasEffects() const {
         if (ti >= 2 && !t.clips.empty())
             return true;
         for (const auto& c : t.clips) {
-            if (c.kind != ClipKind::Media || !c.transform.isIdentity() || !c.color.isIdentity() || !c.transitionIn.isNone() || c.fadeIn > 0 ||
+            if (c.kind != ClipKind::Media || c.loops() || !c.transform.isIdentity() || !c.color.isIdentity() || !c.transitionIn.isNone() || c.fadeIn > 0 ||
                 c.fadeOut > 0 || c.gainDb != 0.0 || !c.audio.isIdentity() || c.stabilization.isActive() || !c.motion.isEmpty() ||
                 c.redaction.isActive() || c.background.enabled)
                 return true;
@@ -99,7 +99,7 @@ bool TimelineState::hasVideoEffects() const {
         if (ti != 0 && !t.clips.empty())
             return true;
         for (const auto& c : t.clips)
-            if (c.kind != ClipKind::Media || !c.transform.isIdentity() || !c.color.isIdentity() ||
+            if (c.kind != ClipKind::Media || c.loops() || !c.transform.isIdentity() || !c.color.isIdentity() ||
                 !c.transitionIn.isNone() || c.fadeIn > 0 || c.fadeOut > 0 || c.stabilization.isActive() || !c.motion.isEmpty() ||
                 c.redaction.isActive() || c.background.enabled)
                 return true;
@@ -520,15 +520,28 @@ QUuid Timeline::placeMedia(const QUuid& mediaId, Ticks sourceIn, Ticks sourceOut
 }
 
 QUuid Timeline::addTitle(const TitleData& title, Ticks duration, int trackIndex, Ticks at) {
+    Clip c;
+    c.kind = ClipKind::Title;
+    c.title = title;
+    return addGenerated(c, duration, trackIndex, at);
+}
+
+QUuid Timeline::addStill(const QUuid& mediaId, Ticks duration, int trackIndex, Ticks at, const ClipTransform& transform) {
+    Clip c;
+    c.kind = ClipKind::Freeze;
+    c.mediaId = mediaId;
+    c.freezeTime = 0;
+    c.transform = transform;
+    return addGenerated(c, duration, trackIndex, at);
+}
+
+QUuid Timeline::addGenerated(Clip c, Ticks duration, int trackIndex, Ticks at) {
     Track* t = track(trackIndex);
     if (!t || !t->isVideo() || t->locked || duration <= 0)
         return {};
-    Clip c;
     c.id = QUuid::createUuid();
-    c.kind = ClipKind::Title;
     c.sourceIn = 0;
     c.sourceOut = duration;
-    c.title = title;
     if (t->magnetic) {
         int index = static_cast<int>(t->clips.size());
         if (at != kInvalidTicks)
@@ -726,6 +739,28 @@ bool Timeline::setBackgroundRemoval(const QUuid& clipId, const BackgroundRemoval
     if (!c || !c->hasMedia() || c->background == b)
         return false;
     c->background = b;
+    emit changed();
+    return true;
+}
+
+bool Timeline::setLoop(const QUuid& clipId, bool on, Ticks mediaDuration) {
+    Clip* c = mutableClip(clipId);
+    if (!c || c->kind != ClipKind::Media || on == c->loops() || (on && mediaDuration <= c->sourceIn))
+        return false;
+    if (on) {
+        c->loopStart = c->sourceIn;
+        c->loopLength = mediaDuration - c->sourceIn;
+    } else {
+        c->loopStart = c->loopLength = 0;
+        for (const auto& id : linkedClips(clipId)) {
+            Clip* lc = mutableClip(id);
+            if (lc->sourceOut > mediaDuration) {
+                lc->sourceOut = std::max(lc->sourceIn + frameDuration(), mediaDuration);
+                lc->fadeOut = std::min(lc->fadeOut, lc->duration());
+            }
+        }
+    }
+    normalize();
     emit changed();
     return true;
 }
@@ -1107,7 +1142,7 @@ bool Timeline::trimOut(const QUuid& clipId, Ticks newSourceOut, Ticks mediaDurat
     const Clip* c = clip(clipId);
     if (!c)
         return false;
-    if (c->kind != ClipKind::Media)
+    if (c->kind != ClipKind::Media || c->loops())
         mediaDuration = 0;
     const Ticks minDur = frameDuration();
     newSourceOut = std::clamp<Ticks>(newSourceOut, c->sourceIn + minDur, mediaDuration > 0 ? mediaDuration : INT64_MAX);
@@ -1157,7 +1192,8 @@ bool Timeline::canJoinWithNext(const QUuid& clipId) const {
     const Clip& a = clips[loc->index];
     const Clip& b = clips[loc->index + 1];
     return a.kind == ClipKind::Media && b.kind == ClipKind::Media && a.mediaId == b.mediaId &&
-           a.sourceOut == b.sourceIn && a.timelineEnd() == b.timelineStart;
+           a.sourceOut == b.sourceIn && a.timelineEnd() == b.timelineStart && a.loopStart == b.loopStart &&
+           a.loopLength == b.loopLength;
 }
 
 bool Timeline::joinWithNext(const QUuid& clipId) {

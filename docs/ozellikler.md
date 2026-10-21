@@ -57,6 +57,7 @@ Hedef: kullanıcı istemedikçe hiçbir aşamada kalite düşmez.
 - Maskeler (dikdörtgen, elips, serbest çizim), maske takibi
 - Yeşil perde (chroma key), luma key
 - ✅ Resim içinde resim, bölünmüş ekran şablonları
+- ✅ Çıkartmalar: videonun üstüne resim (saydam PNG/WebP), hareketli GIF ya da video; önizlemede sürükleyerek taşıma, boyutlandırma, döndürme; kısa klipler döngüde tekrar
 - ✅ Sabitleme (stabilizasyon)
 - ✅ Hareket takibi (nesneye yazı/klip yapıştırma; efekt yapıştırma sonra)
 - Dikey / kare / yatay formata otomatik yeniden çerçeveleme
@@ -136,6 +137,7 @@ Hedef: kullanıcı istemedikçe hiçbir aşamada kalite düşmez.
 ### 3.3 Katmanlı düzenleme (Photoshop tarzı)
 
 - ✅ Katmanlar (ayar ve resim katmanları), karışım modları, opaklık
+- ✅ Çıkartmalar: fotoğrafın üstüne başka bir resim ya da bir videodan kare; fotoğraf üstünde taşıma, boyutlandırma, döndürme
 - Katman grupları
 - ✅ Katman maskeleri: dikdörtgen, elips, degrade; yumuşak kenar, ters çevirme
 - ✅ Fırçayla maske boyama (boyut, sertlik, akış, silgi)
@@ -197,5 +199,5 @@ Hedef: kullanıcı istemedikçe hiçbir aşamada kalite düşmez.
 3. ✅ **Sürüm 0.3:** Renk paneli, kapsamlar, LUT; fotoğrafta katmanlar ve maskeler.
 4. ✅ **Sürüm 0.4:** Ses araçları, altyazı, RAW desteği; eğriler, HSL ve fırça maskesi. 0.4.1: dondurma karesi.
 5. ✅ **Sürüm 0.5 (ilk dilim):** Görüntü sabitleme, hareket takibi, Whisper ile yerel otomatik altyazı.
-6. ✅ **Sürüm 0.6 (ilk dilim):** Yüz ve plaka bulanıklaştırma (otomatik takip ile), arka plan kaldırma (video ve fotoğraf); hepsi yerel modellerle (ONNX Runtime).
+6. ✅ **Sürüm 0.6 (ilk dilim):** Yüz ve plaka bulanıklaştırma (otomatik takip ile), arka plan kaldırma (video ve fotoğraf); hepsi yerel modellerle (ONNX Runtime). 0.6.1: tek tıkla arka plan silme; 0.6.2: tam ekran; 0.6.3: çıkartmalar.
 7. **Sonrası:** Süper çözünürlük, içeriğe duyarlı nesne silme, maske takibi, çoklu kamera (ses ile eşitleme), OpenFX eklentileri, HDR10/HLG ve ton eşleme, OpenColorIO/ACES.

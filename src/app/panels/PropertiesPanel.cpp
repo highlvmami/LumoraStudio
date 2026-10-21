@@ -177,6 +177,23 @@ PropertiesPanel::PropertiesPanel(Project* project, QUndoStack* undo, QWidget* pa
     f->addRow(m_freezeInfo);
     layout->addWidget(m_freezeSection);
 
+    // --- picture (stills and stickers) ---
+    m_stillSection = makeSection(tr("Picture"), &f);
+    m_stillDuration = dspin(0.04, 3600, 0.5, 2, sec);
+    f->addRow(tr("Duration"), m_stillDuration);
+    layout->addWidget(m_stillSection);
+
+    // --- repeat ---
+    m_loopSection = makeSection(tr("Repeat"), &f);
+    m_loop = new QCheckBox(tr("Play over and over"));
+    m_loop->setToolTip(tr("Repeat the clip, e.g. an animated sticker; drag its end on the timeline to make it longer"));
+    f->addRow(m_loop);
+    m_loopInfo = new QLabel(tr("Drag the end of the clip on the timeline to make it as long as you like. The sound is not repeated."));
+    m_loopInfo->setWordWrap(true);
+    m_loopInfo->setStyleSheet(QStringLiteral("color: palette(placeholder-text);"));
+    f->addRow(m_loopInfo);
+    layout->addWidget(m_loopSection);
+
     // --- subtitle ---
     m_subSection = makeSection(tr("Subtitle"), &f);
     m_subText = new QPlainTextEdit;
@@ -570,6 +587,16 @@ PropertiesPanel::PropertiesPanel(Project* project, QUndoStack* undo, QWidget* pa
         edit(tr("Change freeze length"), QStringLiteral("duration"),
              [&](const Clip& c) { return m_project->timeline()->setDuration(c.id, ticksFromSeconds(v)); });
     });
+    connect(m_stillDuration, &QDoubleSpinBox::valueChanged, this, [this](double v) {
+        edit(tr("Change picture length"), QStringLiteral("duration"),
+             [&](const Clip& c) { return m_project->timeline()->setDuration(c.id, ticksFromSeconds(v)); });
+    });
+    connect(m_loop, &QCheckBox::toggled, this, [this](bool on) {
+        edit(on ? tr("Repeat clip") : tr("Stop repeating clip"), {}, [&](const Clip& c) {
+            auto m = m_project->media()->find(c.mediaId);
+            return m && m_project->timeline()->setLoop(c.id, on, m->info.duration);
+        });
+    });
     connect(m_titleDuration, &QDoubleSpinBox::valueChanged, this, [this](double v) {
         edit(tr("Change title length"), QStringLiteral("duration"),
              [&](const Clip& c) { return m_project->timeline()->setDuration(c.id, ticksFromSeconds(v)); });
@@ -764,7 +791,9 @@ void PropertiesPanel::refreshEditors(const Clip* clip) {
     const Timeline* tl = m_project->timeline();
     const bool isTitle = clip && clip->kind == ClipKind::Title;
     const bool isSubtitle = clip && clip->kind == ClipKind::Subtitle;
-    const bool isFreeze = clip && clip->kind == ClipKind::Freeze;
+    auto clipMedia = clip && clip->hasMedia() ? m_project->media()->find(clip->mediaId) : nullptr;
+    const bool isStill = clip && clip->kind == ClipKind::Freeze && clipMedia && clipMedia->info.kind == MediaKind::Image;
+    const bool isFreeze = clip && clip->kind == ClipKind::Freeze && !isStill;
     const bool video = clip && track >= 0 && tl->tracks()[track].type == TrackType::Video;
     const bool audio = clip && track >= 0 && tl->tracks()[track].type == TrackType::Audio;
 
@@ -775,6 +804,7 @@ void PropertiesPanel::refreshEditors(const Clip* clip) {
                                    isTitle      ? tr("Title")
                                    : isSubtitle ? tr("Subtitle")
                                    : isFreeze   ? tr("Freeze frame")
+                                   : isStill    ? tr("Picture")
                                    : video      ? tr("Video clip")
                                                 : tr("Audio clip"),
                                    g_dim));
@@ -823,7 +853,8 @@ void PropertiesPanel::refreshEditors(const Clip* clip) {
         m_stabInfo->setVisible(s.path.size() < 2);
     }
     const bool ai = video && clip->hasMedia();
-    m_redactSection->setVisible(ai);
+    // Faces are searched in video frames; a picture can still lose its background.
+    m_redactSection->setVisible(ai && !isStill);
     m_bgSection->setVisible(ai);
     if (ai) {
         const Redaction& r = clip->redaction;
@@ -885,7 +916,7 @@ void PropertiesPanel::refreshEditors(const Clip* clip) {
         m_bgInfo->setVisible(!bgInfo.isEmpty());
     }
 
-    const bool follow = video && track != 0 && (clip->kind == ClipKind::Media || clip->kind == ClipKind::Title);
+    const bool follow = video && track != 0 && (clip->hasMedia() || clip->kind == ClipKind::Title);
     m_trackSection->setVisible(follow);
     if (follow) {
         m_trackClear->setEnabled(!clip->motion.isEmpty());
@@ -898,6 +929,16 @@ void PropertiesPanel::refreshEditors(const Clip* clip) {
     if (isFreeze) {
         setSpin(m_freezeDuration, ticksToSeconds(clip->duration()));
         m_freezeInfo->setText(tr("Shows the frame at %1 of the source.").arg(formatTimecode(clip->freezeTime, tl->frameRate())));
+    }
+
+    m_stillSection->setVisible(isStill);
+    if (isStill)
+        setSpin(m_stillDuration, ticksToSeconds(clip->duration()));
+    const bool loopable = video && clip->kind == ClipKind::Media && clipMedia && clipMedia->info.duration > 0;
+    m_loopSection->setVisible(loopable);
+    if (loopable) {
+        m_loop->setChecked(clip->loops());
+        m_loopInfo->setVisible(clip->loops());
     }
 
     m_subSection->setVisible(isSubtitle);

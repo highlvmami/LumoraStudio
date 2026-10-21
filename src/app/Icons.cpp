@@ -336,6 +336,38 @@ QIcon transition() {
     });
 }
 
+QIcon sticker() {
+    return draw([](QPainter& p, QColor c) {
+        // A square sticker with its corner peeling off.
+        p.setPen(pen(c, 1.8));
+        p.setBrush(Qt::NoBrush);
+        QPainterPath body;
+        body.moveTo(13, 20);
+        body.lineTo(6, 20);
+        body.quadTo(4, 20, 4, 18);
+        body.lineTo(4, 6);
+        body.quadTo(4, 4, 6, 4);
+        body.lineTo(18, 4);
+        body.quadTo(20, 4, 20, 6);
+        body.lineTo(20, 13);
+        body.closeSubpath();
+        p.drawPath(body);
+        QColor fill = c;
+        fill.setAlphaF(0.55);
+        p.setBrush(fill);
+        QPainterPath curl;
+        curl.moveTo(20, 13);
+        curl.lineTo(15, 13);
+        curl.quadTo(13, 13, 13, 15);
+        curl.lineTo(13, 20);
+        curl.closeSubpath();
+        p.drawPath(curl);
+        p.setPen(Qt::NoPen);
+        p.setBrush(c);
+        p.drawEllipse(QPointF(9.5, 9.5), 1.6, 1.6);
+    });
+}
+
 QIcon close(const QColor& color) {
     return draw(
         [](QPainter& p, QColor c) {

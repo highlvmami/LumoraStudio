@@ -13,6 +13,7 @@
 #include "ai/Vision.h"
 #include "color/ColorProcessor.h"
 #include "ffmpeg/FFmpeg.h"
+#include "image/PhotoProcessor.h"
 #include "media/VideoDecoder.h"
 #include "render/TitleRenderer.h"
 
@@ -48,7 +49,8 @@ bool hasAlpha(int format) {
 } // namespace
 
 struct FrameRenderer::Slot {
-    std::unique_ptr<VideoDecoder> decoder;
+    std::unique_ptr<VideoDecoder> decoder; // null for still pictures
+    QImage still; // still pictures: the picture, at most twice the canvas size
     bool failed = false;
     av::SwsPtr sws;
     int swsKey[6] = {0, 0, -1, 0, 0, -1};
@@ -270,7 +272,14 @@ FrameRenderer::Slot* FrameRenderer::slotFor(const Clip& clip) {
         return it->second.get();
     }
     auto slot = std::make_unique<Slot>();
-    if (!media || !media->info.video) {
+    if (media && media->info.kind == MediaKind::Image) {
+        slot->still = PhotoProcessor::load(media->path);
+        const int cap = 2 * std::max(m_canvas.width(), m_canvas.height());
+        if (slot->still.isNull())
+            slot->failed = true;
+        else if (slot->still.width() > cap || slot->still.height() > cap)
+            slot->still = slot->still.scaled(cap, cap, Qt::KeepAspectRatio, Qt::SmoothTransformation);
+    } else if (!media || !media->info.video) {
         slot->failed = true;
     } else if (job) {
         adopt(slot.get());
@@ -322,21 +331,62 @@ void FrameRenderer::prefetch(Ticks t, Ticks horizon) {
         m_prefetcher->retain(wanted);
 }
 
+// Converts a decoded frame to the working format at `size`: 16 bits per
+// channel for exports, 8 for the preview; alpha stays straight.
+QImage FrameRenderer::convertFrame(Slot& slot, const AVFrame* f, QSize size) {
+    const bool final = m_precision == Precision::Final;
+    const int tw = size.width(), th = size.height();
+    const bool alpha = hasAlpha(f->format);
+    // Native-endian formats that match QImage's memory layout.
+    const AVPixelFormat dstFmt = final ? AV_PIX_FMT_RGBA64 : (alpha ? AV_PIX_FMT_RGB32 : AV_PIX_FMT_0RGB32);
+    const int key[6] = {f->width, f->height, f->format, tw, th, f->colorspace * 4 + f->color_range};
+    if (!slot.sws || !std::equal(std::begin(key), std::end(key), std::begin(slot.swsKey))) {
+        const int flags = final ? (SWS_LANCZOS | SWS_ACCURATE_RND | SWS_FULL_CHR_H_INT) : (SWS_BICUBIC | SWS_FULL_CHR_H_INT);
+        slot.sws.reset(sws_getContext(f->width, f->height, static_cast<AVPixelFormat>(f->format), tw, th, dstFmt, flags,
+                                       nullptr, nullptr, nullptr));
+        if (!slot.sws)
+            return {};
+        sws_setColorspaceDetails(slot.sws.get(), sws_getCoefficients(swsColorspace(f)),
+                                 f->color_range == AVCOL_RANGE_JPEG ? 1 : 0, sws_getCoefficients(SWS_CS_DEFAULT), 1, 0,
+                                 1 << 16, 1 << 16);
+        std::copy(std::begin(key), std::end(key), std::begin(slot.swsKey));
+    }
+    QImage img(tw, th, final ? QImage::Format_RGBA64 : (alpha ? QImage::Format_ARGB32 : QImage::Format_RGB32));
+    uint8_t* dst[4] = {img.bits(), nullptr, nullptr, nullptr};
+    int stride[4] = {static_cast<int>(img.bytesPerLine()), 0, 0, 0};
+    sws_scale(slot.sws.get(), f->data, f->linesize, 0, f->height, dst, stride);
+    if (final && !alpha) {
+        // Opaque sources: make sure alpha is exactly 1.0 whatever sws wrote.
+        for (int y = 0; y < th; ++y) {
+            auto* px = reinterpret_cast<quint16*>(img.scanLine(y));
+            for (int x = 0; x < tw; ++x)
+                px[x * 4 + 3] = 0xffff;
+        }
+    }
+    return img;
+}
+
 QImage FrameRenderer::clipImage(const Clip& clip, Ticks sourceTime, QSize* fitSize, int* rotation) {
     Slot* slot = slotFor(clip);
     if (slot->failed)
         return {};
     Ticks pts = 0;
-    const AVFrame* f = slot->decoder->frameAt(sourceTime + m_sampleOffset, &pts);
-    if (!f || f->width <= 0 || f->height <= 0)
-        return {};
-    const int rot = slot->decoder->info().rotation;
+    const AVFrame* f = nullptr;
+    int rot = 0;
+    double dw = slot->still.width(), dh = slot->still.height();
+    if (slot->decoder) {
+        f = slot->decoder->frameAt(sourceTime + m_sampleOffset, &pts);
+        if (!f || f->width <= 0 || f->height <= 0)
+            return {};
+        rot = slot->decoder->info().rotation;
+        // Display size of the picture (square pixels, rotated).
+        dw = f->width;
+        dh = f->height;
+        if (f->sample_aspect_ratio.num > 0 && f->sample_aspect_ratio.den > 0)
+            dw = dw * f->sample_aspect_ratio.num / f->sample_aspect_ratio.den;
+    }
     if (rotation)
         *rotation = rot;
-    // Display size of the picture (square pixels, rotated).
-    double dw = f->width, dh = f->height;
-    if (f->sample_aspect_ratio.num > 0 && f->sample_aspect_ratio.den > 0)
-        dw = dw * f->sample_aspect_ratio.num / f->sample_aspect_ratio.den;
     const bool sideways = rot == 90 || rot == 270;
     QSizeF display = sideways ? QSizeF(dh, dw) : QSizeF(dw, dh);
     const QSizeF fit = display.scaled(QSizeF(m_output), Qt::KeepAspectRatio);
@@ -356,33 +406,13 @@ QImage FrameRenderer::clipImage(const Clip& clip, Ticks sourceTime, QSize* fitSi
         return slot->image;
 
     const bool final = m_precision == Precision::Final;
-    const bool alpha = hasAlpha(f->format);
-    // Native-endian formats that match QImage's memory layout.
-    const AVPixelFormat dstFmt = final ? AV_PIX_FMT_RGBA64 : (alpha ? AV_PIX_FMT_RGB32 : AV_PIX_FMT_0RGB32);
-    const int key[6] = {f->width, f->height, f->format, tw, th, f->colorspace * 4 + f->color_range};
-    if (!slot->sws || !std::equal(std::begin(key), std::end(key), std::begin(slot->swsKey))) {
-        const int flags = final ? (SWS_LANCZOS | SWS_ACCURATE_RND | SWS_FULL_CHR_H_INT) : (SWS_BICUBIC | SWS_FULL_CHR_H_INT);
-        slot->sws.reset(sws_getContext(f->width, f->height, static_cast<AVPixelFormat>(f->format), tw, th, dstFmt, flags,
-                                       nullptr, nullptr, nullptr));
-        if (!slot->sws)
-            return {};
-        sws_setColorspaceDetails(slot->sws.get(), sws_getCoefficients(swsColorspace(f)),
-                                 f->color_range == AVCOL_RANGE_JPEG ? 1 : 0, sws_getCoefficients(SWS_CS_DEFAULT), 1, 0,
-                                 1 << 16, 1 << 16);
-        std::copy(std::begin(key), std::end(key), std::begin(slot->swsKey));
-    }
-    QImage img(tw, th, final ? QImage::Format_RGBA64 : (alpha ? QImage::Format_ARGB32 : QImage::Format_RGB32));
-    uint8_t* dst[4] = {img.bits(), nullptr, nullptr, nullptr};
-    int stride[4] = {static_cast<int>(img.bytesPerLine()), 0, 0, 0};
-    sws_scale(slot->sws.get(), f->data, f->linesize, 0, f->height, dst, stride);
-    if (final && !alpha) {
-        // Opaque sources: make sure alpha is exactly 1.0 whatever sws wrote.
-        for (int y = 0; y < th; ++y) {
-            auto* px = reinterpret_cast<quint16*>(img.scanLine(y));
-            for (int x = 0; x < tw; ++x)
-                px[x * 4 + 3] = 0xffff;
-        }
-    }
+    QImage img = f ? convertFrame(*slot, f, QSize(tw, th))
+                   : slot->still.scaled(tw, th, Qt::IgnoreAspectRatio, Qt::SmoothTransformation)
+                         .convertToFormat(final ? QImage::Format_RGBA64
+                                          : slot->still.hasAlphaChannel() ? QImage::Format_ARGB32
+                                                                          : QImage::Format_RGB32);
+    if (img.isNull())
+        return {};
     // The subject is found on the picture as shot, before grading, so colour
     // changes do not move the cut-out edge.
     QImage matte;
@@ -660,7 +690,7 @@ const AVFrame* FrameRenderer::passthroughFrame(Ticks t) {
                 return nullptr;
         }
         Slot* slot = slotFor(c);
-        if (slot->failed || slot->decoder->info().rotation != 0)
+        if (slot->failed || !slot->decoder || slot->decoder->info().rotation != 0)
             return nullptr;
         const AVFrame* f = slot->decoder->frameAt(c.mediaTime(t) + m_sampleOffset);
         if (!f || f->width != m_output.width() || f->height != m_output.height())
