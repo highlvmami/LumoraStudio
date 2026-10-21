@@ -15,6 +15,7 @@ class VideoView : public QWidget {
 public:
     explicit VideoView(QWidget* parent = nullptr);
     void setImage(const QImage& img);
+    const QImage& image() const { return m_image; }
     void setOverlayText(const QString& text);
     void setPlaceholder(const QString& text);
     // Lets the user drag a rectangle over the picture; regionPicked() gets it
@@ -36,6 +37,7 @@ signals:
     void mediaDropped(const QList<QUuid>& ids);
     void regionPicked(const QRectF& region);
     void regionPickCancelled();
+    void doubleClicked();
 
 protected:
     void paintEvent(QPaintEvent*) override;
@@ -45,6 +47,7 @@ protected:
     void mousePressEvent(QMouseEvent* e) override;
     void mouseMoveEvent(QMouseEvent* e) override;
     void mouseReleaseEvent(QMouseEvent* e) override;
+    void mouseDoubleClickEvent(QMouseEvent* e) override;
     void keyPressEvent(QKeyEvent* e) override;
 
 private:

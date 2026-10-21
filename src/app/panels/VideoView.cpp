@@ -128,6 +128,12 @@ void VideoView::mouseReleaseEvent(QMouseEvent* e) {
     emit regionPicked(region);
 }
 
+void VideoView::mouseDoubleClickEvent(QMouseEvent* e) {
+    if (m_picking || e->button() != Qt::LeftButton)
+        return QWidget::mouseDoubleClickEvent(e);
+    emit doubleClicked();
+}
+
 void VideoView::keyPressEvent(QKeyEvent* e) {
     if (m_picking && e->key() == Qt::Key_Escape) {
         cancelRegionPick();

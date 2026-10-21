@@ -22,6 +22,7 @@ namespace lumora {
 class Project;
 class MediaCache;
 class PlaybackEngine;
+class FullScreenViewer;
 class MonitorPanel;
 class MediaBinPanel;
 class TimelineView;
@@ -50,9 +51,11 @@ public:
     void autoSubtitles();
     // Starts following an object with the selected clip.
     void trackClip(const QUuid& clipId = {});
+    void showFullScreenPreview();
 
 protected:
     void closeEvent(QCloseEvent* e) override;
+    void changeEvent(QEvent* e) override;
 
 private:
     void createActions();
@@ -102,6 +105,8 @@ private:
     void removeBackground(const QUuid& clipId, const QString& model);
     void refreshProgram();
     void showShortcuts();
+    void closeFullScreenPreview();
+    void setWindowFullScreen(bool on);
     void showAbout();
 public:
     void checkForUpdatesOnStartup();
@@ -118,6 +123,8 @@ private:
     QTabBar* m_tabs;
     QStackedWidget* m_stack;
     MonitorPanel* m_monitor;
+    FullScreenViewer* m_fullScreen = nullptr;
+    bool m_wasMaximized = false;
     MediaBinPanel* m_bin;
     TimelineView* m_timelineView;
     TimelinePanel* m_timelinePanel;
@@ -176,6 +183,8 @@ private:
     QAction* m_actAutoSubtitles;
     QAction* m_actExportSubtitles;
     QAction* m_actExportFrame;
+    QAction* m_actFullScreenPreview;
+    QAction* m_actFullScreenWindow;
     class Updater* m_updater = nullptr;
 };
 

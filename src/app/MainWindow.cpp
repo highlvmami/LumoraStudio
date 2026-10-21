@@ -56,6 +56,7 @@
 #include "dialogs/ExportDialog.h"
 #include "ffmpeg/FFmpeg.h"
 #include "panels/MediaBinPanel.h"
+#include "panels/FullScreenViewer.h"
 #include "panels/MonitorPanel.h"
 #include "panels/PropertiesPanel.h"
 #include "panels/TimelinePanel.h"
@@ -150,7 +151,7 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
     switcherLayout->addWidget(m_tabs);
     barLayout->addWidget(switcher);
     barLayout->addSpacing(14);
-    for (QAction* a : {m_actImport, m_actUndo, m_actRedo}) {
+    for (QAction* a : {m_actImport, m_actUndo, m_actRedo, m_actFullScreenWindow}) {
         auto* b = new QToolButton;
         b->setDefaultAction(a);
         b->setIconSize(QSize(18, 18));
@@ -318,6 +319,12 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
             m_properties->showMedia(m_monitor->sourceItem()->id);
     });
     connect(m_photo, &PhotoWorkspace::statusMessage, this, [this](const QString& s) { statusBar()->showMessage(s, 6000); });
+    connect(m_monitor, &MonitorPanel::fullScreenRequested, this, &MainWindow::showFullScreenPreview);
+    connect(m_photo, &PhotoWorkspace::fullScreenRequested, this, &MainWindow::showFullScreenPreview);
+    connect(m_photo, &PhotoWorkspace::previewChanged, this, [this] {
+        if (m_fullScreen && m_fullScreen->isVisible() && !m_fullScreen->isVideo())
+            m_fullScreen->setPhoto(m_photo->previewImage(), m_photo->currentTitle());
+    });
 
     restoreSettings();
     refreshProgram();
@@ -418,6 +425,13 @@ void MainWindow::createActions() {
     m_actExportSubtitles = make(tr("Export subtitles…"), {}, &MainWindow::exportSubtitles);
     m_actExportFrame = make(tr("Export current &frame…"), QKeySequence(Qt::CTRL | Qt::ALT | Qt::Key_S),
                             &MainWindow::exportFrame);
+    m_actFullScreenPreview = make(tr("Full-screen &preview"), QKeySequence(Qt::Key_F), &MainWindow::showFullScreenPreview);
+    m_actFullScreenPreview->setToolTip(tr("Show the video or photo on the whole screen (F, Esc leaves)"));
+    m_actFullScreenWindow = make(tr("Full-screen &window"), QKeySequence(Qt::Key_F11), &MainWindow::setWindowFullScreen,
+                                 Icons::fullScreen());
+    m_actFullScreenWindow->setToolTip(tr("Fill the whole screen with LumoraStudio (F11)"));
+    m_actFullScreenWindow->setShortcuts({QKeySequence(Qt::Key_F11), QKeySequence::FullScreen});
+    m_actFullScreenWindow->setCheckable(true);
 
     auto* tb = m_timelinePanel->toolBar();
     tb->addAction(m_actSplit);
@@ -490,6 +504,9 @@ void MainWindow::createMenus() {
     play->addAction(m_actEnd);
 
     QMenu* view = menuBar()->addMenu(tr("&View"));
+    view->addAction(m_actFullScreenPreview);
+    view->addAction(m_actFullScreenWindow);
+    view->addSeparator();
     view->addAction(m_actZoomIn);
     view->addAction(m_actZoomOut);
     view->addSeparator();
@@ -663,6 +680,16 @@ bool MainWindow::maybeSave() {
 void MainWindow::checkForUpdatesOnStartup() {
     if (m_updater)
         m_updater->checkOnStartup();
+}
+
+void MainWindow::changeEvent(QEvent* e) {
+    if (e->type() == QEvent::WindowStateChange) {
+        m_actFullScreenWindow->setChecked(isFullScreen());
+        m_actFullScreenWindow->setIcon(isFullScreen() ? Icons::exitFullScreen() : Icons::fullScreen());
+        m_actFullScreenWindow->setToolTip(isFullScreen() ? tr("Leave full screen (F11)")
+                                                         : tr("Fill the whole screen with LumoraStudio (F11)"));
+    }
+    QMainWindow::changeEvent(e);
 }
 
 void MainWindow::closeEvent(QCloseEvent* e) {
@@ -1583,7 +1610,8 @@ void MainWindow::showShortcuts() {
     QString html = QStringLiteral("<table cellspacing=6>");
     for (QAction* a : {m_actPlay, m_actPrevFrame, m_actNextFrame, m_actHome, m_actEnd, m_actSplit, m_actDelete, m_actJoin,
                        m_actFreeze, m_actMarkIn, m_actMarkOut, m_actAddSource, m_actSnap, m_actZoomIn, m_actZoomOut, m_actUndo, m_actRedo,
-                       m_actImport, m_actExport, m_actExportPhoto, m_actSave, m_actOpen}) {
+                       m_actFullScreenPreview, m_actFullScreenWindow, m_actImport, m_actExport, m_actExportPhoto, m_actSave,
+                       m_actOpen}) {
         QStringList keys;
         for (const auto& k : a->shortcuts())
             keys << k.toString(QKeySequence::NativeText);
@@ -1598,6 +1626,51 @@ void MainWindow::showShortcuts() {
     connect(buttons, &QDialogButtonBox::rejected, &dlg, &QDialog::reject);
     layout->addWidget(buttons);
     dlg.exec();
+}
+
+void MainWindow::showFullScreenPreview() {
+    if (!m_fullScreen) {
+        m_fullScreen = new FullScreenViewer(m_engine, this);
+        connect(m_fullScreen, &FullScreenViewer::closed, this, &MainWindow::closeFullScreenPreview);
+        connect(m_fullScreen, &FullScreenViewer::photoStepRequested, m_photo, &PhotoWorkspace::stepPhoto);
+    }
+    if (m_workspace == Workspace::Photo) {
+        const QImage img = m_photo->previewImage();
+        if (img.isNull())
+            return;
+        m_fullScreen->showPhoto(img, m_photo->currentTitle(), this);
+        return;
+    }
+    VideoView* view = m_monitor->view();
+    if (view->isPickingRegion())
+        return;
+    const MediaItemPtr source = m_monitor->mode() == MonitorPanel::Mode::Source ? m_monitor->sourceItem() : nullptr;
+    const QString title = source ? QFileInfo(source->info.path).fileName() : tr("Timeline");
+    m_fullScreen->showVideo(view->image(), title, this);
+}
+
+void MainWindow::closeFullScreenPreview() {
+    if (!m_fullScreen || !m_fullScreen->isVideo())
+        return;
+    // Back to the monitor's own size; redraw a paused frame at that size.
+    VideoView* view = m_monitor->view();
+    m_engine->setPreviewSize(view->size() * view->devicePixelRatioF());
+    if (!m_engine->isPlaying())
+        m_engine->seek(m_engine->position());
+}
+
+void MainWindow::setWindowFullScreen(bool on) {
+    if (on == isFullScreen())
+        return;
+    if (on) {
+        m_wasMaximized = isMaximized();
+        showFullScreen();
+    } else if (m_wasMaximized) {
+        showMaximized();
+    } else {
+        showNormal();
+    }
+    m_actFullScreenWindow->setChecked(on);
 }
 
 void MainWindow::showAbout() {

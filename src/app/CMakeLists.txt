@@ -13,6 +13,7 @@ set(APP_SOURCES
     panels/VideoView.h panels/VideoView.cpp
     panels/TransformGizmo.h panels/TransformGizmo.cpp
     panels/MonitorPanel.h panels/MonitorPanel.cpp
+    panels/FullScreenViewer.h panels/FullScreenViewer.cpp
     panels/MediaBinPanel.h panels/MediaBinPanel.cpp
     panels/TimelineView.h panels/TimelineView.cpp
     panels/TimelinePanel.h panels/TimelinePanel.cpp

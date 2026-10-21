@@ -41,12 +41,14 @@ signals:
     void filesDropped(const QStringList& paths);
     // While dragging the picture handles (finished = false) and on release.
     void pictureMoved(const lumora::TransformGizmo::Box& box, bool finished);
+    void doubleClicked();
 
 protected:
     void paintEvent(QPaintEvent*) override;
     void mousePressEvent(QMouseEvent*) override;
     void mouseMoveEvent(QMouseEvent*) override;
     void mouseReleaseEvent(QMouseEvent*) override;
+    void mouseDoubleClickEvent(QMouseEvent*) override;
     void leaveEvent(QEvent*) override;
     void dragEnterEvent(QDragEnterEvent*) override;
     void dropEvent(QDropEvent*) override;

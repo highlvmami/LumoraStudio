@@ -1128,6 +1128,33 @@
     </message>
 </context>
 <context>
+    <name>lumora::FullScreenViewer</name>
+    <message>
+        <source>Leave full screen (Esc)</source>
+        <translation>Tam ekrandan çık (Esc)</translation>
+    </message>
+    <message>
+        <source>Play / pause (Space)</source>
+        <translation>Oynat / duraklat (Boşluk)</translation>
+    </message>
+    <message>
+        <source>Previous frame (Left)</source>
+        <translation>Önceki kare (Sol)</translation>
+    </message>
+    <message>
+        <source>Next frame (Right)</source>
+        <translation>Sonraki kare (Sağ)</translation>
+    </message>
+    <message>
+        <source>Previous photo (Left)</source>
+        <translation>Önceki fotoğraf (Sol)</translation>
+    </message>
+    <message>
+        <source>Next photo (Right)</source>
+        <translation>Sonraki fotoğraf (Sağ)</translation>
+    </message>
+</context>
+<context>
     <name>lumora::LayersPanel</name>
     <message>
         <source>Normal</source>
@@ -2085,6 +2112,26 @@
         <translation>Arka planı kaldır</translation>
     </message>
     <message>
+        <source>Full-screen &amp;preview</source>
+        <translation>Tam ekran ö&amp;nizleme</translation>
+    </message>
+    <message>
+        <source>Show the video or photo on the whole screen (F, Esc leaves)</source>
+        <translation>Videoyu ya da fotoğrafı tüm ekranda göster (F, Esc ile çık)</translation>
+    </message>
+    <message>
+        <source>Full-screen &amp;window</source>
+        <translation>Tam ekran &amp;pencere</translation>
+    </message>
+    <message>
+        <source>Fill the whole screen with LumoraStudio (F11)</source>
+        <translation>LumoraStudio tüm ekranı kaplasın (F11)</translation>
+    </message>
+    <message>
+        <source>Leave full screen (F11)</source>
+        <translation>Tam ekrandan çık (F11)</translation>
+    </message>
+    <message>
         <source>Move picture</source>
         <translation>Resmi taşı</translation>
     </message>
@@ -2225,6 +2272,10 @@
     <message>
         <source>Add to timeline (%1)</source>
         <translation>Zaman çizelgesine ekle (%1)</translation>
+    </message>
+    <message>
+        <source>Full screen (F or double-click the picture)</source>
+        <translation>Tam ekran (F ya da görüntüye çift tıklayın)</translation>
     </message>
 </context>
 <context>
@@ -2450,6 +2501,34 @@ Orijinal dosya asla değişmez: düzenlemeler projede saklanır ve dışa aktar�
     <message>
         <source>Found %1 face(s) and %2 number plate(s).</source>
         <translation>%1 yüz ve %2 plaka bulundu.</translation>
+    </message>
+    <message>
+        <source>Full screen (F or double-click the photo)</source>
+        <translation>Tam ekran (F ya da fotoğrafa çift tıklayın)</translation>
+    </message>
+    <message>
+        <source>Remove background</source>
+        <translation>Arka planı sil</translation>
+    </message>
+    <message>
+        <source>Cut the person or object out and make the rest transparent, in one click (B)</source>
+        <translation>Kişiyi ya da nesneyi tek tıkla ayırır, gerisini saydam yapar (B)</translation>
+    </message>
+    <message>
+        <source>Background removed</source>
+        <translation>Arka plan silindi</translation>
+    </message>
+    <message>
+        <source>Keep the background</source>
+        <translation>Arka planı koru</translation>
+    </message>
+    <message>
+        <source>Background removed. Export as PNG to keep the transparency; click again to bring it back.</source>
+        <translation>Arka plan silindi. Saydamlığı korumak için PNG olarak dışa aktarın; geri getirmek için yeniden tıklayın.</translation>
+    </message>
+    <message>
+        <source>Bring the background back</source>
+        <translation>Arka planı geri getir</translation>
     </message>
     <message>
         <source>Move sticker</source>
