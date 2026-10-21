@@ -152,6 +152,17 @@ QIcon join() {
     });
 }
 
+QIcon freeze() {
+    // A clip with a held frame: a film frame and a pause mark.
+    return draw([](QPainter& p, QColor c) {
+        p.setPen(pen(c));
+        p.drawRoundedRect(QRectF(3, 6, 18, 12), 1.5, 1.5);
+        p.setPen(pen(themeColors().accent, 2));
+        p.drawLine(QPointF(10, 9.5), QPointF(10, 14.5));
+        p.drawLine(QPointF(14, 9.5), QPointF(14, 14.5));
+    });
+}
+
 QIcon undo() {
     return draw([](QPainter& p, QColor c) {
         p.setPen(pen(c));

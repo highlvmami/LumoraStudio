@@ -113,6 +113,26 @@ private slots:
         QVERIFY(r.toJson().contains("\"version\": 2"));
     }
 
+    void freezeFramesSurviveSaving() {
+        Project p;
+        Timeline* tl = p.timeline();
+        tl->setFrameRate({25, 1});
+        tl->insertMedia(QUuid::createUuid(), 0, ticksFromSeconds(4), true, true);
+        const QUuid f = tl->freezeFrame(tl->tracks()[0].clips[0].id, ticksFromSeconds(2), ticksFromSeconds(3));
+        QVERIFY(!f.isNull());
+        ColorGrade g;
+        g.saturation = 0.5;
+        QVERIFY(tl->setColor(f, g));
+        const QByteArray json = p.toJson();
+        QVERIFY(json.contains("\"version\": 4"));
+        QVERIFY(json.contains("\"freeze\""));
+        Project q;
+        QString err;
+        QVERIFY2(q.fromJson(json, {}, &err), qPrintable(err));
+        QCOMPARE(q.timeline()->state(), tl->state());
+        QCOMPARE(q.timeline()->clip(f)->freezeTime, ticksFromSeconds(2));
+    }
+
 };
 
 QTEST_GUILESS_MAIN(ProjectTest)

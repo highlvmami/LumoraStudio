@@ -84,6 +84,10 @@ private:
     QDoubleSpinBox* m_titleAnimDuration;
     QDoubleSpinBox* m_titleDuration;
 
+    QWidget* m_freezeSection;
+    QDoubleSpinBox* m_freezeDuration;
+    QLabel* m_freezeInfo;
+
     QWidget* m_subSection;
     QPlainTextEdit* m_subText;
     QDoubleSpinBox* m_subDuration;

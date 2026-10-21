@@ -237,6 +237,112 @@ private slots:
         QCOMPARE(tl.clip(b)->duration(), sec(1));
     }
 
+    void freezeFrameRipplesTheStoryline() {
+        Timeline tl;
+        tl.setFrameRate({25, 1});
+        const QUuid m = QUuid::createUuid();
+        tl.insertMedia(m, sec(1), sec(11), true, true);
+        const int v2 = tl.addTrack(TrackType::Video);
+        TitleData title;
+        title.text = "Later";
+        const QUuid t = tl.addTitle(title, sec(1), v2, sec(6));
+        const QUuid early = tl.addTitle(title, sec(1), v2, sec(1));
+        const QUuid clip = tl.tracks()[0].clips[0].id;
+
+        const QUuid f = tl.freezeFrame(clip, sec(4), sec(2));
+        QVERIFY(!f.isNull());
+        const auto& v = tl.tracks()[0].clips;
+        QCOMPARE(v.size(), size_t(3));
+        QCOMPARE(v[0].sourceIn, sec(1));
+        QCOMPARE(v[0].sourceOut, sec(5));
+        QCOMPARE(v[1].id, f);
+        QCOMPARE(int(v[1].kind), int(ClipKind::Freeze));
+        QCOMPARE(v[1].timelineStart, sec(4));
+        QCOMPARE(v[1].duration(), sec(2));
+        // The held frame is the one that was under the playhead (source 5 s),
+        // for the whole length of the freeze.
+        QCOMPARE(v[1].mediaTime(sec(4)), sec(5));
+        QCOMPARE(v[1].mediaTime(sec(5.9)), sec(5));
+        QCOMPARE(v[2].sourceIn, sec(5));
+        QCOMPARE(v[2].timelineStart, sec(6));
+        QCOMPARE(tl.duration(), sec(12));
+        QVERIFY(tl.state().hasVideoEffects());
+        QVERIFY(!tl.canJoinWithNext(v[0].id));
+        QVERIFY(!tl.canJoinWithNext(v[1].id));
+        // The sound pauses: the second half of the audio moves with its picture.
+        const auto& a = tl.tracks()[1].clips;
+        QCOMPARE(a.size(), size_t(2));
+        QCOMPARE(a[0].timelineEnd(), sec(4));
+        QCOMPARE(a[1].timelineStart, sec(6));
+        QCOMPARE(a[1].sourceIn, sec(5));
+        QCOMPARE(a[1].linkId, v[2].linkId);
+        // Connected clips after the freeze move with the picture; earlier ones stay.
+        QCOMPARE(tl.clip(t)->timelineStart, sec(8));
+        QCOMPARE(tl.clip(early)->timelineStart, sec(1));
+
+        // A freeze is as long as you like and splits into two freezes of the same frame.
+        QVERIFY(tl.setDuration(f, sec(3)));
+        QCOMPARE(tl.tracks()[0].clips[2].timelineStart, sec(7));
+        QVERIFY(tl.trimOut(f, sec(4), 0));
+        QCOMPARE(tl.clip(f)->duration(), sec(4));
+        QVERIFY(tl.splitAt(sec(5)));
+        QCOMPARE(tl.tracks()[0].clips[2].kind, ClipKind::Freeze);
+        QCOMPARE(tl.tracks()[0].clips[2].mediaTime(sec(6)), sec(5));
+
+        // Freezing a freeze clip holds the same frame again.
+        const QUuid f2 = tl.freezeFrame(f, sec(4.5), sec(1));
+        QVERIFY(!f2.isNull());
+        QCOMPARE(tl.clip(f2)->freezeTime, sec(5));
+    }
+
+    void freezeFrameAtClipStartAndOnUpperTracks() {
+        Timeline tl;
+        tl.setFrameRate({25, 1});
+        const QUuid m = QUuid::createUuid();
+        tl.insertMedia(m, 0, sec(4), true, true);
+        tl.insertMedia(m, sec(10), sec(14), true, true);
+        // At the first frame of a clip: the freeze goes in front of it.
+        const QUuid second = tl.tracks()[0].clips[1].id;
+        const QUuid f = tl.freezeFrame(second, sec(4), sec(1));
+        QVERIFY(!f.isNull());
+        QCOMPARE(tl.tracks()[0].clips.size(), size_t(3));
+        QCOMPARE(tl.clip(f)->freezeTime, sec(10));
+        QCOMPARE(tl.clip(second)->timelineStart, sec(5));
+        // Outside the clip, on audio or with no duration: nothing happens.
+        QVERIFY(tl.freezeFrame(second, sec(1), sec(1)).isNull());
+        QVERIFY(tl.freezeFrame(tl.tracks()[1].clips[0].id, sec(1), sec(1)).isNull());
+        QVERIFY(tl.freezeFrame(second, sec(6), 0).isNull());
+
+        // On V2 the clips after the freeze on that track move later, with
+        // their linked audio; the storyline is untouched.
+        const int v2 = tl.addTrack(TrackType::Video);
+        const QUuid a = tl.placeMedia(m, 0, sec(2), true, true, v2, sec(20));
+        const QUuid b = tl.placeMedia(m, 0, sec(2), true, true, v2, sec(23));
+        const Ticks storyline = tl.tracks()[0].clips.back().timelineEnd();
+        const QUuid f3 = tl.freezeFrame(a, sec(21), sec(1.5));
+        QVERIFY(!f3.isNull());
+        QCOMPARE(tl.clip(f3)->timelineStart, sec(21));
+        QCOMPARE(tl.clip(f3)->freezeTime, sec(1));
+        QCOMPARE(tl.clip(b)->timelineStart, sec(24.5));
+        for (const auto& id : tl.linkedClips(b))
+            QCOMPARE(tl.clip(id)->timelineStart, sec(24.5));
+        QCOMPARE(tl.tracks()[0].clips.back().timelineEnd(), storyline);
+    }
+
+    void freezeFrameUndoes() {
+        Timeline tl;
+        QUndoStack stack;
+        tl.insertMedia(QUuid::createUuid(), 0, sec(10), true, true);
+        const TimelineState before = tl.state();
+        const QUuid id = tl.tracks()[0].clips[0].id;
+        QVERIFY(runTimelineEdit(&stack, &tl, "freeze", [&] { return !tl.freezeFrame(id, sec(5), sec(2)).isNull(); }));
+        QCOMPARE(tl.duration(), sec(12));
+        stack.undo();
+        QCOMPARE(tl.state(), before);
+        stack.redo();
+        QCOMPARE(tl.duration(), sec(12));
+    }
+
     void undoRedoSnapshots() {
         Timeline tl;
         QUndoStack stack;

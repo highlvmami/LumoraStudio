@@ -22,6 +22,14 @@ Açık tema ("Gündüz", Görünüm → Tema):
 
 Tam yol haritası: [docs/ozellikler.md](docs/ozellikler.md). Mimari: [docs/mimari.md](docs/mimari.md).
 
+## Sürüm 0.4.1: dondurma karesi
+
+![Dondurulmuş kare](docs/screenshots/dondurma.png)
+
+- Oynatma imlecini istediğiniz kareye getirin, **Düzen → Kareyi dondur…** (Shift+F ya da klibe sağ tık) ve süreyi saniye olarak yazın. O kare bu süre boyunca ekranda kalır, klibin geri kalanı ardından devam eder; sonraki her şey (bağlı ses, üst izlerdeki yazılar) birlikte kayar. Dondurma sırasında klibin kendi sesi susar.
+- Dondurulmuş kare zaman çizelgesinde ayrı bir parçadır: süresi Özellikler panelinden ya da kenarından sürüklenerek değişir, rengi ayarlanabilir, geri alınabilir ve projeye kaydedilir.
+- Kalite: bekletilen kare kaynağın kendi karesidir; "Kaynakla aynı" ve "Kayıpsız ara format" dokunulmayan kareleri doğrudan kaynaktan dönüştürür. Kayıpsız kesim (yeniden kodlamasız) yeni kare üretemediği için dondurulmuş kare varken bunun nedenini söyler.
+
 ## Sürüm 0.4'te neler var
 
 ![Ses çalışma alanı](docs/screenshots/ses.png)

@@ -308,6 +308,52 @@ private slots:
         QCOMPARE(int(plan.video), int(VideoStrategy::Render));
     }
 
+    void freezeFrameHoldsTheExactSourceFrame() {
+        Timeline tl;
+        tl.setFrameRate({kFps, 1});
+        tl.insertMedia(m_item->id, frames(5), frames(45), true, true);
+        // Hold source frame 15 (timeline frame 10) for one second.
+        QVERIFY(!tl.freezeFrame(tl.tracks()[0].clips[0].id, frames(10), sec(1)).isNull());
+        QCOMPARE(tl.duration(), frames(65));
+
+        ExportSettings s;
+        s.mode = ExportMode::StreamCopy;
+        s.outputPath = out("freeze-copy.mp4");
+        const auto blocked = ExportPlanner::plan(tl.state(), m_pool, s);
+        QVERIFY(!blocked.ok());
+        QVERIFY(blocked.blockers.join(' ').contains("freeze"));
+
+        // Lossless intermediate: every frame, the held ones included, is the
+        // source frame bit for bit.
+        const QString path = out("freeze.mkv");
+        ExportPlan plan;
+        auto r = exportTimeline(tl, ExportMode::LosslessIntermediate, path, &plan);
+        QVERIFY2(r.ok, qPrintable(r.error));
+        QCOMPARE(int(plan.video), int(VideoStrategy::Render));
+        const auto src = decodedFrameHashes(m_src);
+        const auto dst = decodedFrameHashes(path);
+        QCOMPARE(dst.size(), size_t(65));
+        for (int i = 0; i < 10; ++i)
+            QCOMPARE(dst[i], src[5 + i]);
+        for (int i = 10; i < 35; ++i)
+            QCOMPARE(dst[i], src[15]);
+        for (int i = 35; i < 65; ++i)
+            QCOMPARE(dst[i], src[15 + (i - 35)]);
+        // The sound pauses during the freeze, so the file keeps its full length.
+        QVERIFY(std::abs(audioDuration(path) - 2.6) < 0.05);
+
+        // Match source keeps the codec and shows the right frames.
+        const QString match = out("freeze.mp4");
+        r = exportTimeline(tl, ExportMode::MatchSource, match);
+        QVERIFY2(r.ok, qPrintable(r.error));
+        const auto d = decodeAll(match);
+        std::vector<int> expected = range(5, 15);
+        expected.insert(expected.end(), 25, 15);
+        const auto rest = range(15, 45);
+        expected.insert(expected.end(), rest.begin(), rest.end());
+        QCOMPARE(d.frameIndices, expected);
+    }
+
     void customH264KeepsEveryFrame() {
         if (!avcodec_find_encoder_by_name("libx264"))
             QSKIP("FFmpeg build has no libx264");

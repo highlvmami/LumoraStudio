@@ -164,6 +164,16 @@ PropertiesPanel::PropertiesPanel(Project* project, QUndoStack* undo, QWidget* pa
     f->addRow(tr("Duration"), m_titleDuration);
     layout->addWidget(m_titleSection);
 
+    // --- freeze frame ---
+    m_freezeSection = makeSection(tr("Freeze frame"), &f);
+    m_freezeDuration = dspin(0.04, 3600, 0.5, 2, sec);
+    f->addRow(tr("Hold for"), m_freezeDuration);
+    m_freezeInfo = new QLabel;
+    m_freezeInfo->setWordWrap(true);
+    m_freezeInfo->setStyleSheet(QStringLiteral("color: palette(placeholder-text);"));
+    f->addRow(m_freezeInfo);
+    layout->addWidget(m_freezeSection);
+
     // --- subtitle ---
     m_subSection = makeSection(tr("Subtitle"), &f);
     m_subText = new QPlainTextEdit;
@@ -344,6 +354,10 @@ PropertiesPanel::PropertiesPanel(Project* project, QUndoStack* undo, QWidget* pa
                 applySubtitleStyle();
             }
         });
+    connect(m_freezeDuration, &QDoubleSpinBox::valueChanged, this, [this](double v) {
+        edit(tr("Change freeze length"), QStringLiteral("duration"),
+             [&](const Clip& c) { return m_project->timeline()->setDuration(c.id, ticksFromSeconds(v)); });
+    });
     connect(m_titleDuration, &QDoubleSpinBox::valueChanged, this, [this](double v) {
         edit(tr("Change title length"), QStringLiteral("duration"),
              [&](const Clip& c) { return m_project->timeline()->setDuration(c.id, ticksFromSeconds(v)); });
@@ -538,6 +552,7 @@ void PropertiesPanel::refreshEditors(const Clip* clip) {
     const Timeline* tl = m_project->timeline();
     const bool isTitle = clip && clip->kind == ClipKind::Title;
     const bool isSubtitle = clip && clip->kind == ClipKind::Subtitle;
+    const bool isFreeze = clip && clip->kind == ClipKind::Freeze;
     const bool video = clip && track >= 0 && tl->tracks()[track].type == TrackType::Video;
     const bool audio = clip && track >= 0 && tl->tracks()[track].type == TrackType::Audio;
 
@@ -547,6 +562,7 @@ void PropertiesPanel::refreshEditors(const Clip* clip) {
                               .arg(trackName,
                                    isTitle      ? tr("Title")
                                    : isSubtitle ? tr("Subtitle")
+                                   : isFreeze   ? tr("Freeze frame")
                                    : video      ? tr("Video clip")
                                                 : tr("Audio clip"),
                                    g_dim));
@@ -580,6 +596,12 @@ void PropertiesPanel::refreshEditors(const Clip* clip) {
         m_titleAnimOut->setCurrentIndex(m_titleAnimOut->findData(static_cast<int>(t.animationOut)));
         setSpin(m_titleAnimDuration, ticksToSeconds(t.animationDuration));
         setSpin(m_titleDuration, ticksToSeconds(clip->duration()));
+    }
+
+    m_freezeSection->setVisible(isFreeze);
+    if (isFreeze) {
+        setSpin(m_freezeDuration, ticksToSeconds(clip->duration()));
+        m_freezeInfo->setText(tr("Shows the frame at %1 of the source.").arg(formatTimecode(clip->freezeTime, tl->frameRate())));
     }
 
     m_subSection->setVisible(isSubtitle);

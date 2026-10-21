@@ -81,6 +81,7 @@ private:
     void splitAtPlayhead();
     void deleteSelection();
     void joinSelection();
+    void freezeFrame();
     void refreshProgram();
     void showShortcuts();
     void showAbout();
@@ -132,6 +133,7 @@ private:
     QAction* m_actSplit;
     QAction* m_actDelete;
     QAction* m_actJoin;
+    QAction* m_actFreeze;
     QAction* m_actPlay;
     QAction* m_actPrevFrame;
     QAction* m_actNextFrame;
