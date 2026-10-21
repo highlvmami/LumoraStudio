@@ -147,6 +147,9 @@ PhotoWorkspace::PhotoWorkspace(PhotoLibrary* library, QUndoStack* undo, QWidget*
     resetBtn->setIcon(Icons::reset());
     resetBtn->setText(tr("Reset"));
     resetBtn->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
+    m_fullScreenBtn = new QToolButton;
+    m_fullScreenBtn->setIcon(Icons::fullScreen());
+    m_fullScreenBtn->setToolTip(tr("Full screen (F or double-click the photo)"));
     m_bgBtn = new QToolButton;
     m_bgBtn->setIcon(Icons::removeBackground());
     m_bgBtn->setText(tr("Remove background"));
@@ -157,6 +160,7 @@ PhotoWorkspace::PhotoWorkspace(PhotoLibrary* library, QUndoStack* undo, QWidget*
     bottom->addWidget(m_compareBtn);
     bottom->addWidget(resetBtn);
     bottom->addStretch();
+    bottom->addWidget(m_fullScreenBtn);
     rl->addLayout(bottom);
     m_exportBtn = new QPushButton(Icons::exportFile(), tr("Export photo…"));
     m_exportBtn->setDefault(true);
@@ -269,6 +273,8 @@ PhotoWorkspace::PhotoWorkspace(PhotoLibrary* library, QUndoStack* undo, QWidget*
         scheduleRender();
     });
     connect(m_exportBtn, &QPushButton::clicked, this, &PhotoWorkspace::exportCurrent);
+    connect(m_fullScreenBtn, &QToolButton::clicked, this, &PhotoWorkspace::fullScreenRequested);
+    connect(m_view, &PhotoView::doubleClicked, this, &PhotoWorkspace::fullScreenRequested);
     connect(m_bgBtn, &QToolButton::clicked, this, &PhotoWorkspace::toggleBackground);
     auto* bgKey = new QShortcut(QKeySequence(Qt::Key_B), this);
     bgKey->setContext(Qt::WidgetWithChildrenShortcut);
@@ -376,7 +382,7 @@ void PhotoWorkspace::syncControls() {
     m_layers->setLayers(a.layers, has);
     m_smart->setState(a.redaction, a.background, has);
     m_view->setCrop(a.crop);
-    for (QWidget* w : std::initializer_list<QWidget*>{m_cropBtn, m_aspect, m_exportBtn, m_compareBtn, m_bgBtn})
+    for (QWidget* w : std::initializer_list<QWidget*>{m_cropBtn, m_aspect, m_exportBtn, m_compareBtn, m_fullScreenBtn, m_bgBtn})
         w->setEnabled(has);
     m_bgBtn->setChecked(a.background.enabled);
     m_bgBtn->setText(a.background.enabled ? tr("Background removed") : tr("Remove background"));
@@ -420,6 +426,8 @@ void PhotoWorkspace::scheduleRender() { m_renderTimer->start(); }
 void PhotoWorkspace::render() {
     if (m_proxy.isNull()) {
         m_view->setImage({});
+        m_shown = {};
+        emit previewChanged();
         return;
     }
     PhotoAdjustments a = current();
@@ -450,6 +458,29 @@ void PhotoWorkspace::render() {
     const QRect crop = a.cropRect(measured.size());
     m_scope->setImage(crop == measured.rect() ? measured : measured.copy(crop));
     m_view->setBadge(m_compare ? tr("Before") : QString());
+    m_shown = shown;
+    m_shownCrop = a.cropRect(shown.size());
+    emit previewChanged();
+}
+
+QImage PhotoWorkspace::previewImage() const {
+    if (m_shown.isNull() || m_shownCrop == m_shown.rect())
+        return m_shown;
+    return m_shown.copy(m_shownCrop);
+}
+
+QString PhotoWorkspace::currentTitle() const {
+    const PhotoEntry* e = m_lib->find(m_current);
+    return e ? QFileInfo(e->path).fileName() : QString();
+}
+
+void PhotoWorkspace::stepPhoto(int delta) {
+    const int n = m_list->count();
+    if (n < 2)
+        return;
+    const int row = std::clamp(m_list->currentRow() + delta, 0, n - 1);
+    if (row != m_list->currentRow())
+        m_list->setCurrentRow(row);
 }
 
 void PhotoWorkspace::toggleBackground() {

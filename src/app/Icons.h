@@ -9,8 +9,8 @@ namespace lumora::Icons {
 // An explicit colour is used for icons drawn on an accent background.
 QIcon play(const QColor& color = {});
 QIcon pause(const QColor& color = {});
-QIcon stepBack();
-QIcon stepForward();
+QIcon stepBack(const QColor& color = {});
+QIcon stepForward(const QColor& color = {});
 QIcon toStart();
 QIcon toEnd();
 QIcon markIn();
@@ -34,8 +34,10 @@ QIcon compare();
 QIcon keyframe();
 QIcon title();
 QIcon transition();
-QIcon close();
+QIcon close(const QColor& color = {});
 QIcon popOut();
+QIcon fullScreen(const QColor& color = {});
+QIcon exitFullScreen(const QColor& color = {});
 QIcon appIcon();
 
 } // namespace lumora::Icons

@@ -36,12 +36,14 @@ signals:
     void maskMoved(const QRectF& normalized);  // emitted on mouse release
     void strokePainted(const lumora::BrushStroke& stroke); // emitted on mouse release
     void filesDropped(const QStringList& paths);
+    void doubleClicked();
 
 protected:
     void paintEvent(QPaintEvent*) override;
     void mousePressEvent(QMouseEvent*) override;
     void mouseMoveEvent(QMouseEvent*) override;
     void mouseReleaseEvent(QMouseEvent*) override;
+    void mouseDoubleClickEvent(QMouseEvent*) override;
     void leaveEvent(QEvent*) override;
     void dragEnterEvent(QDragEnterEvent*) override;
     void dropEvent(QDropEvent*) override;

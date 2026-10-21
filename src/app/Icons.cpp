@@ -66,18 +66,22 @@ QIcon pause(const QColor& color) {
         color);
 }
 
-QIcon stepBack() {
-    return draw([](QPainter& p, QColor c) {
-        p.fillRect(QRectF(5, 6, 2.5, 12), c);
-        triangle(p, c, {18, 6}, {9, 12}, {18, 18});
-    });
+QIcon stepBack(const QColor& color) {
+    return draw(
+        [](QPainter& p, QColor c) {
+            p.fillRect(QRectF(5, 6, 2.5, 12), c);
+            triangle(p, c, {18, 6}, {9, 12}, {18, 18});
+        },
+        color);
 }
 
-QIcon stepForward() {
-    return draw([](QPainter& p, QColor c) {
-        p.fillRect(QRectF(16.5, 6, 2.5, 12), c);
-        triangle(p, c, {6, 6}, {15, 12}, {6, 18});
-    });
+QIcon stepForward(const QColor& color) {
+    return draw(
+        [](QPainter& p, QColor c) {
+            p.fillRect(QRectF(16.5, 6, 2.5, 12), c);
+            triangle(p, c, {6, 6}, {15, 12}, {6, 18});
+        },
+        color);
 }
 
 QIcon toStart() {
@@ -332,12 +336,14 @@ QIcon transition() {
     });
 }
 
-QIcon close() {
-    return draw([](QPainter& p, QColor c) {
-        p.setPen(pen(c, 2.2));
-        p.drawLine(QPointF(6, 6), QPointF(18, 18));
-        p.drawLine(QPointF(18, 6), QPointF(6, 18));
-    });
+QIcon close(const QColor& color) {
+    return draw(
+        [](QPainter& p, QColor c) {
+            p.setPen(pen(c, 2.2));
+            p.drawLine(QPointF(6, 6), QPointF(18, 18));
+            p.drawLine(QPointF(18, 6), QPointF(6, 18));
+        },
+        color);
 }
 
 QIcon popOut() {
@@ -348,6 +354,31 @@ QIcon popOut() {
         p.drawLine(QPointF(14, 4), QPointF(20, 4));
         p.drawLine(QPointF(20, 4), QPointF(20, 10));
     });
+}
+
+// Four corner brackets pointing out (enter) or in (exit).
+QIcon fullScreen(const QColor& color) {
+    return draw(
+        [](QPainter& p, QColor c) {
+            p.setPen(pen(c, 2.2));
+            p.drawPolyline(QPolygonF{QPointF(4, 9), QPointF(4, 4), QPointF(9, 4)});
+            p.drawPolyline(QPolygonF{QPointF(15, 4), QPointF(20, 4), QPointF(20, 9)});
+            p.drawPolyline(QPolygonF{QPointF(20, 15), QPointF(20, 20), QPointF(15, 20)});
+            p.drawPolyline(QPolygonF{QPointF(9, 20), QPointF(4, 20), QPointF(4, 15)});
+        },
+        color);
+}
+
+QIcon exitFullScreen(const QColor& color) {
+    return draw(
+        [](QPainter& p, QColor c) {
+            p.setPen(pen(c, 2.2));
+            p.drawPolyline(QPolygonF{QPointF(4, 9), QPointF(9, 9), QPointF(9, 4)});
+            p.drawPolyline(QPolygonF{QPointF(15, 4), QPointF(15, 9), QPointF(20, 9)});
+            p.drawPolyline(QPolygonF{QPointF(20, 15), QPointF(15, 15), QPointF(15, 20)});
+            p.drawPolyline(QPolygonF{QPointF(9, 20), QPointF(9, 15), QPointF(4, 15)});
+        },
+        color);
 }
 
 QIcon appIcon() {

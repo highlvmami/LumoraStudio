@@ -67,8 +67,9 @@ int main(int argc, char* argv[]) {
     QCommandLineOption sizeOpt(QStringLiteral("size"), QStringLiteral("Window size WxH"), QStringLiteral("size"));
     QCommandLineOption autoSubsOpt(QStringLiteral("auto-subtitles-dialog"), QStringLiteral("Open the automatic subtitles dialog"));
     QCommandLineOption trackOpt(QStringLiteral("track-selected"), QStringLiteral("Start following an object with the selected clip"));
+    QCommandLineOption fullScreenOpt(QStringLiteral("full-screen-preview"), QStringLiteral("Open the full-screen preview"));
     for (auto* o : {&shotOpt, &workspaceOpt, &selectOpt, &selectClipOpt, &exportOpt, &exportCustomOpt, &seekOpt, &sizeOpt,
-                    &autoSubsOpt, &trackOpt}) {
+                    &autoSubsOpt, &trackOpt, &fullScreenOpt}) {
         o->setFlags(QCommandLineOption::HiddenFromHelp);
         parser.addOption(*o);
     }
@@ -107,7 +108,20 @@ int main(int argc, char* argv[]) {
         const bool exportCustom = parser.isSet(exportCustomOpt);
         const bool exportDlg = parser.isSet(exportOpt) || exportCustom;
         const bool autoSubs = parser.isSet(autoSubsOpt), track = parser.isSet(trackOpt);
-        QTimer::singleShot(2500, &w, [&w, out, exportDlg, exportCustom, autoSubs, track] {
+        const bool fullScreen = parser.isSet(fullScreenOpt);
+        QTimer::singleShot(2500, &w, [&w, out, exportDlg, exportCustom, autoSubs, track, fullScreen] {
+            if (fullScreen) {
+                w.showFullScreenPreview();
+                QTimer::singleShot(1500, &w, [out] {
+                    for (QWidget* top : QApplication::topLevelWidgets())
+                        if (top->isVisible() && top->inherits("lumora::FullScreenViewer")) {
+                            top->grab().save(out);
+                            break;
+                        }
+                    QCoreApplication::exit(0);
+                });
+                return;
+            }
             if (autoSubs) {
                 QTimer::singleShot(1200, &w, [out] {
                     for (QWidget* top : QApplication::topLevelWidgets())

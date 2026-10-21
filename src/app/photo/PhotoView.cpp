@@ -440,6 +440,12 @@ void PhotoView::mouseReleaseEvent(QMouseEvent*) {
     m_drag = None;
 }
 
+void PhotoView::mouseDoubleClickEvent(QMouseEvent* e) {
+    // Only on the plain picture: crop and mask editing use the mouse.
+    if (e->button() == Qt::LeftButton && !m_cropMode && !m_mask && !m_image.isNull())
+        emit doubleClicked();
+}
+
 void PhotoView::dragEnterEvent(QDragEnterEvent* e) {
     if (e->mimeData()->hasUrls())
         e->acceptProposedAction();

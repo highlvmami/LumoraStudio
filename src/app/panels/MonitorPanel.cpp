@@ -163,6 +163,8 @@ MonitorPanel::MonitorPanel(PlaybackEngine* engine, QWidget* parent) : QWidget(pa
     st->addWidget(m_addBtn);
     controls->addWidget(m_sourceTools);
     m_sourceTools->setVisible(false);
+    controls->addSpacing(6);
+    auto* fullScreen = makeBtn(Icons::fullScreen(), tr("Full screen (F or double-click the picture)"));
     layout->addLayout(controls);
 
     connect(m_sourceBtn, &QToolButton::clicked, this, [this] {
@@ -185,6 +187,8 @@ MonitorPanel::MonitorPanel(PlaybackEngine* engine, QWidget* parent) : QWidget(pa
     connect(outBtn, &QToolButton::clicked, this, &MonitorPanel::setMarkOut);
     connect(m_addBtn, &QPushButton::clicked, this, &MonitorPanel::addSourceToTimeline);
     connect(m_scrub, &ScrubBar::seekRequested, m_engine, &PlaybackEngine::seek);
+    connect(fullScreen, &QToolButton::clicked, this, &MonitorPanel::fullScreenRequested);
+    connect(m_view, &VideoView::doubleClicked, this, &MonitorPanel::fullScreenRequested);
 
     connect(m_engine, &PlaybackEngine::frameReady, m_view, [this](const QImage& img) { m_view->setImage(img); });
     connect(m_engine, &PlaybackEngine::positionChanged, this, [this](Ticks t) {
