@@ -7,9 +7,12 @@
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QListWidget>
+#include <QRegularExpression>
+#include <QResizeEvent>
 #include <QScrollBar>
 #include <QTextBrowser>
 #include <QUrl>
+#include <QUrlQuery>
 #include <QVBoxLayout>
 
 namespace lumora {
@@ -17,6 +20,53 @@ namespace lumora {
 namespace {
 
 constexpr int kIdRole = Qt::UserRole;
+
+// Pictures on the pages are screenshots: shrink them smoothly to the width
+// of the reading area instead of letting them run off the side.
+class HelpBrowser : public QTextBrowser {
+public:
+    void showHtml(const QString& html) {
+        m_html = html;
+        layoutPage();
+    }
+
+    QVariant loadResource(int type, const QUrl& url) override {
+        if (type != QTextDocument::ImageResource)
+            return QTextBrowser::loadResource(type, url);
+        // "qrc:<file>?w=<width>": the picture shrunk to that width.
+        QImage img(QLatin1Char(':') + url.path());
+        const int room = QUrlQuery(url).queryItemValue(QStringLiteral("w")).toInt();
+        const qreal dpr = devicePixelRatioF();
+        if (!img.isNull() && room > 0 && img.width() > room * dpr) {
+            img = img.scaledToWidth(int(room * dpr), Qt::SmoothTransformation);
+            img.setDevicePixelRatio(dpr);
+        }
+        return img;
+    }
+
+protected:
+    void resizeEvent(QResizeEvent* e) override {
+        QTextBrowser::resizeEvent(e);
+        if (e->oldSize().width() != e->size().width() && m_html.contains(QLatin1String("<img"))) {
+            const int pos = verticalScrollBar()->value();
+            layoutPage();
+            verticalScrollBar()->setValue(pos);
+        }
+    }
+
+private:
+    // Pictures are screenshots: shrink them smoothly to the reading width
+    // instead of letting them run off the side.
+    void layoutPage() {
+        const int room = std::max(200, viewport()->width() - 2 * int(document()->documentMargin()) - 8);
+        QString html = m_html;
+        static const QRegularExpression img(QStringLiteral("<img src=\":([^\"?]+)\""));
+        html.replace(img, QStringLiteral("<img src=\"qrc:\\1?w=%1\"").arg(room));
+        setHtml(html);
+    }
+
+    QString m_html;
+};
 
 } // namespace
 
@@ -29,13 +79,12 @@ HelpPage::HelpPage(QWidget* parent) : QWidget(parent) {
     makePanelSurface(reading);
     auto* readingLayout = new QVBoxLayout(reading);
     readingLayout->setContentsMargins(4, 4, 4, 4);
-    m_page = new QTextBrowser;
+    m_page = new HelpBrowser;
     m_page->setObjectName(QStringLiteral("helpPage"));
     m_page->setOpenLinks(false);
     m_page->document()->setDocumentMargin(28);
     connect(m_page, &QTextBrowser::anchorClicked, this, &HelpPage::openLink);
     readingLayout->addWidget(m_page);
-    layout->addWidget(reading, 1);
 
     auto* side = new QWidget;
     makePanelSurface(side);
@@ -61,6 +110,7 @@ HelpPage::HelpPage(QWidget* parent) : QWidget(parent) {
     });
     sideLayout->addWidget(m_menu, 1);
     layout->addWidget(side);
+    layout->addWidget(reading, 1);
 
     applyStyle();
     showWelcome();
@@ -134,9 +184,9 @@ void HelpPage::showWelcome() {
         m_menu->setCurrentItem(nullptr);
         m_menu->clearSelection();
     }
-    m_page->setHtml(QStringLiteral("<div class='welcome'><h1>%1</h1><p class='lead'>%2</p><p>%3</p></div>")
+    static_cast<HelpBrowser*>(m_page)->showHtml(QStringLiteral("<div class='welcome'><h1>%1</h1><p class='lead'>%2</p><p>%3</p></div>")
                         .arg(tr("How to use LumoraStudio").toHtmlEscaped(),
-                             tr("Pick a section on the right.").toHtmlEscaped(),
+                             tr("Pick a section on the left.").toHtmlEscaped(),
                              tr("Each section explains one part of the program step by step. The menu stays where it is, "
                                 "so you can jump between sections while you read. Go back to Edit, Color, Audio or Photo "
                                 "with the tabs at the top whenever you like.")
@@ -151,7 +201,7 @@ void HelpPage::showSection(const QString& id) {
             m_menu->setCurrentItem(item);
         }
     }
-    m_page->setHtml(pageHtml(id));
+    static_cast<HelpBrowser*>(m_page)->showHtml(pageHtml(id));
     m_page->verticalScrollBar()->setValue(0);
 }
 
@@ -174,7 +224,9 @@ void HelpPage::applyStyle() {
                        "a { color: %4; text-decoration: none; }"
                        "kbd, .key { font-weight: 600; color: %4; }"
                        "b { color: %1; }"
-                       "td { padding: 3px 14px 3px 0; color: %1; }")
+                       "td { padding: 3px 14px 3px 0; color: %1; }"
+                       "p.shot { margin-top: 10px; margin-bottom: 4px; }"
+                       "span.n { color: #eb2d3c; font-weight: 700; }")
             .arg(c.text.name(), c.textDim.name(), c.textDim.name(), c.accent.name()));
 }
 

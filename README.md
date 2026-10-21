@@ -26,8 +26,9 @@ Tam yol haritası: [docs/ozellikler.md](docs/ozellikler.md). Mimari: [docs/mimar
 
 ![Nasıl kullanılır sekmesi](docs/screenshots/nasil-kullanilir.png)
 
-- Üstteki sekmelerin sonunda yeni bir **Nasıl kullanılır** sekmesi var (**F1** ya da **Yardım → Nasıl kullanılır**). Bir kitapçık gibi açılır ve önce "Sağdan bir bölüm seçin" der.
-- Sağdaki bölüm menüsü yerinde kalır; bir bölüme tıklayınca anlatımı aynı sekmede solda açılır. Bölümler: Başlarken, Video kurgusu, Başlıklar ve geçişler, Çıkartmalar, Altyazılar, Akıllı video araçları, Renk, Ses, Fotoğraf, Dışa aktarma, Tam ekran ve ayarlar, Klavye kısayolları.
+- Üstteki sekmelerin sonunda yeni bir **Nasıl kullanılır** sekmesi var (**F1** ya da **Yardım → Nasıl kullanılır**). Bir kitapçık gibi açılır ve önce "Soldan bir bölüm seçin" der.
+- Soldaki bölüm menüsü yerinde kalır; bir bölüme tıklayınca anlatımı aynı sekmede yanında açılır. Bölümler: Başlarken, Video kurgusu, Başlıklar ve geçişler, Çıkartmalar, Altyazılar, Akıllı video araçları, Renk, Ses, Fotoğraf, Dışa aktarma, Tam ekran ve ayarlar, Klavye kısayolları.
+- Her bölümde programın gerçek ekran görüntüsü var; anlatılan düğme ve paneller kırmızı çerçeve ve numarayla işaretli, numaraların ne olduğu resmin altında yazıyor. Resimler okuma alanının genişliğine göre küçülür.
 - Sayfalar arayüz diliyle (Türkçe ya da İngilizce) gelir; yeni bir dil için `src/app/resources/help/<dil>/` klasörüne sayfaları eklemek yeter.
 
 ## Sürüm 0.6.2: tam ekran

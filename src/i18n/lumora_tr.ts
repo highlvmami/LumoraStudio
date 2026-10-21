@@ -1223,8 +1223,8 @@
         <translation>LumoraStudio nasıl kullanılır</translation>
     </message>
     <message>
-        <source>Pick a section on the right.</source>
-        <translation>Sağdan bir bölüm seçin.</translation>
+        <source>Pick a section on the left.</source>
+        <translation>Soldan bir bölüm seçin.</translation>
     </message>
     <message>
         <source>Each section explains one part of the program step by step. The menu stays where it is, so you can jump between sections while you read. Go back to Edit, Color, Audio or Photo with the tabs at the top whenever you like.</source>

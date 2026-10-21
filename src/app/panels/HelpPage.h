@@ -10,8 +10,8 @@ class QUrl;
 
 namespace lumora {
 
-// The "How to use" workspace: a booklet. The section menu stays on the right;
-// picking a section shows its page in the reading area on the left. The pages
+// The "How to use" workspace: a booklet. The section menu stays on the left;
+// picking a section shows its page in the reading area beside it. The pages
 // are HTML files in resources/help/<language>/<section>.html.
 class HelpPage : public QWidget {
     Q_OBJECT
