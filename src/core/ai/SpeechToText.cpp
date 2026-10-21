@@ -4,6 +4,7 @@
 #include <QFileInfo>
 #include <QStandardPaths>
 #include <algorithm>
+#include <cmath>
 #include <thread>
 
 #include "render/AudioMixer.h"
@@ -135,14 +136,33 @@ Result transcribe(const TimelineState& timeline, const MediaPool& pool, Ticks fr
         r.error = Tr::tr("Speech recognition failed.");
         return r;
     }
+    // Whisper often starts the first segment of a window at the window's
+    // start even when the speech begins later, so each cue start is moved to
+    // where the sound actually begins (10 ms frames, as Whisper's times).
+    std::vector<float> level(pcm.size() / 160);
+    float peak = 0.0f;
+    for (size_t f = 0; f < level.size(); ++f) {
+        double sum = 0.0;
+        for (size_t k = f * 160; k < (f + 1) * 160; ++k)
+            sum += double(pcm[k]) * pcm[k];
+        level[f] = static_cast<float>(std::sqrt(sum / 160.0));
+        peak = std::max(peak, level[f]);
+    }
+    const float quiet = std::max(0.003f, 0.1f * peak);
+    auto soundStart = [&](int64_t t0, int64_t t1) {
+        while (t0 < t1 && t0 >= 0 && t0 < static_cast<int64_t>(level.size()) && level[t0] < quiet)
+            ++t0;
+        return t0 < t1 ? t0 : t1;
+    };
     const int n = whisper_full_n_segments(ctx);
     for (int i = 0; i < n; ++i) {
         const QString text = QString::fromUtf8(whisper_full_get_segment_text(ctx, i)).simplified();
         if (text.isEmpty())
             continue;
         // Whisper times are in 10 ms steps.
-        const Ticks s = from + whisper_full_get_segment_t0(ctx, i) * (kTicksPerSecond / 100);
-        const Ticks e = from + whisper_full_get_segment_t1(ctx, i) * (kTicksPerSecond / 100);
+        const int64_t t1 = whisper_full_get_segment_t1(ctx, i);
+        const Ticks s = from + soundStart(whisper_full_get_segment_t0(ctx, i), t1) * (kTicksPerSecond / 100);
+        const Ticks e = from + t1 * (kTicksPerSecond / 100);
         if (e <= s)
             continue;
         // Short pieces that belong together read better as one cue.
