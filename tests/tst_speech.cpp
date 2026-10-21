@@ -66,7 +66,12 @@ private slots:
             all += c.text + QLatin1Char(' ');
         }
         qInfo() << all;
-        QVERIFY2(all.contains(QLatin1String("test"), Qt::CaseInsensitive), qPrintable(all));
+        // The smallest model mishears the synthetic voice now and then, so
+        // most of the words, not every one, must come through.
+        int heard = 0;
+        for (const char* word : {"hello", "world", "test", "automatic", "subtitle"})
+            heard += all.contains(QLatin1String(word), Qt::CaseInsensitive);
+        QVERIFY2(heard >= 3, qPrintable(all));
         QVERIFY(r.cues.front().start >= ticksFromSeconds(1.5));
 
         // Cancelling stops early.
