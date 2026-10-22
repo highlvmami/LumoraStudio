@@ -3,6 +3,8 @@
 #include <QTransform>
 #include <atomic>
 
+#include "media/Proxy.h"
+
 extern "C" {
 #include <libavutil/hwcontext.h>
 }
@@ -74,6 +76,9 @@ bool VideoDecoder::open(const QString& path, QString* error, int threads, bool h
         return false;
     m_pkt = av::makePacket();
     m_origin = m_fmt->start_time != AV_NOPTS_VALUE ? ticksFromStream(m_fmt->start_time, AVRational{1, AV_TIME_BASE}) : 0;
+    // Preview copies store media time already.
+    if (av_dict_get(m_fmt->metadata, proxy::kMetadataKey, nullptr, 0))
+        m_origin = 0;
     // Described from the stream that is already open (probing would open
     // the file a second time, which is slow for big phone videos).
     m_info = videoStreamInfo(m_stream, m_fmt->duration != AV_NOPTS_VALUE

@@ -1,5 +1,7 @@
 #include "MediaCache.h"
 
+#include <QFile>
+#include <QFileInfo>
 #include <QImageReader>
 #include <QPointer>
 #include <QTransform>
@@ -9,15 +11,66 @@
 #include "image/HeifDecoder.h"
 #include "image/RawDecoder.h"
 #include "media/AudioDecoder.h"
+#include "media/Proxy.h"
 #include "media/VideoDecoder.h"
+#include "playback/PlaybackEngine.h"
 
 namespace lumora {
 
 MediaCache::MediaCache(MediaPool* pool, QObject* parent) : QObject(parent), m_pool(pool) {
+    m_proxyPool.setMaxThreadCount(1);
     connect(pool, &MediaPool::itemAdded, this, &MediaCache::analyze);
     connect(pool, &MediaPool::cleared, this, [this] {
         m_thumbs.clear();
         m_peaks.clear();
+    });
+}
+
+MediaCache::~MediaCache() {
+    *m_quit = true; // stops a copy in progress (its file is left out)
+    m_proxyPool.clear();
+    m_proxyPool.waitForDone();
+}
+
+void MediaCache::makeProxy(const MediaItemPtr& item) {
+    if (!PlaybackEngine::useProxies() || !proxy::wanted(item->info) || !item->proxy().isEmpty())
+        return;
+    const QString dest = proxy::pathFor(item->path);
+    if (QFile::exists(dest)) {
+        // Made in an earlier session.
+        item->setProxy(dest);
+        emit proxyFinished(item->id, true);
+        return;
+    }
+    QPointer<MediaCache> self(this);
+    auto quit = m_quit;
+    const bool hardware = PlaybackEngine::hardwareDecoding();
+    m_proxyPool.start([self, quit, item, dest, hardware] {
+        if (*quit)
+            return;
+        const QString name = QFileInfo(item->path).fileName();
+        int shown = -1;
+        auto progress = [&](double p) {
+            const int percent = static_cast<int>(p * 100);
+            if (percent != shown) {
+                shown = percent;
+                QMetaObject::invokeMethod(self, [self, name, percent] {
+                    if (self)
+                        emit self->proxyProgress(name, percent);
+                }, Qt::QueuedConnection);
+            }
+            return !*quit;
+        };
+        const bool ok = proxy::make(item->path, dest, progress, hardware);
+        if (*quit)
+            return;
+        if (ok)
+            item->setProxy(dest);
+        const QUuid id = item->id;
+        QMetaObject::invokeMethod(self, [self, id, ok] {
+            if (self)
+                emit self->proxyFinished(id, ok);
+        }, Qt::QueuedConnection);
     });
 }
 
@@ -69,6 +122,9 @@ void MediaCache::analyze(const MediaItemPtr& item) {
             emit self->thumbnailReady(id);
         }, Qt::QueuedConnection);
     });
+
+    // Preview copy of a heavy video, so it plays smoothly.
+    makeProxy(item);
 
     // Key frames (needed for lossless cut planning).
     if (info.video && !item->hasKeyframes()) {

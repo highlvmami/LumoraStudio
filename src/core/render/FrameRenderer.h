@@ -55,6 +55,11 @@ public:
     void setHardwareDecoding(bool on);
     bool hardwareDecoding() const { return m_hardware; }
 
+    // Decode heavy videos from their preview copy (media/Proxy.h) when it
+    // is ready (playback preview; off by default, exports always read the
+    // originals). Frames and times are the same, the copy is just smaller.
+    void setUseProxies(bool on) { m_useProxies = on; }
+
     // Subtitle cues are drawn on top of the picture (preview, burnt in
     // exports); off by default.
     void setDrawSubtitles(bool on) { m_subtitles = on; }
@@ -92,6 +97,8 @@ private:
     };
 
     Slot* slotFor(const Clip& clip);
+    // The file to decode for `media`: its preview copy or the original.
+    QString decodePath(const MediaItem& media) const;
     QImage convertFrame(Slot& slot, const AVFrame* f, QSize size);
     QImage clipImage(const Clip& clip, Ticks sourceTime, QSize* fitSize, int* rotation);
     // Frame at media time `t` of a clip that plays backwards, and the one
@@ -116,6 +123,7 @@ private:
     Ticks m_sampleOffset = 0;
     bool m_subtitles = false;
     bool m_hardware = false;
+    bool m_useProxies = false;
     std::unique_ptr<Prefetcher> m_prefetcher; // started on the first prefetch()
     int m_prefetchedUsed = 0;
     // The subtitle cue under `t` on each visible subtitle track.

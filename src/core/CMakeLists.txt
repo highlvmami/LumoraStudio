@@ -8,6 +8,7 @@ add_library(lumora_core STATIC
     media/MediaInfo.h media/MediaInfo.cpp
     media/MediaPool.h media/MediaPool.cpp
     media/VideoDecoder.h media/VideoDecoder.cpp
+    media/Proxy.h media/Proxy.cpp
     media/AudioDecoder.h media/AudioDecoder.cpp
     color/ColorGrade.h color/ColorGrade.cpp
     color/ColorProcessor.h color/ColorProcessor.cpp

@@ -6,6 +6,8 @@
 
 #include "TestMedia.h"
 #include "media/MediaPool.h"
+#include "media/Proxy.h"
+#include "media/VideoDecoder.h"
 #include "render/AudioMixer.h"
 #include "render/FrameRenderer.h"
 #include "timeline/Timeline.h"
@@ -81,6 +83,29 @@ private slots:
         QCOMPARE(frameIndexOf(r.render(frames(5))), 15);
         QCOMPARE(frameIndexOf(r.render(frames(6))), 16);
         QCOMPARE(frameIndexOf(r.render(frames(49))), 59);
+    }
+
+    void previewCopyShowsTheSameFrames() {
+        // The playback preview reads the preview copy of a heavy video; it
+        // has to show exactly the frames the original shows.
+        const QString copy = m_dir.filePath("pattern-proxy.mp4");
+        QString err;
+        QVERIFY2(proxy::make(m_pattern->path, copy, {}, false, &err), qPrintable(err));
+        VideoDecoder dec;
+        QVERIFY(dec.open(copy));
+        QCOMPARE(av_cmp_q(dec.info().frameRate, m_pattern->info.video->frameRate), 0);
+
+        Timeline tl;
+        tl.insertMedia(m_pattern->id, frames(10), frames(60), true, true);
+        FrameRenderer r(&m_pool);
+        r.setTimeline(tl.state());
+        r.setOutputSize(QSize(320, 240));
+        r.setPrecision(FrameRenderer::Precision::Preview);
+        r.setUseProxies(true);
+        m_pattern->setProxy(copy);
+        for (int f : {5, 6, 7, 30, 12, 49, 0})
+            QCOMPARE(frameIndexOf(r.render(frames(f))), f + 10);
+        m_pattern->setProxy({});
     }
 
     void prefetchedDecodersShowTheRightFrames() {

@@ -44,13 +44,17 @@ SettingsDialog::SettingsDialog(Updater* updater, QWidget* parent) : QDialog(pare
     hardware->setToolTip(tr("Plays 4K, HEVC and high frame rate videos smoothly. Turn it off if the preview shows "
                             "wrong colours or stays black. Exports always use the full quality decoder."));
     pl->addWidget(hardware);
-    auto* note = new QLabel(tr("When the computer cannot keep up, the preview plays at a lower resolution; "
-                               "the paused picture and the exported file stay full quality."));
+    auto* proxies = new QCheckBox(tr("Smooth preview copies of 4K videos"));
+    proxies->setChecked(PlaybackEngine::useProxies());
+    pl->addWidget(proxies);
+    auto* note = new QLabel(tr("Videos larger than Full HD get a lighter copy in the background when they are added; "
+                               "the preview plays from it. Exports always use the original files in full quality."));
     note->setWordWrap(true);
     note->setStyleSheet(QStringLiteral("color: palette(placeholder-text);"));
     pl->addWidget(note);
     layout->addWidget(preview);
     connect(hardware, &QCheckBox::toggled, this, [](bool on) { PlaybackEngine::setHardwareDecoding(on); });
+    connect(proxies, &QCheckBox::toggled, this, [](bool on) { PlaybackEngine::setUseProxies(on); });
 
     if (DesktopShortcut::supported()) {
         auto* shortcut = new QGroupBox(tr("Desktop shortcut"));
