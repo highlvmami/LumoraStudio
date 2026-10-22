@@ -4026,6 +4026,22 @@ Orijinal dosya asla değişmez: düzenlemeler projede saklanır ve dışa aktar�
         <source>Not checked yet</source>
         <translation>Henüz denetlenmedi</translation>
     </message>
+    <message>
+        <source>Preview</source>
+        <translation>Önizleme</translation>
+    </message>
+    <message>
+        <source>Decode videos on the graphics card</source>
+        <translation>Videoları ekran kartıyla çöz</translation>
+    </message>
+    <message>
+        <source>Plays 4K, HEVC and high frame rate videos smoothly. Turn it off if the preview shows wrong colours or stays black. Exports always use the full quality decoder.</source>
+        <translation>4K, HEVC ve yüksek kare hızlı videolar akıcı oynar. Önizlemede renkler yanlış görünür ya da ekran siyah kalırsa kapatın. Dışa aktarma her zaman tam kaliteli çözücüyü kullanır.</translation>
+    </message>
+    <message>
+        <source>When the computer cannot keep up, the preview plays at a lower resolution; the paused picture and the exported file stay full quality.</source>
+        <translation>Bilgisayar yetişemediğinde önizleme daha düşük çözünürlükte oynar; durdurulmuş görüntü ve dışa aktarılan dosya tam kalitede kalır.</translation>
+    </message>
 </context>
 <context>
     <name>lumora::SliderRow</name>

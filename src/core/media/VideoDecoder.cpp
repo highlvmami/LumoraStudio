@@ -1,8 +1,19 @@
 #include "VideoDecoder.h"
 
 #include <QTransform>
+#include <atomic>
+
+extern "C" {
+#include <libavutil/hwcontext.h>
+}
 
 namespace lumora {
+
+namespace {
+// Set once a graphics card failed to hand over a picture; later decoders
+// then stay in software.
+std::atomic_bool g_hardwareFailed{false};
+} // namespace
 
 QImage decodeVideoFrame(const QString& path, Ticks t, QString* error) {
     VideoDecoder dec;
@@ -43,8 +54,9 @@ QImage decodeVideoFrame(const QString& path, Ticks t, QString* error) {
     return img;
 }
 
-bool VideoDecoder::open(const QString& path, QString* error, int threads) {
+bool VideoDecoder::open(const QString& path, QString* error, int threads, bool hardware) {
     m_path = path;
+    m_threads = threads;
     m_fmt = av::openInput(path, error);
     if (!m_fmt)
         return false;
@@ -57,7 +69,7 @@ bool VideoDecoder::open(const QString& path, QString* error, int threads) {
     m_stream = m_fmt->streams[idx];
     for (unsigned i = 0; i < m_fmt->nb_streams; ++i)
         m_fmt->streams[i]->discard = (static_cast<int>(i) == idx) ? AVDISCARD_DEFAULT : AVDISCARD_ALL;
-    m_codec = av::openDecoder(m_stream, error, threads);
+    m_codec = av::openDecoder(m_stream, error, threads, hardware && !g_hardwareFailed);
     if (!m_codec)
         return false;
     m_pkt = av::makePacket();
@@ -100,6 +112,18 @@ bool VideoDecoder::decodeOne(DecodedFrame& out) {
     while (true) {
         int ret = avcodec_receive_frame(m_codec.get(), frame.get());
         if (ret == 0) {
+            if (frame->hw_frames_ctx) {
+                auto picture = av::makeFrame();
+                if (av_hwframe_transfer_data(picture.get(), frame.get(), 0) < 0 ||
+                    av_frame_copy_props(picture.get(), frame.get()) < 0) {
+                    const std::int64_t at = frame->best_effort_timestamp != AV_NOPTS_VALUE ? frame->best_effort_timestamp
+                                                                                          : frame->pts;
+                    if (!fallBackToSoftware(at != AV_NOPTS_VALUE ? ticksFromStream(at, m_stream->time_base) - m_origin : 0))
+                        return false;
+                    continue;
+                }
+                frame = std::move(picture);
+            }
             std::int64_t ts = frame->best_effort_timestamp;
             if (ts == AV_NOPTS_VALUE)
                 ts = frame->pts;
@@ -129,6 +153,16 @@ bool VideoDecoder::decodeOne(DecodedFrame& out) {
             avcodec_send_packet(m_codec.get(), m_pkt.get());
         av_packet_unref(m_pkt.get());
     }
+}
+
+bool VideoDecoder::fallBackToSoftware(Ticks at) {
+    g_hardwareFailed = true;
+    auto codec = av::openDecoder(m_stream, nullptr, m_threads);
+    if (!codec)
+        return false;
+    m_codec = std::move(codec);
+    seek(at);
+    return true;
 }
 
 bool VideoDecoder::seek(Ticks t) {

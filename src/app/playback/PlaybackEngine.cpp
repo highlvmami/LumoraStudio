@@ -4,6 +4,7 @@
 #include <QAudioSink>
 #include <QIODevice>
 #include <QMediaDevices>
+#include <QSettings>
 #include <QTransform>
 #include <algorithm>
 #include <chrono>
@@ -21,6 +22,16 @@ constexpr int kAudioRate = 48000;
 constexpr int kAudioChannels = 2;
 // How far ahead of the playhead upcoming clips get their decoders ready.
 constexpr Ticks kPrefetchHorizon = 2 * kTicksPerSecond;
+// Frames after starting or jumping that do not count towards the preview
+// size (they also open and seek the decoders).
+constexpr int kWarmupFrames = 6;
+
+const char* const kHardwareKey = "preview/hardwareDecoding";
+
+std::atomic_bool& hardwareFlag() {
+    static std::atomic_bool on{QSettings().value(QLatin1String(kHardwareKey), true).toBool()};
+    return on;
+}
 
 // Thread-safe float ring buffer exposed as a QIODevice for QAudioSink (pull
 // mode). The decoder thread blocks in write() while the buffer is full.
@@ -282,6 +293,9 @@ void PlaybackEngine::videoLoop() {
     std::shared_ptr<MediaPool> media; // keeps the renderer's media alive
     quint64 version = ~quint64(0);
     QSize outputSize;
+    int reduce = 1;        // playback preview size divider (1, 2 or 4)
+    double load = 0.0;     // render time per frame / frame duration (smoothed)
+    int framesAtLevel = 0; // frames played since `reduce` changed
 
     auto toWall = [&](Ticks t) {
         return wallOrigin + std::chrono::nanoseconds(av_rescale(t - playOrigin, 1'000'000'000, kTicksPerSecond));
@@ -308,23 +322,16 @@ void PlaybackEngine::videoLoop() {
         if (cmd.type == Command::Quit)
             return;
 
-        // Preview resolution: the composition scaled to fit the view.
-        QSize target = seq.canvas.scaled(size, Qt::KeepAspectRatio);
-        if (target.width() > seq.canvas.width())
-            target = seq.canvas;
-        target = target.expandedTo(QSize(16, 9));
         if (changed || !renderer || media != seq.media) {
             if (!renderer || media != seq.media) {
                 renderer = std::make_unique<FrameRenderer>(seq.media.get());
                 renderer->setDrawSubtitles(true); // the preview shows them; export decides for itself
                 media = seq.media;
+                reduce = 1;
             }
             renderer->setTimeline(seq.timeline);
         }
-        if (target != outputSize) {
-            outputSize = target;
-            renderer->setOutputSize(target);
-        }
+        renderer->setHardwareDecoding(hardwareFlag());
 
         Ticks renderAt = kInvalidTicks;
         switch (cmd.type) {
@@ -332,14 +339,18 @@ void PlaybackEngine::videoLoop() {
             playing = true;
             playOrigin = cmd.time;
             wallOrigin = Clock::now();
+            framesAtLevel = -kWarmupFrames;
             break;
         case Command::Pause:
             playing = false;
+            if (reduce > 1)
+                renderAt = cmd.time; // the still frame in full quality
             break;
         case Command::Render:
             if (playing) {
                 playOrigin = cmd.time;
                 wallOrigin = Clock::now();
+                framesAtLevel = -kWarmupFrames;
             } else {
                 renderAt = cmd.time;
             }
@@ -368,7 +379,37 @@ void PlaybackEngine::videoLoop() {
         if (pos == kInvalidTicks)
             continue;
 
+        // Preview resolution: the composition scaled to fit the view, and
+        // while playing divided by `reduce` when the computer cannot keep up
+        // at full size (e.g. 4K, high frame rate). A still frame is always
+        // full size.
+        QSize target = seq.canvas.scaled(size, Qt::KeepAspectRatio);
+        if (target.width() > seq.canvas.width())
+            target = seq.canvas;
+        if (playing && reduce > 1)
+            target /= reduce;
+        target = target.expandedTo(QSize(16, 9));
+        if (target != outputSize) {
+            outputSize = target;
+            renderer->setOutputSize(target);
+        }
+
+        const auto started = Clock::now();
         const QImage image = seq.media ? renderer->render(pos) : QImage();
+        if (playing) {
+            // Learn how long a frame takes against how long it lasts.
+            const double took = std::chrono::duration<double>(Clock::now() - started).count();
+            const double lasts = static_cast<double>(frameDuration(seq.frameRate)) / kTicksPerSecond;
+            if (++framesAtLevel > 0)
+                load = framesAtLevel == 1 ? took / lasts : 0.85 * load + 0.15 * took / lasts;
+            if (framesAtLevel >= 12 && load > 0.9 && reduce < 4) {
+                reduce *= 2;
+                framesAtLevel = 0;
+            } else if (framesAtLevel >= 90 && load < 0.3 && reduce > 1) {
+                reduce /= 2;
+                framesAtLevel = 0;
+            }
+        }
         if (!image.isNull())
             QMetaObject::invokeMethod(this, [this, image, pos] { emit frameReady(image, pos); }, Qt::QueuedConnection);
         if (playing) {
@@ -386,6 +427,13 @@ void PlaybackEngine::videoLoop() {
                             [&] { return m_pending.type != Command::None; });
         }
     }
+}
+
+bool PlaybackEngine::hardwareDecoding() { return hardwareFlag(); }
+
+void PlaybackEngine::setHardwareDecoding(bool on) {
+    QSettings().setValue(QLatin1String(kHardwareKey), on);
+    hardwareFlag() = on; // the video thread picks it up with the next frame
 }
 
 void PlaybackEngine::setMuted(bool muted) {

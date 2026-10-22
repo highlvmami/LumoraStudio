@@ -84,6 +84,7 @@ struct FrameRenderer::Prefetcher {
         QString path;
         Ticks sourceTime = 0;
         ColorGrade grade;
+        bool hardware = false;
         std::unique_ptr<VideoDecoder> decoder;
         std::unique_ptr<ColorProcessor> color;
         bool started = false;
@@ -108,7 +109,7 @@ struct FrameRenderer::Prefetcher {
             thread.join();
     }
 
-    void request(const QUuid& clip, const QString& path, Ticks sourceTime, const ColorGrade& grade) {
+    void request(const QUuid& clip, const QString& path, Ticks sourceTime, const ColorGrade& grade, bool hardware) {
         {
             std::lock_guard lock(mutex);
             if (jobs.count(clip))
@@ -117,6 +118,7 @@ struct FrameRenderer::Prefetcher {
             job->path = path;
             job->sourceTime = sourceTime;
             job->grade = grade;
+            job->hardware = hardware;
             jobs[clip] = job;
             queue.push_back(job);
             if (!thread.joinable())
@@ -174,7 +176,7 @@ struct FrameRenderer::Prefetcher {
                 job->started = true;
             }
             auto decoder = std::make_unique<VideoDecoder>();
-            if (decoder->open(job->path))
+            if (decoder->open(job->path, nullptr, 0, job->hardware))
                 decoder->frameAt(job->sourceTime);
             else
                 decoder.reset();
@@ -205,6 +207,13 @@ void FrameRenderer::setPrecision(Precision p) {
         slot->image = {};
         slot->sws.reset();
     }
+}
+
+void FrameRenderer::setHardwareDecoding(bool on) {
+    if (on == m_hardware)
+        return;
+    m_hardware = on;
+    clearCache(); // reopen the decoders the other way
 }
 
 void FrameRenderer::clearCache() {
@@ -294,7 +303,7 @@ FrameRenderer::Slot* FrameRenderer::slotFor(const Clip& clip) {
         adopt(slot.get());
     } else {
         slot->decoder = std::make_unique<VideoDecoder>();
-        if (!slot->decoder->open(media->path))
+        if (!slot->decoder->open(media->path, nullptr, 0, m_hardware))
             slot->failed = true;
     }
     while (m_slots.size() >= kMaxSlots && !m_lru.empty()) {
@@ -332,7 +341,7 @@ void FrameRenderer::prefetch(Ticks t, Ticks horizon) {
                 continue; // nothing to gain
             if (!m_prefetcher)
                 m_prefetcher = std::make_unique<Prefetcher>();
-            m_prefetcher->request(c.id, media->path, source, c.color);
+            m_prefetcher->request(c.id, media->path, source, c.color, m_hardware);
             wanted.push_back(c.id);
         }
     }
@@ -350,9 +359,19 @@ QImage FrameRenderer::convertFrame(Slot& slot, const AVFrame* f, QSize size) {
     const AVPixelFormat dstFmt = final ? AV_PIX_FMT_RGBA64 : (alpha ? AV_PIX_FMT_RGB32 : AV_PIX_FMT_0RGB32);
     const int key[6] = {f->width, f->height, f->format, tw, th, f->colorspace * 4 + f->color_range};
     if (!slot.sws || !std::equal(std::begin(key), std::end(key), std::begin(slot.swsKey))) {
-        const int flags = final ? (SWS_LANCZOS | SWS_ACCURATE_RND | SWS_FULL_CHR_H_INT) : (SWS_BICUBIC | SWS_FULL_CHR_H_INT);
-        slot.sws.reset(sws_getContext(f->width, f->height, static_cast<AVPixelFormat>(f->format), tw, th, dstFmt, flags,
-                                       nullptr, nullptr, nullptr));
+        if (final) {
+            slot.sws.reset(sws_getContext(f->width, f->height, static_cast<AVPixelFormat>(f->format), tw, th, dstFmt,
+                                           SWS_LANCZOS | SWS_ACCURATE_RND | SWS_FULL_CHR_H_INT, nullptr, nullptr, nullptr));
+        } else {
+            // The preview shrinks big videos (4K into a window) with an area
+            // average, which is several times cheaper than bicubic and looks
+            // the same at that ratio, and spreads it over the cores: with
+            // bicubic on one core a 4K frame alone took longer than a frame
+            // lasts at 60 fps.
+            const bool shrink = tw * 2 <= f->width && th * 2 <= f->height;
+            slot.sws = av::makeScaler(f->width, f->height, static_cast<AVPixelFormat>(f->format), tw, th, dstFmt,
+                                      shrink ? SWS_AREA : (SWS_BICUBIC | SWS_FULL_CHR_H_INT));
+        }
         if (!slot.sws)
             return {};
         sws_setColorspaceDetails(slot.sws.get(), sws_getCoefficients(swsColorspace(f)),
@@ -363,7 +382,10 @@ QImage FrameRenderer::convertFrame(Slot& slot, const AVFrame* f, QSize size) {
     QImage img(tw, th, final ? QImage::Format_RGBA64 : (alpha ? QImage::Format_ARGB32 : QImage::Format_RGB32));
     uint8_t* dst[4] = {img.bits(), nullptr, nullptr, nullptr};
     int stride[4] = {static_cast<int>(img.bytesPerLine()), 0, 0, 0};
-    sws_scale(slot.sws.get(), f->data, f->linesize, 0, f->height, dst, stride);
+    if (final)
+        sws_scale(slot.sws.get(), f->data, f->linesize, 0, f->height, dst, stride);
+    else if (!av::scaleInto(slot.sws.get(), f, dst[0], stride[0], tw, th, dstFmt))
+        return {};
     if (final && !alpha) {
         // Opaque sources: make sure alpha is exactly 1.0 whatever sws wrote.
         for (int y = 0; y < th; ++y) {

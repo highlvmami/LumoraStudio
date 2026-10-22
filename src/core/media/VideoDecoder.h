@@ -25,7 +25,10 @@ public:
     VideoDecoder(const VideoDecoder&) = delete;
     VideoDecoder& operator=(const VideoDecoder&) = delete;
 
-    bool open(const QString& path, QString* error = nullptr, int threads = 0);
+    // With `hardware` the graphics card decodes when it can (preview only:
+    // exports keep the software decoder). Its pictures are downloaded to
+    // memory, so callers see ordinary frames either way.
+    bool open(const QString& path, QString* error = nullptr, int threads = 0, bool hardware = false);
     bool isOpen() const { return m_codec != nullptr; }
     const QString& path() const { return m_path; }
     const VideoStreamInfo& info() const { return m_info; }
@@ -49,6 +52,8 @@ public:
 private:
     bool decodeOne(DecodedFrame& out);
     Ticks nominalFrameDuration() const;
+    // The card could not hand a picture over: decode in software from `at` on.
+    bool fallBackToSoftware(Ticks at);
 
     QString m_path;
     VideoStreamInfo m_info;
@@ -56,6 +61,7 @@ private:
     av::CodecContextPtr m_codec;
     av::PacketPtr m_pkt;
     AVStream* m_stream = nullptr;
+    int m_threads = 0;
     Ticks m_origin = 0;
     bool m_eofSent = false;
     bool m_eof = false;
