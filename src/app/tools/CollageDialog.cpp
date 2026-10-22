@@ -37,7 +37,7 @@ QIcon layoutIcon(const CollageLayout& l) {
         const QRectF r(c.x() * size.width() + 1.5, c.y() * size.height() + 1.5, c.width() * size.width() - 3,
                        c.height() * size.height() - 3);
         QColor fill = accent;
-        fill.setAlphaF(0.35);
+        fill.setAlphaF(0.35f);
         p.setPen(QPen(accent, 1.2));
         p.setBrush(fill);
         p.drawRoundedRect(r, 3, 3);

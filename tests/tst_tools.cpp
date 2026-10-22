@@ -383,8 +383,12 @@ private slots:
         BatchPhotoSettings s;
         s.resize = BatchPhotoSettings::Resize::LongEdge;
         s.pixels = 100;
-        s.watermark = BatchPhotoSettings::Watermark::Text;
-        s.watermarkText = QStringLiteral("LUMORA");
+        // A picture mark: text marks need fonts, which test machines may lack.
+        QImage logo(80, 20, QImage::Format_ARGB32);
+        logo.fill(Qt::white);
+        QVERIFY(logo.save(m_dir.filePath("logo.png")));
+        s.watermark = BatchPhotoSettings::Watermark::Picture;
+        s.watermarkPicture = m_dir.filePath("logo.png");
         s.watermarkOpacity = 1.0;
         s.watermarkSize = 0.5;
         s.format.format = PhotoFormat::Png;
