@@ -241,6 +241,13 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
     connect(m_project->photos(), &PhotoLibrary::added, this, &MainWindow::markDirty);
     connect(m_cache, &MediaCache::keyframesReady, m_properties, &PropertiesPanel::refresh);
     connect(m_cache, &MediaCache::thumbnailReady, m_properties, &PropertiesPanel::refresh);
+    connect(m_cache, &MediaCache::proxyProgress, this, [this](const QString& name, int percent) {
+        statusBar()->showMessage(tr("Preparing smooth preview of %1: %2%").arg(name).arg(percent), 3000);
+    });
+    connect(m_cache, &MediaCache::proxyFinished, this, [this](const QUuid&, bool ok) {
+        if (ok)
+            statusBar()->showMessage(tr("Smooth preview ready"), 4000);
+    });
 
     connect(m_engine, &PlaybackEngine::positionChanged, this, [this](Ticks t) {
         updateTransformBox();

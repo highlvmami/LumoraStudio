@@ -23,6 +23,19 @@ struct MediaItem {
     std::vector<Ticks> keyframes;
     bool keyframesReady = false;
 
+    // Preview copy of a heavy video (media/Proxy.h), empty until it is
+    // ready. Guarded by `mutex`.
+    QString proxyPath;
+
+    QString proxy() const {
+        std::lock_guard lock(mutex);
+        return proxyPath;
+    }
+    void setProxy(const QString& path) {
+        std::lock_guard lock(mutex);
+        proxyPath = path;
+    }
+
     std::vector<Ticks> keyframesCopy() const {
         std::lock_guard lock(mutex);
         return keyframes;

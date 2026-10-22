@@ -209,6 +209,15 @@ void FrameRenderer::setPrecision(Precision p) {
     }
 }
 
+QString FrameRenderer::decodePath(const MediaItem& media) const {
+    if (m_useProxies) {
+        const QString proxy = media.proxy();
+        if (!proxy.isEmpty())
+            return proxy;
+    }
+    return media.path;
+}
+
 void FrameRenderer::setHardwareDecoding(bool on) {
     if (on == m_hardware)
         return;
@@ -268,7 +277,8 @@ FrameRenderer::Slot* FrameRenderer::slotFor(const Clip& clip) {
     std::shared_ptr<Prefetcher::Job> job;
     if (m_prefetcher && m_prefetcher->has(clip.id))
         job = m_prefetcher->take(clip.id);
-    if (job && (!job->decoder || !media || job->decoder->path() != media->path))
+    const QString path = media ? decodePath(*media) : QString();
+    if (job && (!job->decoder || !media || job->decoder->path() != path))
         job.reset(); // failed, or the clip now shows another file
     auto adopt = [&](Slot* slot) {
         if (!job)
@@ -283,6 +293,17 @@ FrameRenderer::Slot* FrameRenderer::slotFor(const Clip& clip) {
     };
 
     auto it = m_slots.find(clip.id);
+    if (it != m_slots.end() && !job && it->second->decoder && it->second->decoder->path() != path) {
+        // The preview copy became ready (or proxies were switched): reopen.
+        auto fresh = std::make_unique<VideoDecoder>();
+        if (fresh->open(path, nullptr, 0, m_hardware)) {
+            it->second->decoder = std::move(fresh);
+            it->second->image = {};
+            it->second->imagePts = kInvalidTicks;
+            it->second->back.clear();
+            it->second->backBytes = 0;
+        }
+    }
     if (it != m_slots.end()) {
         m_lru.remove(clip.id);
         m_lru.push_back(clip.id);
@@ -303,7 +324,7 @@ FrameRenderer::Slot* FrameRenderer::slotFor(const Clip& clip) {
         adopt(slot.get());
     } else {
         slot->decoder = std::make_unique<VideoDecoder>();
-        if (!slot->decoder->open(media->path, nullptr, 0, m_hardware))
+        if (!slot->decoder->open(path, nullptr, 0, m_hardware))
             slot->failed = true;
     }
     while (m_slots.size() >= kMaxSlots && !m_lru.empty()) {
@@ -336,12 +357,14 @@ void FrameRenderer::prefetch(Ticks t, Ticks horizon) {
             if (!media || !media->info.video)
                 continue;
             const Ticks source = std::max<Ticks>(0, c.mediaTime(first)) + m_sampleOffset;
+            const QString path = decodePath(*media);
             if (auto it = m_slots.find(c.id); it != m_slots.end() &&
-                (it->second->failed || it->second->decoder->reachesForward(source)))
+                (it->second->failed ||
+                 (it->second->decoder->path() == path && it->second->decoder->reachesForward(source))))
                 continue; // nothing to gain
             if (!m_prefetcher)
                 m_prefetcher = std::make_unique<Prefetcher>();
-            m_prefetcher->request(c.id, media->path, source, c.color, m_hardware);
+            m_prefetcher->request(c.id, path, source, c.color, m_hardware);
             wanted.push_back(c.id);
         }
     }

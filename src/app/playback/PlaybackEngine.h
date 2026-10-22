@@ -56,6 +56,10 @@ public:
     // (saved setting, on by default). Exports are not affected.
     static bool hardwareDecoding();
     static void setHardwareDecoding(bool on);
+    // Heavy videos (4K and up) play from a lighter preview copy made in the
+    // background (saved setting, on by default). Exports read the originals.
+    static bool useProxies();
+    static void setUseProxies(bool on);
 
 signals:
     void frameReady(const QImage& image, lumora::Ticks time);

@@ -1839,6 +1839,14 @@
         <translation>Proje kaydedildi</translation>
     </message>
     <message>
+        <source>Preparing smooth preview of %1: %2%</source>
+        <translation>%1 için akıcı önizleme hazırlanıyor: %%2</translation>
+    </message>
+    <message>
+        <source>Smooth preview ready</source>
+        <translation>Akıcı önizleme hazır</translation>
+    </message>
+    <message>
         <source>Import media</source>
         <translation>Medya içe aktar</translation>
     </message>
@@ -4039,8 +4047,12 @@ Orijinal dosya asla değişmez: düzenlemeler projede saklanır ve dışa aktar�
         <translation>4K, HEVC ve yüksek kare hızlı videolar akıcı oynar. Önizlemede renkler yanlış görünür ya da ekran siyah kalırsa kapatın. Dışa aktarma her zaman tam kaliteli çözücüyü kullanır.</translation>
     </message>
     <message>
-        <source>When the computer cannot keep up, the preview plays at a lower resolution; the paused picture and the exported file stay full quality.</source>
-        <translation>Bilgisayar yetişemediğinde önizleme daha düşük çözünürlükte oynar; durdurulmuş görüntü ve dışa aktarılan dosya tam kalitede kalır.</translation>
+        <source>Smooth preview copies of 4K videos</source>
+        <translation>4K videolar için akıcı önizleme kopyası</translation>
+    </message>
+    <message>
+        <source>Videos larger than Full HD get a lighter copy in the background when they are added; the preview plays from it. Exports always use the original files in full quality.</source>
+        <translation>Full HD&apos;den büyük videolar eklenince arka planda daha hafif bir kopyası hazırlanır; önizleme ondan oynar. Dışa aktarma her zaman orijinal dosyaları tam kalitede kullanır.</translation>
     </message>
 </context>
 <context>
