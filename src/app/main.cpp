@@ -26,6 +26,7 @@
 #include "Icons.h"
 #include "MainWindow.h"
 #include "Updater.h"
+#include "WheelGuard.h"
 #include "Theme.h"
 #include "media/MediaPool.h"
 
@@ -106,6 +107,7 @@ int main(int argc, char* argv[]) {
     qRegisterMetaType<lumora::MediaItemPtr>();
 
     QSettings settings;
+    WheelGuard::install();
     applyTheme(themeFromString(settings.value(QStringLiteral("ui/theme"), QStringLiteral("dark")).toString()));
 
     // Interface language: setting, else the system language (Turkish or English).
