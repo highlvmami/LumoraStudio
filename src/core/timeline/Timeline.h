@@ -50,6 +50,10 @@ struct Clip {
     MotionPath motion;           // video and title clips: follows a tracked object
     Redaction redaction;         // video clips: hidden faces and number plates
     BackgroundRemoval background; // video clips: subject cut out of its background
+    PictureEffects effects;      // video clips: green screen, noise, sharpen ...
+    // Speed changes (media clips): when active, sourceIn / sourceOut are in
+    // remapped time (see TimeRemap) and mediaTime() maps them to the media.
+    TimeRemap remap;
     Transition transitionIn;     // primary storyline: transition from the previous clip
     Ticks fadeIn = 0;            // opacity (video) / volume (audio) ramps
     Ticks fadeOut = 0;
@@ -72,15 +76,29 @@ struct Clip {
     Ticks toSource(Ticks t) const { return sourceIn + (t - timelineStart); }
     bool contains(Ticks t) const { return t >= timelineStart && t < timelineEnd(); }
     // Media time whose picture is shown at timeline time `t`.
-    Ticks mediaTime(Ticks t) const {
+    Ticks mediaTime(Ticks t) const { return sourceToMedia(toSource(t)); }
+    // Media time of source time `s` (loops and speed changes applied).
+    Ticks sourceToMedia(Ticks s) const {
         if (kind == ClipKind::Freeze)
             return freezeTime;
-        const Ticks s = toSource(t);
+        if (remap.isActive())
+            return remap.map(s);
         if (loopLength > 0 && s >= loopStart + loopLength)
             return loopStart + (s - loopStart) % loopLength;
         return s;
     }
     bool loops() const { return kind == ClipKind::Media && loopLength > 0; }
+    bool hasSpeedChange() const { return kind == ClipKind::Media && remap.isActive(); }
+    // Media range the clip shows, [first, last) in media time (for analyses
+    // that walk through the clip's frames).
+    std::pair<Ticks, Ticks> mediaRange() const {
+        if (kind == ClipKind::Freeze)
+            return {freezeTime, freezeTime + 1};
+        if (!hasSpeedChange())
+            return {sourceIn, loops() ? std::max(sourceIn, loopStart + loopLength) : sourceOut};
+        const Ticks a = remap.map(sourceIn), b = remap.map(sourceOut);
+        return {std::min(a, b), std::max(a, b)};
+    }
 
     bool operator==(const Clip&) const = default;
 };
@@ -218,6 +236,15 @@ public:
     bool setMotionPath(const QUuid& clipId, const MotionPath& path);
     bool setRedaction(const QUuid& clipId, const Redaction& r);
     bool setBackgroundRemoval(const QUuid& clipId, const BackgroundRemoval& b);
+    bool setPictureEffects(const QUuid& clipId, const PictureEffects& e);
+    // Changes the speed of a media clip and its linked clips (sound plays at
+    // the same speed): `speed` 0.05 .. 20, backwards, optionally along a speed
+    // ramp. The clip keeps showing the same part of its media, so it gets
+    // shorter or longer. Speed 1 forwards without a ramp removes the change.
+    // `mediaDuration` is the length of the media.
+    bool setSpeed(const QUuid& clipId, double speed, bool reverse, const std::vector<SpeedPoint>& ramp, Ticks mediaDuration);
+    // Frame blending and pitch of a speed change (no length change).
+    bool setSpeedOptions(const QUuid& clipId, FrameBlending blending, bool keepPitch);
     bool setTransition(const QUuid& clipId, const Transition& t);
     // Repeats the media of a video clip: the range from its in point to the
     // end of the media (`mediaDuration`) loops. Off restores the length to

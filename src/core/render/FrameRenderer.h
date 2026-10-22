@@ -89,6 +89,9 @@ private:
     Slot* slotFor(const Clip& clip);
     QImage convertFrame(Slot& slot, const AVFrame* f, QSize size);
     QImage clipImage(const Clip& clip, Ticks sourceTime, QSize* fitSize, int* rotation);
+    // Frame at media time `t` of a clip that plays backwards, and the one
+    // after it (for frame blending).
+    const AVFrame* reverseFrameAt(Slot& slot, Ticks t, Ticks* pts, const AVFrame** next, Ticks* nextPts);
     void drawLayer(QPainter& p, const Clip& clip, Ticks t, Ticks sourceTime, double opacity);
     QImage renderStoryline(Ticks t);
     QImage renderStorylineClip(int index, Ticks t);

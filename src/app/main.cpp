@@ -150,9 +150,10 @@ int main(int argc, char* argv[]) {
     QCommandLineOption grabScrollOpt(QStringLiteral("grab-scroll"),
                                      QStringLiteral("Screenshot the whole scrolled content of the first widget of this class"),
                                      QStringLiteral("class"));
+    QCommandLineOption toolOpt(QStringLiteral("tool"), QStringLiteral("Open a tool of the Tools menu"), QStringLiteral("name"));
     QCommandLineOption fullScreenOpt(QStringLiteral("full-screen-preview"), QStringLiteral("Open the full-screen preview"));
     for (auto* o : {&shotOpt, &workspaceOpt, &selectOpt, &selectClipOpt, &exportOpt, &exportCustomOpt, &seekOpt, &sizeOpt,
-                    &autoSubsOpt, &trackOpt, &fullScreenOpt, &helpSectionOpt, &widgetsOpt, &grabScrollOpt}) {
+                    &autoSubsOpt, &trackOpt, &fullScreenOpt, &helpSectionOpt, &widgetsOpt, &grabScrollOpt, &toolOpt}) {
         o->setFlags(QCommandLineOption::HiddenFromHelp);
         parser.addOption(*o);
     }
@@ -199,11 +200,14 @@ int main(int argc, char* argv[]) {
         const bool autoSubs = parser.isSet(autoSubsOpt), track = parser.isSet(trackOpt);
         const bool fullScreen = parser.isSet(fullScreenOpt);
         const QString grabScroll = parser.value(grabScrollOpt);
-        QTimer::singleShot(2500, &w, [&w, out, exportDlg, exportCustom, autoSubs, track, fullScreen, grabScroll] {
+        const QString tool = parser.value(toolOpt);
+        QTimer::singleShot(2500, &w, [&w, out, exportDlg, exportCustom, autoSubs, track, fullScreen, grabScroll, tool] {
             if (!grabScroll.isEmpty()) {
                 for (QWidget* c : w.findChildren<QWidget*>())
                     if (c->isVisible() && c->inherits(grabScroll.toLatin1().constData()))
-                        if (auto* scroll = c->findChild<QScrollArea*>(); scroll && scroll->widget()) {
+                        for (auto* scroll : c->findChildren<QScrollArea*>()) {
+                            if (!scroll->isVisible() || !scroll->widget())
+                                continue;
                             QWidget* content = scroll->widget();
                             scroll->setWidgetResizable(false);
                             content->resize(scroll->viewport()->width(), content->sizeHint().height());
@@ -223,6 +227,18 @@ int main(int argc, char* argv[]) {
                         }
                     QCoreApplication::exit(0);
                 });
+                return;
+            }
+            if (!tool.isEmpty()) {
+                QTimer::singleShot(1200, &w, [out] {
+                    for (QWidget* top : QApplication::topLevelWidgets())
+                        if (top->isVisible() && top->inherits("QDialog")) {
+                            saveShot(top, out);
+                            break;
+                        }
+                    QCoreApplication::exit(0);
+                });
+                w.runTool(tool);
                 return;
             }
             if (autoSubs) {

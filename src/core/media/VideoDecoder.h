@@ -38,6 +38,9 @@ public:
     const AVFrame* frameAt(Ticks t, Ticks* framePts = nullptr, Ticks* frameDur = nullptr);
     // True when frameAt(t) can get there by decoding forward, without a seek.
     bool reachesForward(Ticks t) const;
+    // The frame after the one frameAt() returned last (decoded ahead without
+    // moving on), or nullptr at the end. Valid until the next call.
+    const AVFrame* peekNext(Ticks* framePts = nullptr);
 
     // Sequential access.
     bool seek(Ticks t);

@@ -50,6 +50,9 @@ public:
     void openExportDialog(bool modal);
     void seekSeconds(double s);
     void autoSubtitles();
+    // Opens a tool of the Tools menu by name (gif, collage, batch, screen,
+    // voiceover); used for the screenshots of the booklet.
+    void runTool(const QString& name);
     // Starts following an object with the selected clip.
     void trackClip(const QUuid& clipId = {});
     void showFullScreenPreview();
@@ -105,6 +108,14 @@ private:
     void stabilizeClip(const QUuid& clipId);
     void redactClip(const QUuid& clipId);
     void removeBackground(const QUuid& clipId, const QString& model);
+    // Lets the user pick the green screen colour of a clip in the viewer.
+    void pickKeyColor(const QUuid& clipId);
+    // Tools menu.
+    void exportGif();
+    void makeCollage();
+    void batchPhotos();
+    void recordScreen();
+    void recordVoiceover();
     void refreshProgram();
     void showShortcuts();
     QString shortcutsHtml() const;
@@ -190,6 +201,11 @@ private:
     QAction* m_actFullScreenPreview;
     QAction* m_actFullScreenWindow;
     QAction* m_actHowTo;
+    QAction* m_actGif;
+    QAction* m_actCollage;
+    QAction* m_actBatchPhotos;
+    QAction* m_actRecordScreen;
+    QAction* m_actVoiceover;
     class Updater* m_updater = nullptr;
 };
 

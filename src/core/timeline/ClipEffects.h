@@ -20,8 +20,13 @@ struct ClipTransform {
     double scale = 1.0;    // 1 = fit the frame
     double rotation = 0.0; // degrees, clockwise
     double opacity = 1.0;  // 0 .. 1
+    // Part of the picture that is shown, in fractions of the picture; the
+    // rest is cut away and the shown part stays where it was (collage cells).
+    // A null rectangle shows everything.
+    QRectF crop;
 
-    bool isIdentity() const { return x == 0.0 && y == 0.0 && scale == 1.0 && rotation == 0.0 && opacity == 1.0; }
+    bool hasCrop() const { return !crop.isNull() && crop != QRectF(0, 0, 1, 1); }
+    bool isIdentity() const { return x == 0.0 && y == 0.0 && scale == 1.0 && rotation == 0.0 && opacity == 1.0 && !hasCrop(); }
     bool operator==(const ClipTransform&) const = default;
 
     QJsonObject toJson() const;
@@ -45,7 +50,22 @@ enum class TransitionType {
     SlideRight,
     Zoom,
     Blur,
+    // Transition pack (0.7)
+    PushUp,    // the new clip pushes the old one out upwards
+    PushDown,
+    Iris,      // a growing circle reveals the new clip
+    ClockWipe, // a hand sweeping round from twelve o'clock
+    BarnDoor,  // the old clip opens like two doors from the middle
+    DiagonalWipe,
+    Flash,     // a white flash at the cut
+    Pixelate,  // the picture breaks into blocks and comes back
+    Spin,      // the old clip spins away, the new one spins in
+    Glitch,    // colour channels and stripes jump about
+    ZoomBlur,  // zooms into the cut with motion blur
 };
+
+// All transition types, for menus (None first).
+std::vector<TransitionType> allTransitionTypes();
 
 struct Transition {
     TransitionType type = TransitionType::None;
@@ -61,7 +81,20 @@ struct Transition {
 QString transitionTypeId(TransitionType t);
 TransitionType transitionTypeFromId(const QString& id);
 
-enum class TitleAnimation { None, Fade, SlideUp, Pop, Typewriter };
+enum class TitleAnimation { None, Fade, SlideUp, Pop, Typewriter, SlideLeft, Zoom, Blur };
+
+// Shapes drawn with a title (title templates).
+enum class TitleDecoration {
+    None,
+    Bar,       // an accent bar on the left of the text (lower thirds)
+    Underline, // an accent line under the text
+    Frame,     // a thin rectangle around the text
+    Band,      // a full-width band behind the text (news ticker)
+    Brackets,  // corner brackets
+};
+
+QString titleDecorationId(TitleDecoration d);
+TitleDecoration titleDecorationFromId(const QString& id);
 
 QString titleAnimationId(TitleAnimation a);
 TitleAnimation titleAnimationFromId(const QString& id);
@@ -86,6 +119,10 @@ struct TitleData {
     TitleAnimation animationIn = TitleAnimation::Fade;
     TitleAnimation animationOut = TitleAnimation::Fade;
     Ticks animationDuration = kTicksPerSecond / 2;
+    TitleDecoration decoration = TitleDecoration::None;
+    QColor accentColor = QColor(255, 176, 32);
+    double letterSpacing = 0.0; // extra space between letters, fraction of the font size
+    bool uppercase = false;
 
     bool operator==(const TitleData&) const = default;
 
@@ -208,6 +245,92 @@ struct BackgroundRemoval {
     bool operator==(const BackgroundRemoval&) const = default;
     QJsonObject toJson() const;
     static BackgroundRemoval fromJson(const QJsonObject& o);
+};
+
+
+// Speed changes of a media clip: faster, slower, backwards, or a speed ramp
+// that gets gradually faster and slower. The clip's source range is then
+// measured in "remapped" time, [0, length), which runs at timeline speed;
+// map() turns it into media time. Splitting, trimming and moving keep working
+// on the remapped time, so the clip is cut like any other.
+struct SpeedPoint {
+    double pos = 0.0;  // 0 .. 1 along the remapped range
+    double rate = 1.0; // relative speed there (linear in between)
+    bool operator==(const SpeedPoint&) const = default;
+};
+
+// How new pictures are made between source frames when a clip plays slower
+// than it was filmed.
+enum class FrameBlending {
+    None,        // each frame is held (steps)
+    Blend,       // neighbouring frames are mixed
+    OpticalFlow, // in-between frames are drawn from the motion (smooth slow motion)
+};
+
+struct TimeRemap {
+    double speed = 1.0;            // average speed: 2 = twice as fast, 0.5 = half (0.05 .. 20)
+    bool reverse = false;          // plays backwards
+    std::vector<SpeedPoint> ramp;  // speed ramp shape; empty = constant speed
+    FrameBlending blending = FrameBlending::OpticalFlow;
+    bool keepPitch = true;         // sound keeps its pitch (constant speed)
+    Ticks length = 0;              // remapped length of the whole range
+    Ticks mediaIn = 0;             // media range that the remapped range covers
+    Ticks mediaOut = 0;
+
+    bool isActive() const { return length > 0 && (speed != 1.0 || reverse || !ramp.empty()); }
+    // Relative speed at `pos` (0 .. 1) of a ramp.
+    double rateAt(double pos) const;
+    // Media time at remapped time `v` (clamped to the media range).
+    Ticks map(Ticks v) const;
+    // Media seconds per timeline second at remapped time `v` (negative when
+    // playing backwards).
+    double mediaRate(Ticks v) const;
+    // Remapped time at which media time `m` is shown (inverse of map).
+    Ticks unmap(Ticks m) const;
+    // Average relative speed of the ramp (1 without a ramp).
+    double rampAverage() const;
+
+    bool operator==(const TimeRemap&) const = default;
+    QJsonObject toJson() const;
+    static TimeRemap fromJson(const QJsonObject& o);
+};
+
+// Ready-made speed ramps.
+enum class SpeedRampPreset { None, Montage, Hero, Bullet, FlashIn, FlashOut, SlowIn, SlowOut };
+std::vector<SpeedPoint> speedRampPoints(SpeedRampPreset preset);
+QString speedRampId(SpeedRampPreset preset);
+SpeedRampPreset speedRampFromId(const QString& id);
+// The preset a ramp was made from (None when it was changed by hand).
+SpeedRampPreset speedRampPresetOf(const std::vector<SpeedPoint>& ramp);
+
+// Green or blue screen: the key colour becomes transparent so the tracks below
+// show through.
+struct ChromaKey {
+    bool enabled = false;
+    QColor color = QColor(0, 177, 64); // the screen colour
+    double tolerance = 0.35;           // 0 .. 1: how far from the key colour still goes away
+    double softness = 0.15;            // 0 .. 1: width of the soft edge
+    double spill = 0.5;                // 0 .. 1: removes the green / blue glow on the subject
+    bool operator==(const ChromaKey&) const = default;
+    QJsonObject toJson() const;
+    static ChromaKey fromJson(const QJsonObject& o);
+};
+
+// Picture effects of a video clip, applied after the colour settings.
+struct PictureEffects {
+    ChromaKey chromaKey;
+    double denoise = 0.0;  // 0 .. 1: removes grain / noise ("karıncalanma")
+    double sharpen = 0.0;  // 0 .. 1
+    double blur = 0.0;     // 0 .. 1
+    double vignette = 0.0; // 0 .. 1
+    double grain = 0.0;    // 0 .. 1 film grain
+
+    bool isIdentity() const {
+        return !chromaKey.enabled && denoise == 0.0 && sharpen == 0.0 && blur == 0.0 && vignette == 0.0 && grain == 0.0;
+    }
+    bool operator==(const PictureEffects&) const = default;
+    QJsonObject toJson() const;
+    static PictureEffects fromJson(const QJsonObject& o);
 };
 
 } // namespace lumora

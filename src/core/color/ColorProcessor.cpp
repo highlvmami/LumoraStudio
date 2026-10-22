@@ -1,5 +1,7 @@
 #include "ColorProcessor.h"
 
+#include "color/Looks.h"
+
 #include <QtConcurrent/QtConcurrentMap>
 #include <algorithm>
 #include <cmath>
@@ -199,7 +201,12 @@ void applyHsl(float rgb[3], const float hue[kHslBands], const float sat[kHslBand
 
 } // namespace
 
-ColorProcessor::ColorProcessor(const ColorGrade& g) : m_grade(g) {
+ColorProcessor::ColorProcessor(const ColorGrade& input) : m_grade(input) {
+    // A colour filter is resolved into ordinary settings first.
+    ColorGrade g = input;
+    g.look.clear();
+    if (const Look* look = input.hasLook() ? findLook(input.look) : nullptr)
+        g = applyLook(g, *look, input.lookAmount);
     m_identity = g.isIdentity();
     if (m_identity)
         return;

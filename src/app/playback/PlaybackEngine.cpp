@@ -260,6 +260,7 @@ void PlaybackEngine::startAudio(Ticks from) {
             sample += n;
         }
     });
+    m_sink->setVolume(m_muted ? 0.0 : 1.0);
     m_sink->start(m_ring);
 }
 
@@ -385,6 +386,12 @@ void PlaybackEngine::videoLoop() {
                             [&] { return m_pending.type != Command::None; });
         }
     }
+}
+
+void PlaybackEngine::setMuted(bool muted) {
+    m_muted = muted;
+    if (m_sink)
+        m_sink->setVolume(muted ? 0.0 : 1.0);
 }
 
 } // namespace lumora

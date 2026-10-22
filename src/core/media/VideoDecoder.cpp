@@ -79,6 +79,20 @@ bool VideoDecoder::reachesForward(Ticks t) const {
     return m_current.valid() && t >= m_current.pts && t - m_current.pts < kForwardLimit;
 }
 
+const AVFrame* VideoDecoder::peekNext(Ticks* framePts) {
+    if (!m_current.valid())
+        return nullptr;
+    if (!m_lookahead.valid()) {
+        DecodedFrame f;
+        if (!decodeOne(f))
+            return nullptr;
+        m_lookahead = std::move(f);
+    }
+    if (framePts)
+        *framePts = m_lookahead.pts;
+    return m_lookahead.frame.get();
+}
+
 Ticks VideoDecoder::nominalFrameDuration() const { return frameDuration(m_info.frameRate); }
 
 bool VideoDecoder::decodeOne(DecodedFrame& out) {

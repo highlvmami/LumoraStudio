@@ -12,6 +12,8 @@ add_library(lumora_core STATIC
     color/ColorGrade.h color/ColorGrade.cpp
     color/ColorProcessor.h color/ColorProcessor.cpp
     color/Lut.h color/Lut.cpp
+    color/Looks.h color/Looks.cpp
+    color/AutoColor.h color/AutoColor.cpp
     color/Scopes.h color/Scopes.cpp
     audio/AudioEffects.h audio/AudioEffects.cpp
     audio/AudioDsp.h audio/AudioDsp.cpp
@@ -21,6 +23,9 @@ add_library(lumora_core STATIC
     timeline/Timeline.h timeline/Timeline.cpp
     undo/TimelineCommands.h undo/TimelineCommands.cpp
     render/TitleRenderer.h render/TitleRenderer.cpp
+    render/TitleTemplates.h render/TitleTemplates.cpp
+    render/Collage.h render/Collage.cpp
+    render/Effects.h render/Effects.cpp
     render/FrameRenderer.h render/FrameRenderer.cpp
     render/AudioMixer.h render/AudioMixer.cpp
     export/ExportSettings.h
@@ -29,6 +34,8 @@ add_library(lumora_core STATIC
     export/ExportPlanner.h export/ExportPlanner.cpp
     export/TimelineExporter.h export/TimelineExporter.cpp
     export/RenderExport.h export/RenderExport.cpp
+    export/GifExport.h export/GifExport.cpp
+    export/LiveWriter.h export/LiveWriter.cpp
     export/SubtitleStreams.h export/SubtitleStreams.cpp
     motion/Motion.h motion/Motion.cpp
     ai/SpeechToText.h ai/SpeechToText.cpp
@@ -38,6 +45,7 @@ add_library(lumora_core STATIC
     motion/Analysis.h motion/Analysis.cpp
     image/PhotoAdjustments.h image/PhotoAdjustments.cpp
     image/PhotoProcessor.h image/PhotoProcessor.cpp
+    image/BatchPhoto.h image/BatchPhoto.cpp
     image/PhotoLibrary.h image/PhotoLibrary.cpp
     image/RawDecoder.h image/RawDecoder.cpp
     image/HeifDecoder.h image/HeifDecoder.cpp
@@ -68,9 +76,15 @@ set(CORE_TRANSLATABLE_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/ai/Vision.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/ai/Redaction.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/color/Lut.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/color/Looks.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/render/TitleTemplates.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/render/Collage.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/export/ExportPlanner.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/export/TimelineExporter.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/export/GifExport.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/export/LiveWriter.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/image/HeifDecoder.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/image/BatchPhoto.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/project/Project.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/timeline/Subtitles.cpp
     PARENT_SCOPE)

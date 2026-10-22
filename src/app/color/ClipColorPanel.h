@@ -1,7 +1,9 @@
 #pragma once
 
+#include <QImage>
 #include <QUuid>
 #include <QWidget>
+#include <functional>
 
 class QUndoStack;
 
@@ -20,12 +22,16 @@ public:
 
     void showClip(const QUuid& clipId);
     void refresh();
+    // Small pictures of media items (filter previews, automatic colour).
+    void setThumbnailProvider(std::function<QImage(const QUuid&)> provider) { m_thumbnail = std::move(provider); }
 
 private:
     Project* m_project;
     QUndoStack* m_undo;
     ColorPanel* m_panel;
     QUuid m_clip;
+    QUuid m_previewMedia;
+    std::function<QImage(const QUuid&)> m_thumbnail;
     int m_session = 0;
     bool m_updating = false;
 };

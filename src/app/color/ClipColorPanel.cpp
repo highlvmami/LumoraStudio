@@ -66,6 +66,13 @@ void ClipColorPanel::refresh() {
         name = QFileInfo(m->path).fileName();
     m_panel->setHeader(name);
     m_panel->setEditable(true);
+    if (m_thumbnail && c->mediaId != m_previewMedia) {
+        const QImage thumb = m_thumbnail(c->mediaId);
+        if (!thumb.isNull()) {
+            m_previewMedia = c->mediaId;
+            m_panel->setPreviewImage(thumb);
+        }
+    }
     m_panel->setGrade(c->color);
 }
 

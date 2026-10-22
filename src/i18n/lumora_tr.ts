@@ -720,6 +720,38 @@
         <source>HSL</source>
         <translation>HSL</translation>
     </message>
+    <message>
+        <source>Filters</source>
+        <translation>Filtreler</translation>
+    </message>
+    <message>
+        <source>Auto colour and light</source>
+        <translation>Otomatik renk ve ışık</translation>
+    </message>
+    <message>
+        <source>Measures the picture and sets exposure, contrast and white balance so it looks natural</source>
+        <translation>Resmi ölçer ve doğal görünsün diye pozlamayı, kontrastı ve beyaz dengesini ayarlar</translation>
+    </message>
+    <message>
+        <source>Ready-made looks; all settings below can still be changed</source>
+        <translation>Hazır görünümler; aşağıdaki tüm ayarlar yine değiştirilebilir</translation>
+    </message>
+    <message>
+        <source>Filter strength (%)</source>
+        <translation>Filtre gücü (%)</translation>
+    </message>
+    <message>
+        <source>Remove filter</source>
+        <translation>Filtreyi kaldır</translation>
+    </message>
+    <message>
+        <source>Apply filter</source>
+        <translation>Filtre uygula</translation>
+    </message>
+    <message>
+        <source>Filter strength</source>
+        <translation>Filtre gücü</translation>
+    </message>
 </context>
 <context>
     <name>lumora::ColorWheelWidget</name>
@@ -1229,6 +1261,14 @@
     <message>
         <source>Each section explains one part of the program step by step. The menu stays where it is, so you can jump between sections while you read. Go back to Edit, Color, Audio or Photo with the tabs at the top whenever you like.</source>
         <translation>Her bölüm programın bir kısmını adım adım anlatır. Menü yerinde kalır, okurken bölümler arasında geçebilirsiniz. Kurgu, Renk, Ses ya da Fotoğraf sekmesine üstteki sekmelerle istediğiniz an dönebilirsiniz.</translation>
+    </message>
+    <message>
+        <source>Speed and effects</source>
+        <translation>Hız ve efektler</translation>
+    </message>
+    <message>
+        <source>Tools</source>
+        <translation>Araçlar</translation>
     </message>
 </context>
 <context>
@@ -2275,6 +2315,88 @@
     <message>
         <source>Compare the photo with the original</source>
         <translation>Fotoğrafı orijinalle karşılaştır</translation>
+    </message>
+    <message>
+        <source>Save as &amp;GIF…</source>
+        <translation>&amp;GIF olarak kaydet…</translation>
+    </message>
+    <message>
+        <source>Save the video or a part of it as an animated GIF</source>
+        <translation>Videoyu ya da bir bölümünü hareketli GIF olarak kaydeder</translation>
+    </message>
+    <message>
+        <source>Video &amp;collage…</source>
+        <translation>Video &amp;kolaj…</translation>
+    </message>
+    <message>
+        <source>Show several videos or pictures side by side in one frame</source>
+        <translation>Birkaç videoyu ya da resmi tek karede yan yana gösterir</translation>
+    </message>
+    <message>
+        <source>Process many &amp;photos…</source>
+        <translation>Çok sayıda &amp;fotoğrafı işle…</translation>
+    </message>
+    <message>
+        <source>Resize, colour, watermark and convert many photos at once</source>
+        <translation>Çok sayıda fotoğrafı tek seferde yeniden boyutlandırır, renklendirir, filigran ekler ve dönüştürür</translation>
+    </message>
+    <message>
+        <source>Record the &amp;screen…</source>
+        <translation>&amp;Ekranı kaydet…</translation>
+    </message>
+    <message>
+        <source>Record what happens on the screen, with your voice if you like</source>
+        <translation>Ekranda olanları, isterseniz sesinizle birlikte kaydeder</translation>
+    </message>
+    <message>
+        <source>Record &amp;voice-over…</source>
+        <translation>&amp;Sesli anlatım kaydet…</translation>
+    </message>
+    <message>
+        <source>Speak over the video while it plays; the recording goes on a sound track</source>
+        <translation>Video oynarken üzerine konuşun; kayıt bir ses izine konur</translation>
+    </message>
+    <message>
+        <source>&amp;Tools</source>
+        <translation>&amp;Araçlar</translation>
+    </message>
+    <message>
+        <source>Draw a box over the screen behind the subject (Esc cancels)</source>
+        <translation>Öznenin arkasındaki perdenin üzerine küçük bir kutu çizin (Esc iptal eder)</translation>
+    </message>
+    <message>
+        <source>Save as GIF</source>
+        <translation>GIF olarak kaydet</translation>
+    </message>
+    <message>
+        <source>GIF saved to %1</source>
+        <translation>GIF kaydedildi: %1</translation>
+    </message>
+    <message>
+        <source>Video collage</source>
+        <translation>Video kolaj</translation>
+    </message>
+    <message numerus="yes">
+        <source>Collage of %n clip(s) added at the playhead.</source>
+        <translation>
+            <numerusform>%n klipten oluşan kolaj oynatma imlecine eklendi.</numerusform>
+        </translation>
+    </message>
+    <message>
+        <source>The screen recording is in your files: %1</source>
+        <translation>Ekran kaydı dosyalarınızda: %1</translation>
+    </message>
+    <message>
+        <source>Record voice-over</source>
+        <translation>Sesli anlatım kaydet</translation>
+    </message>
+    <message>
+        <source>The recording could not be opened:
+
+%1</source>
+        <translation>Kayıt açılamadı:
+
+%1</translation>
     </message>
 </context>
 <context>
@@ -3347,6 +3469,438 @@ Orijinal dosya asla değişmez: düzenlemeler projede saklanır ve dışa aktar�
         <source>Stop repeating clip</source>
         <translation>Klibi tekrarlamayı bırak</translation>
     </message>
+    <message>
+        <source>Push up</source>
+        <translation>Yukarı it</translation>
+    </message>
+    <message>
+        <source>Push down</source>
+        <translation>Aşağı it</translation>
+    </message>
+    <message>
+        <source>Circle</source>
+        <translation>Daire</translation>
+    </message>
+    <message>
+        <source>Clock wipe</source>
+        <translation>Saat yönünde silme</translation>
+    </message>
+    <message>
+        <source>Doors</source>
+        <translation>Kapılar</translation>
+    </message>
+    <message>
+        <source>Diagonal wipe</source>
+        <translation>Çapraz silme</translation>
+    </message>
+    <message>
+        <source>Flash</source>
+        <translation>Flaş</translation>
+    </message>
+    <message>
+        <source>Spin</source>
+        <translation>Döndür</translation>
+    </message>
+    <message>
+        <source>Glitch</source>
+        <translation>Bozulma (glitch)</translation>
+    </message>
+    <message>
+        <source>Zoom blur</source>
+        <translation>Yakınlaşma bulanıklığı</translation>
+    </message>
+    <message>
+        <source>Edit</source>
+        <translation>Düzenle</translation>
+    </message>
+    <message>
+        <source>Effects</source>
+        <translation>Efektler</translation>
+    </message>
+    <message>
+        <source>Smart</source>
+        <translation>Akıllı</translation>
+    </message>
+    <message>
+        <source>Info</source>
+        <translation>Bilgi</translation>
+    </message>
+    <message>
+        <source>Text, length, speed, position, transitions and fades</source>
+        <translation>Yazı, süre, hız, konum, geçişler ve belirme/kaybolma</translation>
+    </message>
+    <message>
+        <source>Colour filters, green screen and picture effects</source>
+        <translation>Renk filtreleri, yeşil perde ve görüntü efektleri</translation>
+    </message>
+    <message>
+        <source>Automatic tools: stabilise, follow, hide faces, remove the background</source>
+        <translation>Otomatik araçlar: sabitleme, takip, yüz gizleme, arka plan kaldırma</translation>
+    </message>
+    <message>
+        <source>Volume of the clip</source>
+        <translation>Klibin ses düzeyi</translation>
+    </message>
+    <message>
+        <source>Details of the file</source>
+        <translation>Dosyanın ayrıntıları</translation>
+    </message>
+    <message>
+        <source>Title templates</source>
+        <translation>Başlık şablonları</translation>
+    </message>
+    <message>
+        <source>Click a style: the title keeps its text</source>
+        <translation>Bir stile tıklayın: başlığın yazısı aynı kalır</translation>
+    </message>
+    <message>
+        <source>Side bar</source>
+        <translation>Yan çubuk</translation>
+    </message>
+    <message>
+        <source>Underline</source>
+        <translation>Alt çizgi</translation>
+    </message>
+    <message>
+        <source>Frame</source>
+        <translation>Çerçeve</translation>
+    </message>
+    <message>
+        <source>Band</source>
+        <translation>Bant</translation>
+    </message>
+    <message>
+        <source>Corners</source>
+        <translation>Köşeler</translation>
+    </message>
+    <message>
+        <source>Colour of the shape</source>
+        <translation>Şeklin rengi</translation>
+    </message>
+    <message>
+        <source>Shape</source>
+        <translation>Şekil</translation>
+    </message>
+    <message>
+        <source>Extra space between letters</source>
+        <translation>Harfler arasına ek boşluk</translation>
+    </message>
+    <message>
+        <source>CAPITALS</source>
+        <translation>BÜYÜK HARF</translation>
+    </message>
+    <message>
+        <source>Spacing</source>
+        <translation>Aralık</translation>
+    </message>
+    <message>
+        <source>Slide in from the side</source>
+        <translation>Yandan kayarak gel</translation>
+    </message>
+    <message>
+        <source>Speed</source>
+        <translation>Hız</translation>
+    </message>
+    <message>
+        <source>Normal speed</source>
+        <translation>Normal hız</translation>
+    </message>
+    <message>
+        <source>2 × plays twice as fast, 0.5 × at half speed (slow motion)</source>
+        <translation>2 × iki kat hızlı, 0,5 × yarı hızda (ağır çekim) oynatır</translation>
+    </message>
+    <message>
+        <source>Play at %1 × speed</source>
+        <translation>%1 × hızda oynat</translation>
+    </message>
+    <message>
+        <source>Play backwards</source>
+        <translation>Tersten oynat</translation>
+    </message>
+    <message>
+        <source>Gets gradually faster and slower within the clip</source>
+        <translation>Klip içinde kademeli olarak hızlanır ve yavaşlar</translation>
+    </message>
+    <message>
+        <source>Even speed</source>
+        <translation>Sabit hız</translation>
+    </message>
+    <message>
+        <source>Montage: fast, slow, fast</source>
+        <translation>Montaj: hızlı, yavaş, hızlı</translation>
+    </message>
+    <message>
+        <source>Hero: slows down for the moment</source>
+        <translation>Kahraman: o an için yavaşlar</translation>
+    </message>
+    <message>
+        <source>Bullet: very slow in the middle</source>
+        <translation>Mermi: ortada çok yavaş</translation>
+    </message>
+    <message>
+        <source>Rush in: fast, then normal</source>
+        <translation>Hızlı giriş: önce hızlı, sonra normal</translation>
+    </message>
+    <message>
+        <source>Rush out: normal, then fast</source>
+        <translation>Hızlı çıkış: önce normal, sonra hızlı</translation>
+    </message>
+    <message>
+        <source>Speed up</source>
+        <translation>Hızlan</translation>
+    </message>
+    <message>
+        <source>Slow down</source>
+        <translation>Yavaşla</translation>
+    </message>
+    <message>
+        <source>Speed ramp</source>
+        <translation>Hız rampası</translation>
+    </message>
+    <message>
+        <source>Off: repeat frames</source>
+        <translation>Kapalı: kareleri tekrarla</translation>
+    </message>
+    <message>
+        <source>Mix neighbouring frames</source>
+        <translation>Komşu kareleri karıştır</translation>
+    </message>
+    <message>
+        <source>Make in-between frames (optical flow)</source>
+        <translation>Ara kare üret (optik akış)</translation>
+    </message>
+    <message>
+        <source>For slow motion: new pictures are drawn between the filmed frames, so it plays smoothly</source>
+        <translation>Ağır çekim için: çekilen karelerin arasına yeni kareler çizilir, böylece akıcı oynar</translation>
+    </message>
+    <message>
+        <source>Smooth slow motion</source>
+        <translation>Akıcı ağır çekim</translation>
+    </message>
+    <message>
+        <source>Keep the voice&apos;s pitch</source>
+        <translation>Sesin tonunu koru</translation>
+    </message>
+    <message>
+        <source>The sound gets faster or slower without sounding higher or lower</source>
+        <translation>Ses hızlanır ya da yavaşlar ama incelip kalınlaşmaz</translation>
+    </message>
+    <message>
+        <source>Reset position, size and crop</source>
+        <translation>Konumu, boyutu ve kırpmayı sıfırla</translation>
+    </message>
+    <message>
+        <source>Top</source>
+        <translation>Üst</translation>
+    </message>
+    <message>
+        <source>Bottom</source>
+        <translation>Alt</translation>
+    </message>
+    <message>
+        <source>Cut away from the %1 edge</source>
+        <translation>%1 kenardan kırp</translation>
+    </message>
+    <message>
+        <source>Crop</source>
+        <translation>Kırp</translation>
+    </message>
+    <message>
+        <source>Colour filters</source>
+        <translation>Renk filtreleri</translation>
+    </message>
+    <message>
+        <source>Auto colour and light</source>
+        <translation>Otomatik renk ve ışık</translation>
+    </message>
+    <message>
+        <source>Measures the picture and sets exposure, contrast and white balance so it looks natural</source>
+        <translation>Resmi ölçer ve doğal görünsün diye pozlamayı, kontrastı ve beyaz dengesini ayarlar</translation>
+    </message>
+    <message>
+        <source>Strength (%)</source>
+        <translation>Güç (%)</translation>
+    </message>
+    <message>
+        <source>More colour settings…</source>
+        <translation>Diğer renk ayarları…</translation>
+    </message>
+    <message>
+        <source>Opens the Colour workspace: light, wheels, curves, HSL and LUTs</source>
+        <translation>Renk çalışma alanını açar: ışık, renk çarkları, eğriler, HSL ve LUT&apos;lar</translation>
+    </message>
+    <message>
+        <source>Green screen</source>
+        <translation>Yeşil perde</translation>
+    </message>
+    <message>
+        <source>Remove the screen colour</source>
+        <translation>Perde rengini kaldır</translation>
+    </message>
+    <message>
+        <source>Makes the green (or blue) background transparent, so the clip below shows through</source>
+        <translation>Yeşil (ya da mavi) arka planı saydam yapar, alttaki klip görünür</translation>
+    </message>
+    <message>
+        <source>Screen colour</source>
+        <translation>Perde rengi</translation>
+    </message>
+    <message>
+        <source>Green</source>
+        <translation>Yeşil</translation>
+    </message>
+    <message>
+        <source>Blue</source>
+        <translation>Mavi</translation>
+    </message>
+    <message>
+        <source>Pick…</source>
+        <translation>Seç…</translation>
+    </message>
+    <message>
+        <source>Draw a small box over the screen in the viewer to take its exact colour</source>
+        <translation>Tam rengini almak için önizlemede perdenin üzerine küçük bir kutu çizin</translation>
+    </message>
+    <message>
+        <source>Tolerance (%)</source>
+        <translation>Tolerans (%)</translation>
+    </message>
+    <message>
+        <source>Edge softness (%)</source>
+        <translation>Kenar yumuşaklığı (%)</translation>
+    </message>
+    <message>
+        <source>Remove colour spill (%)</source>
+        <translation>Renk taşmasını gider (%)</translation>
+    </message>
+    <message>
+        <source>Takes away the green glow the screen leaves on hair and edges</source>
+        <translation>Perdenin saç ve kenarlarda bıraktığı yeşil parıltıyı giderir</translation>
+    </message>
+    <message>
+        <source>Put the clip on a track above the new background.</source>
+        <translation>Klibi yeni arka planın üstündeki bir ize koyun.</translation>
+    </message>
+    <message>
+        <source>Picture effects</source>
+        <translation>Görüntü efektleri</translation>
+    </message>
+    <message>
+        <source>Turn all picture effects off</source>
+        <translation>Tüm görüntü efektlerini kapat</translation>
+    </message>
+    <message>
+        <source>Reduce noise (%)</source>
+        <translation>Gürültüyü azalt (%)</translation>
+    </message>
+    <message>
+        <source>Smooths grain and speckles, e.g. in dark phone videos, and keeps edges sharp</source>
+        <translation>Karanlık telefon videolarındaki karıncalanmayı ve lekeleri yumuşatır, kenarları keskin tutar</translation>
+    </message>
+    <message>
+        <source>Sharpen (%)</source>
+        <translation>Keskinleştir (%)</translation>
+    </message>
+    <message>
+        <source>Blur (%)</source>
+        <translation>Bulanıklaştır (%)</translation>
+    </message>
+    <message>
+        <source>Vignette (%)</source>
+        <translation>Vinyet (%)</translation>
+    </message>
+    <message>
+        <source>Darkens the corners</source>
+        <translation>Köşeleri koyulaştırır</translation>
+    </message>
+    <message>
+        <source>Film grain (%)</source>
+        <translation>Film greni (%)</translation>
+    </message>
+    <message>
+        <source>Sound tools…</source>
+        <translation>Ses araçları…</translation>
+    </message>
+    <message>
+        <source>Opens the Sound workspace: noise reduction, equaliser, compressor, ducking</source>
+        <translation>Ses çalışma alanını açar: gürültü azaltma, ekolayzır, kompresör, otomatik kısma</translation>
+    </message>
+    <message>
+        <source>Title template</source>
+        <translation>Başlık şablonu</translation>
+    </message>
+    <message>
+        <source>Slow motion options</source>
+        <translation>Ağır çekim seçenekleri</translation>
+    </message>
+    <message>
+        <source>Remove filter</source>
+        <translation>Filtreyi kaldır</translation>
+    </message>
+    <message>
+        <source>Apply filter</source>
+        <translation>Filtre uygula</translation>
+    </message>
+    <message>
+        <source>Filter strength</source>
+        <translation>Filtre gücü</translation>
+    </message>
+    <message>
+        <source>Turn off green screen</source>
+        <translation>Yeşil perdeyi kapat</translation>
+    </message>
+    <message>
+        <source>Key tolerance</source>
+        <translation>Perde toleransı</translation>
+    </message>
+    <message>
+        <source>Key edge softness</source>
+        <translation>Perde kenar yumuşaklığı</translation>
+    </message>
+    <message>
+        <source>Remove colour spill</source>
+        <translation>Renk taşmasını gider</translation>
+    </message>
+    <message>
+        <source>Reduce noise</source>
+        <translation>Gürültüyü azalt</translation>
+    </message>
+    <message>
+        <source>Sharpen</source>
+        <translation>Keskinleştir</translation>
+    </message>
+    <message>
+        <source>Vignette</source>
+        <translation>Vinyet</translation>
+    </message>
+    <message>
+        <source>Film grain</source>
+        <translation>Film greni</translation>
+    </message>
+    <message>
+        <source>Turn off picture effects</source>
+        <translation>Görüntü efektlerini kapat</translation>
+    </message>
+    <message>
+        <source>Change speed</source>
+        <translation>Hızı değiştir</translation>
+    </message>
+    <message>
+        <source>Select a clip on the timeline to change it, or a file to see its details.</source>
+        <translation>Değiştirmek için zaman çizelgesinde bir klip, ayrıntılarını görmek için bir dosya seçin.</translation>
+    </message>
+    <message>
+        <source>Missing media</source>
+        <translation>Eksik medya</translation>
+    </message>
+    <message>
+        <source>%1 of footage plays in %2.</source>
+        <translation>%1 uzunluğundaki görüntü %2 içinde oynar.</translation>
+    </message>
+    <message>
+        <source>Playing backwards can make the preview slower.</source>
+        <translation>Tersten oynatma önizlemeyi yavaşlatabilir.</translation>
+    </message>
 </context>
 <context>
     <name>lumora::ScopesWidget</name>
@@ -3739,6 +4293,10 @@ Orijinal dosya asla değişmez: düzenlemeler projede saklanır ve dışa aktar�
         <source>Freeze frame</source>
         <translation>Dondurulmuş kare</translation>
     </message>
+    <message>
+        <source>ramp</source>
+        <translation>rampa</translation>
+    </message>
 </context>
 <context>
     <name>lumora::Updater</name>
@@ -3934,6 +4492,1088 @@ Orijinal dosya asla değişmez: düzenlemeler projede saklanır ve dışa aktar�
     <message>
         <source>Speech recognition failed.</source>
         <translation>Konuşma tanıma başarısız oldu.</translation>
+    </message>
+</context>
+<context>
+    <name>lumora::BatchPhoto</name>
+    <message>
+        <source>Cannot create the folder %1.</source>
+        <translation>%1 klasörü oluşturulamıyor.</translation>
+    </message>
+</context>
+<context>
+    <name>lumora::BatchPhotoDialog</name>
+    <message>
+        <source>Process many photos</source>
+        <translation>Çok sayıda fotoğrafı işle</translation>
+    </message>
+    <message>
+        <source>Resize, colour, mark and convert many photos in one go. New files are written; your originals are never changed.</source>
+        <translation>Çok sayıda fotoğrafı tek seferde yeniden boyutlandırın, renklendirin, işaretleyin ve dönüştürün. Yeni dosyalar yazılır; orijinal fotoğraflarınız asla değişmez.</translation>
+    </message>
+    <message>
+        <source>Photos</source>
+        <translation>Fotoğraflar</translation>
+    </message>
+    <message>
+        <source>Add photos…</source>
+        <translation>Fotoğraf ekle…</translation>
+    </message>
+    <message>
+        <source>Add folder…</source>
+        <translation>Klasör ekle…</translation>
+    </message>
+    <message>
+        <source>Remove</source>
+        <translation>Kaldır</translation>
+    </message>
+    <message>
+        <source>Size</source>
+        <translation>Boyut</translation>
+    </message>
+    <message>
+        <source>Keep the size</source>
+        <translation>Boyutu koru</translation>
+    </message>
+    <message>
+        <source>Longest side</source>
+        <translation>Uzun kenar</translation>
+    </message>
+    <message>
+        <source>Width</source>
+        <translation>Genişlik</translation>
+    </message>
+    <message>
+        <source>Height</source>
+        <translation>Yükseklik</translation>
+    </message>
+    <message>
+        <source>Percent</source>
+        <translation>Yüzde</translation>
+    </message>
+    <message>
+        <source>Resize</source>
+        <translation>Yeniden boyutlandır</translation>
+    </message>
+    <message>
+        <source> px</source>
+        <translation> px</translation>
+    </message>
+    <message>
+        <source>To</source>
+        <translation>Hedef</translation>
+    </message>
+    <message>
+        <source>Also make small photos bigger</source>
+        <translation>Küçük fotoğrafları da büyüt</translation>
+    </message>
+    <message>
+        <source>Colour</source>
+        <translation>Renk</translation>
+    </message>
+    <message>
+        <source>Automatic colour and light</source>
+        <translation>Otomatik renk ve ışık</translation>
+    </message>
+    <message>
+        <source>No filter</source>
+        <translation>Filtre yok</translation>
+    </message>
+    <message>
+        <source>Filter</source>
+        <translation>Filtre</translation>
+    </message>
+    <message>
+        <source>Watermark</source>
+        <translation>Filigran</translation>
+    </message>
+    <message>
+        <source>None</source>
+        <translation>Yok</translation>
+    </message>
+    <message>
+        <source>Text</source>
+        <translation>Yazı</translation>
+    </message>
+    <message>
+        <source>Picture (logo)</source>
+        <translation>Resim (logo)</translation>
+    </message>
+    <message>
+        <source>Mark</source>
+        <translation>İşaret</translation>
+    </message>
+    <message>
+        <source>© Your name</source>
+        <translation>© Adınız</translation>
+    </message>
+    <message>
+        <source>Text colour</source>
+        <translation>Yazı rengi</translation>
+    </message>
+    <message>
+        <source>A PNG with transparency works best</source>
+        <translation>En iyi sonucu saydam arka planlı bir PNG verir</translation>
+    </message>
+    <message>
+        <source>Choose…</source>
+        <translation>Seç…</translation>
+    </message>
+    <message>
+        <source>Bottom right</source>
+        <translation>Sağ alt</translation>
+    </message>
+    <message>
+        <source>Bottom left</source>
+        <translation>Sol alt</translation>
+    </message>
+    <message>
+        <source>Top right</source>
+        <translation>Sağ üst</translation>
+    </message>
+    <message>
+        <source>Top left</source>
+        <translation>Sol üst</translation>
+    </message>
+    <message>
+        <source>Centre</source>
+        <translation>Orta</translation>
+    </message>
+    <message>
+        <source>Place</source>
+        <translation>Yer</translation>
+    </message>
+    <message>
+        <source> % of the width</source>
+        <translation> % genişlik</translation>
+    </message>
+    <message>
+        <source>Opacity</source>
+        <translation>Opaklık</translation>
+    </message>
+    <message>
+        <source>Save as</source>
+        <translation>Farklı kaydet</translation>
+    </message>
+    <message>
+        <source>Same type as each photo</source>
+        <translation>Her fotoğrafın kendi türü</translation>
+    </message>
+    <message>
+        <source>JPEG — small, for sharing</source>
+        <translation>JPEG — küçük, paylaşmak için</translation>
+    </message>
+    <message>
+        <source>PNG — lossless</source>
+        <translation>PNG — kayıpsız</translation>
+    </message>
+    <message>
+        <source>WebP — small, for websites</source>
+        <translation>WebP — küçük, web siteleri için</translation>
+    </message>
+    <message>
+        <source>TIFF — lossless, for print</source>
+        <translation>TIFF — kayıpsız, baskı için</translation>
+    </message>
+    <message>
+        <source>File type</source>
+        <translation>Dosya türü</translation>
+    </message>
+    <message>
+        <source>Quality</source>
+        <translation>Kalite</translation>
+    </message>
+    <message>
+        <source>Folder</source>
+        <translation>Klasör</translation>
+    </message>
+    <message>
+        <source>{name} = the photo&apos;s name, {n} = number, {date} = date of the photo</source>
+        <translation>{name} = fotoğrafın adı, {n} = sıra numarası, {date} = fotoğrafın tarihi</translation>
+    </message>
+    <message>
+        <source>Name</source>
+        <translation>Ad</translation>
+    </message>
+    <message>
+        <source>Process photos</source>
+        <translation>Fotoğrafları işle</translation>
+    </message>
+    <message>
+        <source>Add photos</source>
+        <translation>Fotoğraf ekle</translation>
+    </message>
+    <message>
+        <source>Photos (%1)</source>
+        <translation>Fotoğraflar (%1)</translation>
+    </message>
+    <message>
+        <source>Watermark picture</source>
+        <translation>Filigran resmi</translation>
+    </message>
+    <message>
+        <source>Pictures (*.png *.jpg *.jpeg *.webp *.bmp)</source>
+        <translation>Resimler (*.png *.jpg *.jpeg *.webp *.bmp)</translation>
+    </message>
+    <message>
+        <source>Folder for the new photos</source>
+        <translation>Yeni fotoğrafların klasörü</translation>
+    </message>
+    <message>
+        <source>Add folder</source>
+        <translation>Klasör ekle</translation>
+    </message>
+    <message numerus="yes">
+        <source>%n photo(s)</source>
+        <translation>
+            <numerusform>%n fotoğraf</numerusform>
+        </translation>
+    </message>
+    <message>
+        <source>For example: %1</source>
+        <translation>Örnek: %1</translation>
+    </message>
+    <message>
+        <source>Leave the folder empty to save next to each photo.</source>
+        <translation>Her fotoğrafın yanına kaydetmek için klasörü boş bırakın.</translation>
+    </message>
+    <message>
+        <source>Add the photos to change first.</source>
+        <translation>Önce değiştirilecek fotoğrafları ekleyin.</translation>
+    </message>
+    <message>
+        <source>Choose the watermark picture.</source>
+        <translation>Filigran resmini seçin.</translation>
+    </message>
+    <message numerus="yes">
+        <source>%n file(s) with these names already exist. Replace them?</source>
+        <translation>
+            <numerusform>Bu adlarla %n dosya zaten var. Üzerine yazılsın mı?</numerusform>
+        </translation>
+    </message>
+    <message>
+        <source>Processing photos…</source>
+        <translation>Fotoğraflar işleniyor…</translation>
+    </message>
+    <message numerus="yes">
+        <source>%n photo(s) saved.</source>
+        <translation>
+            <numerusform>%n fotoğraf kaydedildi.</numerusform>
+        </translation>
+    </message>
+    <message>
+        <source>Open folder</source>
+        <translation>Klasörü aç</translation>
+    </message>
+</context>
+<context>
+    <name>lumora::CollageDialog</name>
+    <message>
+        <source>Video collage</source>
+        <translation>Video kolaj</translation>
+    </message>
+    <message>
+        <source>Choose a layout and the videos or pictures for it. Each one goes on its own track at the playhead, cut to fit its cell; afterwards every clip can still be moved and changed.</source>
+        <translation>Bir yerleşim ve onun için videoları ya da resimleri seçin. Her biri oynatma imlecinde kendi izine konur ve hücresine sığacak şekilde kırpılır; sonra her klip yine taşınabilir ve değiştirilebilir.</translation>
+    </message>
+    <message>
+        <source>Layout</source>
+        <translation>Yerleşim</translation>
+    </message>
+    <message>
+        <source>Videos and pictures</source>
+        <translation>Videolar ve resimler</translation>
+    </message>
+    <message>
+        <source>Tick what goes in the collage; drag to change the order</source>
+        <translation>Kolaja girecekleri işaretleyin; sırayı değiştirmek için sürükleyin</translation>
+    </message>
+    <message>
+        <source>Add files…</source>
+        <translation>Dosya ekle…</translation>
+    </message>
+    <message>
+        <source>Space between the cells; what is on the tracks below shows through</source>
+        <translation>Hücreler arasındaki boşluk; alttaki izlerde ne varsa arada görünür</translation>
+    </message>
+    <message>
+        <source>Space between</source>
+        <translation>Aradaki boşluk</translation>
+    </message>
+    <message>
+        <source> s</source>
+        <translation> sn</translation>
+    </message>
+    <message>
+        <source>How long the collage lasts when it holds only pictures; with videos it lasts as long as the shortest one</source>
+        <translation>Kolajda yalnızca resim varsa ne kadar süreceği; videolarla en kısa video kadar sürer</translation>
+    </message>
+    <message>
+        <source>Length with pictures only</source>
+        <translation>Yalnızca resimle süre</translation>
+    </message>
+    <message>
+        <source>Sound of the first video</source>
+        <translation>İlk videonun sesi</translation>
+    </message>
+    <message>
+        <source>Sound of every video</source>
+        <translation>Tüm videoların sesi</translation>
+    </message>
+    <message>
+        <source>No sound</source>
+        <translation>Ses yok</translation>
+    </message>
+    <message>
+        <source>Sound</source>
+        <translation>Ses</translation>
+    </message>
+    <message>
+        <source>Make collage</source>
+        <translation>Kolajı yap</translation>
+    </message>
+    <message>
+        <source>Tick at least one video or picture.</source>
+        <translation>En az bir video ya da resim işaretleyin.</translation>
+    </message>
+    <message>
+        <source>Add files</source>
+        <translation>Dosya ekle</translation>
+    </message>
+    <message>
+        <source>Pictures and videos (%1)</source>
+        <translation>Resimler ve videolar (%1)</translation>
+    </message>
+    <message>
+        <source>These files could not be opened:
+%1</source>
+        <translation>Bu dosyalar açılamadı:
+%1</translation>
+    </message>
+    <message>
+        <source>%1 of %2 cells (the rest are left out)</source>
+        <translation>%1 / %2 hücre (fazlası dışarıda kalır)</translation>
+    </message>
+    <message>
+        <source>%1 of %2 cells</source>
+        <translation>%1 / %2 hücre</translation>
+    </message>
+</context>
+<context>
+    <name>lumora::CollapsibleSection</name>
+    <message>
+        <source>Changed</source>
+        <translation>Değişti</translation>
+    </message>
+</context>
+<context>
+    <name>lumora::GifDialog</name>
+    <message>
+        <source>Save as GIF</source>
+        <translation>GIF olarak kaydet</translation>
+    </message>
+    <message>
+        <source>A short moving picture that plays everywhere: in messages, on websites and in documents. GIF has only 256 colours, so keep it short and small.</source>
+        <translation>Her yerde oynayan kısa, hareketli bir resim: mesajlarda, web sitelerinde ve belgelerde. GIF&apos;te yalnızca 256 renk vardır; kısa ve küçük tutun.</translation>
+    </message>
+    <message>
+        <source>Whole video</source>
+        <translation>Tüm video</translation>
+    </message>
+    <message>
+        <source>Selected clips</source>
+        <translation>Seçili klipler</translation>
+    </message>
+    <message>
+        <source>From – to</source>
+        <translation>Başlangıç – bitiş</translation>
+    </message>
+    <message>
+        <source>Part</source>
+        <translation>Bölüm</translation>
+    </message>
+    <message>
+        <source> s</source>
+        <translation> sn</translation>
+    </message>
+    <message>
+        <source>Time</source>
+        <translation>Zaman</translation>
+    </message>
+    <message>
+        <source>%1 pixels wide</source>
+        <translation>%1 piksel genişlik</translation>
+    </message>
+    <message>
+        <source>Size</source>
+        <translation>Boyut</translation>
+    </message>
+    <message>
+        <source>%1 pictures per second</source>
+        <translation>Saniyede %1 kare</translation>
+    </message>
+    <message>
+        <source>Smoothness</source>
+        <translation>Akıcılık</translation>
+    </message>
+    <message>
+        <source>Fewer colours make a smaller file</source>
+        <translation>Daha az renk daha küçük dosya demektir</translation>
+    </message>
+    <message>
+        <source>Colours</source>
+        <translation>Renkler</translation>
+    </message>
+    <message>
+        <source>Smooth colour steps (dithering)</source>
+        <translation>Renk geçişlerini yumuşat (dithering)</translation>
+    </message>
+    <message>
+        <source>Mixes dots of nearby colours so skies and faces show no bands; the file gets a little bigger</source>
+        <translation>Gökyüzü ve yüzlerde bant oluşmasın diye yakın renklerden noktalar karıştırır; dosya biraz büyür</translation>
+    </message>
+    <message>
+        <source>Forever</source>
+        <translation>Sürekli</translation>
+    </message>
+    <message>
+        <source>Once</source>
+        <translation>Bir kez</translation>
+    </message>
+    <message>
+        <source>3 times</source>
+        <translation>3 kez</translation>
+    </message>
+    <message>
+        <source>Repeat</source>
+        <translation>Tekrar</translation>
+    </message>
+    <message>
+        <source>Save GIF…</source>
+        <translation>GIF&apos;i kaydet…</translation>
+    </message>
+    <message>
+        <source>%1 × %2, %3 s, about %4</source>
+        <translation>%1 × %2, %3 sn, yaklaşık %4</translation>
+    </message>
+    <message>
+        <source>Long GIFs get very big; a short part or an MP4 video is often better.</source>
+        <translation>Uzun GIF&apos;ler çok büyük olur; kısa bir bölüm ya da MP4 video çoğu zaman daha iyidir.</translation>
+    </message>
+    <message>
+        <source>Choose a part that is longer than zero.</source>
+        <translation>Sıfırdan uzun bir bölüm seçin.</translation>
+    </message>
+    <message>
+        <source>animation</source>
+        <translation>animasyon</translation>
+    </message>
+    <message>
+        <source>GIF animation (*.gif)</source>
+        <translation>GIF animasyonu (*.gif)</translation>
+    </message>
+    <message>
+        <source>Making the GIF…</source>
+        <translation>GIF hazırlanıyor…</translation>
+    </message>
+    <message>
+        <source>The GIF could not be saved: %1</source>
+        <translation>GIF kaydedilemedi: %1</translation>
+    </message>
+</context>
+<context>
+    <name>lumora::GifExport</name>
+    <message>
+        <source>This FFmpeg has no GIF encoder.</source>
+        <translation>Bu FFmpeg&apos;de GIF kodlayıcısı yok.</translation>
+    </message>
+    <message>
+        <source>Cannot start the GIF encoder: %1</source>
+        <translation>GIF kodlayıcısı başlatılamıyor: %1</translation>
+    </message>
+    <message>
+        <source>Cannot create the output file: %1</source>
+        <translation>Çıktı dosyası oluşturulamıyor: %1</translation>
+    </message>
+    <message>
+        <source>Cannot write %1: %2</source>
+        <translation>%1 yazılamıyor: %2</translation>
+    </message>
+    <message>
+        <source>Cannot write the file header: %1</source>
+        <translation>Dosya başlığı yazılamıyor: %1</translation>
+    </message>
+    <message>
+        <source>Out of memory.</source>
+        <translation>Bellek yetersiz.</translation>
+    </message>
+    <message>
+        <source>Cannot finish the file: %1</source>
+        <translation>Dosya tamamlanamıyor: %1</translation>
+    </message>
+    <message>
+        <source>GIF encoding failed: %1</source>
+        <translation>GIF kodlaması başarısız: %1</translation>
+    </message>
+    <message>
+        <source>Cannot write the file: %1</source>
+        <translation>Dosya yazılamıyor: %1</translation>
+    </message>
+    <message>
+        <source>The part to export is empty.</source>
+        <translation>Dışa aktarılacak bölüm boş.</translation>
+    </message>
+</context>
+<context>
+    <name>lumora::LiveWriter</name>
+    <message>
+        <source>Encoding failed: %1</source>
+        <translation>Kodlama başarısız: %1</translation>
+    </message>
+    <message>
+        <source>Cannot write the file: %1</source>
+        <translation>Dosya yazılamıyor: %1</translation>
+    </message>
+    <message>
+        <source>Cannot convert the picture.</source>
+        <translation>Resim dönüştürülemiyor.</translation>
+    </message>
+    <message>
+        <source>Out of memory.</source>
+        <translation>Bellek yetersiz.</translation>
+    </message>
+    <message>
+        <source>This FFmpeg has no H.264 encoder.</source>
+        <translation>Bu FFmpeg&apos;de H.264 kodlayıcısı yok.</translation>
+    </message>
+    <message>
+        <source>Cannot create the output file: %1</source>
+        <translation>Çıktı dosyası oluşturulamıyor: %1</translation>
+    </message>
+    <message>
+        <source>Cannot start the video encoder: %1</source>
+        <translation>Video kodlayıcısı başlatılamıyor: %1</translation>
+    </message>
+    <message>
+        <source>This FFmpeg has no AAC encoder.</source>
+        <translation>Bu FFmpeg&apos;de AAC kodlayıcısı yok.</translation>
+    </message>
+    <message>
+        <source>Cannot start the sound encoder: %1</source>
+        <translation>Ses kodlayıcısı başlatılamıyor: %1</translation>
+    </message>
+    <message>
+        <source>Cannot convert the sound.</source>
+        <translation>Ses dönüştürülemiyor.</translation>
+    </message>
+    <message>
+        <source>Cannot write %1: %2</source>
+        <translation>%1 yazılamıyor: %2</translation>
+    </message>
+    <message>
+        <source>Cannot write the file header: %1</source>
+        <translation>Dosya başlığı yazılamıyor: %1</translation>
+    </message>
+    <message>
+        <source>Cannot finish the file: %1</source>
+        <translation>Dosya tamamlanamıyor: %1</translation>
+    </message>
+</context>
+<context>
+    <name>lumora::LookGallery</name>
+    <message>
+        <source>None</source>
+        <translation>Yok</translation>
+    </message>
+</context>
+<context>
+    <name>lumora::MicCapture</name>
+    <message>
+        <source>No microphone found.</source>
+        <translation>Mikrofon bulunamadı.</translation>
+    </message>
+    <message>
+        <source>The microphone cannot record 16-bit sound.</source>
+        <translation>Mikrofon 16 bit ses kaydedemiyor.</translation>
+    </message>
+    <message>
+        <source>The microphone could not be opened.</source>
+        <translation>Mikrofon açılamadı.</translation>
+    </message>
+</context>
+<context>
+    <name>lumora::RenderSession</name>
+    <message>
+        <source>Export cancelled.</source>
+        <translation>Dışa aktarma iptal edildi.</translation>
+    </message>
+    <message>
+        <source>Could not finish the file: %1</source>
+        <translation>Dosya tamamlanamadı: %1</translation>
+    </message>
+    <message>
+        <source>Encoder %1 is not available.</source>
+        <translation>%1 kodlayıcısı kullanılamıyor.</translation>
+    </message>
+    <message>
+        <source>Cannot start the %1 encoder: %2</source>
+        <translation>%1 kodlayıcısı başlatılamıyor: %2</translation>
+    </message>
+    <message>
+        <source>Out of memory.</source>
+        <translation>Bellek yetersiz.</translation>
+    </message>
+    <message>
+        <source>Cannot create the output file: %1</source>
+        <translation>Çıktı dosyası oluşturulamıyor: %1</translation>
+    </message>
+    <message>
+        <source>Cannot write %1: %2</source>
+        <translation>%1 yazılamıyor: %2</translation>
+    </message>
+    <message>
+        <source>Cannot write the file header: %1</source>
+        <translation>Dosya başlığı yazılamıyor: %1</translation>
+    </message>
+    <message>
+        <source>Cannot open %1: %2</source>
+        <translation>%1 açılamıyor: %2</translation>
+    </message>
+    <message>
+        <source>%1 has no audio stream.</source>
+        <translation>%1 dosyasında ses akışı yok.</translation>
+    </message>
+    <message>
+        <source>Cannot create the audio converter.</source>
+        <translation>Ses dönüştürücü oluşturulamıyor.</translation>
+    </message>
+    <message>
+        <source>Loudness %1 LUFS, brought to %2 LUFS (%3 dB).</source>
+        <translation>Ses yüksekliği %1 LUFS, %2 LUFS&apos;a getirildi (%3 dB).</translation>
+    </message>
+    <message>
+        <source>Cannot convert the video frames.</source>
+        <translation>Video kareleri dönüştürülemiyor.</translation>
+    </message>
+    <message>
+        <source>Could not render the frame at %1 s.</source>
+        <translation>%1. saniyedeki kare oluşturulamadı.</translation>
+    </message>
+    <message>
+        <source>Video encoding failed: %1</source>
+        <translation>Video kodlaması başarısız: %1</translation>
+    </message>
+    <message>
+        <source>Write error: %1</source>
+        <translation>Yazma hatası: %1</translation>
+    </message>
+    <message>
+        <source>Out of memory while buffering audio.</source>
+        <translation>Ses arabelleğe alınırken bellek yetmedi.</translation>
+    </message>
+    <message>
+        <source>Audio encoding failed: %1</source>
+        <translation>Ses kodlaması başarısız: %1</translation>
+    </message>
+</context>
+<context>
+    <name>lumora::ScreenRecordDialog</name>
+    <message>
+        <source>Record the screen</source>
+        <translation>Ekranı kaydet</translation>
+    </message>
+    <message>
+        <source>Records everything on a screen, with your voice if you like, as a video in high quality. LumoraStudio steps aside while it records; press Stop on the small bar when done.</source>
+        <translation>Bir ekranda olan her şeyi, isterseniz sesinizle birlikte yüksek kaliteli video olarak kaydeder. Kayıt sırasında LumoraStudio kenara çekilir; bitince küçük çubuktaki Durdur düğmesine basın.</translation>
+    </message>
+    <message>
+        <source>Screen %1 (%2 × %3)</source>
+        <translation>Ekran %1 (%2 × %3)</translation>
+    </message>
+    <message>
+        <source>Screen</source>
+        <translation>Ekran</translation>
+    </message>
+    <message>
+        <source>30 pictures per second</source>
+        <translation>Saniyede 30 kare</translation>
+    </message>
+    <message>
+        <source>25 pictures per second</source>
+        <translation>Saniyede 25 kare</translation>
+    </message>
+    <message>
+        <source>15 pictures per second (smaller file)</source>
+        <translation>Saniyede 15 kare (daha küçük dosya)</translation>
+    </message>
+    <message>
+        <source>Smoothness</source>
+        <translation>Akıcılık</translation>
+    </message>
+    <message>
+        <source>Record my voice</source>
+        <translation>Sesimi kaydet</translation>
+    </message>
+    <message>
+        <source>Show the mouse pointer</source>
+        <translation>Fare imlecini göster</translation>
+    </message>
+    <message>
+        <source>Minimise LumoraStudio while recording</source>
+        <translation>Kayıt sırasında LumoraStudio&apos;yu simge durumuna küçült</translation>
+    </message>
+    <message>
+        <source>Start recording</source>
+        <translation>Kaydı başlat</translation>
+    </message>
+    <message>
+        <source>Recording without sound: %1</source>
+        <translation>Ses olmadan kaydediliyor: %1</translation>
+    </message>
+    <message>
+        <source>Screen recording</source>
+        <translation>Ekran kaydı</translation>
+    </message>
+    <message>
+        <source>The recording could not start: %1</source>
+        <translation>Kayıt başlatılamadı: %1</translation>
+    </message>
+    <message>
+        <source>Stop</source>
+        <translation>Durdur</translation>
+    </message>
+    <message>
+        <source>The recording could not be saved: %1</source>
+        <translation>Kayıt kaydedilemedi: %1</translation>
+    </message>
+</context>
+<context>
+    <name>lumora::VoiceoverDialog</name>
+    <message>
+        <source>No microphone found</source>
+        <translation>Mikrofon bulunamadı</translation>
+    </message>
+    <message>
+        <source>Record voice-over</source>
+        <translation>Sesli anlatım kaydet</translation>
+    </message>
+    <message>
+        <source>Speak over the video: the timeline plays from the playhead while you talk, and the recording goes on a sound track right there. Use headphones so the microphone does not pick up the video&apos;s sound.</source>
+        <translation>Videonun üzerine konuşun: siz konuşurken zaman çizelgesi oynatma imlecinden itibaren oynar ve kayıt tam oraya bir ses izine konur. Mikrofon videonun sesini almasın diye kulaklık kullanın.</translation>
+    </message>
+    <message>
+        <source>Microphone</source>
+        <translation>Mikrofon</translation>
+    </message>
+    <message>
+        <source>Level</source>
+        <translation>Seviye</translation>
+    </message>
+    <message>
+        <source>Play the video while recording (without its sound)</source>
+        <translation>Kayıt sırasında videoyu oynat (sesi olmadan)</translation>
+    </message>
+    <message>
+        <source>Count down 3 seconds first</source>
+        <translation>Önce 3 saniye geri say</translation>
+    </message>
+    <message>
+        <source>Ready.</source>
+        <translation>Hazır.</translation>
+    </message>
+    <message>
+        <source>Record</source>
+        <translation>Kaydet</translation>
+    </message>
+    <message>
+        <source>Stop</source>
+        <translation>Durdur</translation>
+    </message>
+    <message>
+        <source>Voice-over</source>
+        <translation>Sesli anlatım</translation>
+    </message>
+    <message>
+        <source>Cannot write %1.</source>
+        <translation>%1 yazılamıyor.</translation>
+    </message>
+    <message>
+        <source>Saved. Record again to add another take.</source>
+        <translation>Kaydedildi. Başka bir deneme eklemek için yeniden kaydedin.</translation>
+    </message>
+</context>
+<context>
+    <name>lumora::collage</name>
+    <message>
+        <source>Side by side</source>
+        <translation>Yan yana</translation>
+    </message>
+    <message>
+        <source>One above the other</source>
+        <translation>Üst üste</translation>
+    </message>
+    <message>
+        <source>Three columns</source>
+        <translation>Üç sütun</translation>
+    </message>
+    <message>
+        <source>One large, two small</source>
+        <translation>Bir büyük, iki küçük</translation>
+    </message>
+    <message>
+        <source>One on top, three below</source>
+        <translation>Üstte bir, altta üç</translation>
+    </message>
+    <message>
+        <source>Four squares</source>
+        <translation>Dört kare</translation>
+    </message>
+    <message>
+        <source>Six squares</source>
+        <translation>Altı kare</translation>
+    </message>
+    <message>
+        <source>Nine squares</source>
+        <translation>Dokuz kare</translation>
+    </message>
+</context>
+<context>
+    <name>lumora::encoders</name>
+    <message>
+        <source>FFV1 (lossless)</source>
+        <translation>FFV1 (kayıpsız)</translation>
+    </message>
+    <message>
+        <source>x264 (software)</source>
+        <translation>x264 (yazılım)</translation>
+    </message>
+    <message>
+        <source>x265 (software)</source>
+        <translation>x265 (yazılım)</translation>
+    </message>
+    <message>
+        <source>SVT-AV1 (software)</source>
+        <translation>SVT-AV1 (yazılım)</translation>
+    </message>
+    <message>
+        <source>libaom (software, slow)</source>
+        <translation>libaom (yazılım, yavaş)</translation>
+    </message>
+    <message>
+        <source>libvpx (software)</source>
+        <translation>libvpx (yazılım)</translation>
+    </message>
+    <message>
+        <source>%1 (software)</source>
+        <translation>%1 (yazılım)</translation>
+    </message>
+    <message>
+        <source>%1 has no constant bit rate mode; a variable bit rate with the same average is used.</source>
+        <translation>%1 sabit bit hızı kipine sahip değil; aynı ortalamayla değişken bit hızı kullanılır.</translation>
+    </message>
+    <message>
+        <source>%1 cannot limit the peak bit rate in this mode; only the average is kept.</source>
+        <translation>%1 bu kipte en yüksek bit hızını sınırlayamıyor; yalnızca ortalama korunur.</translation>
+    </message>
+    <message>
+        <source>YouTube 1080p</source>
+        <translation>YouTube 1080p</translation>
+    </message>
+    <message>
+        <source>YouTube 4K</source>
+        <translation>YouTube 4K</translation>
+    </message>
+    <message>
+        <source>Instagram Reels / Stories (9:16)</source>
+        <translation>Instagram Reels / Hikâyeler (9:16)</translation>
+    </message>
+    <message>
+        <source>Instagram feed (4:5)</source>
+        <translation>Instagram akışı (4:5)</translation>
+    </message>
+    <message>
+        <source>TikTok (9:16)</source>
+        <translation>TikTok (9:16)</translation>
+    </message>
+    <message>
+        <source>X (Twitter)</source>
+        <translation>X (Twitter)</translation>
+    </message>
+    <message>
+        <source>Archive (HEVC 10-bit, original size)</source>
+        <translation>Arşiv (HEVC 10 bit, orijinal boyut)</translation>
+    </message>
+    <message>
+        <source>Apple ProRes 422 HQ (editing)</source>
+        <translation>Apple ProRes 422 HQ (kurgu için)</translation>
+    </message>
+    <message>
+        <source>Avid DNxHR HQ (editing)</source>
+        <translation>Avid DNxHR HQ (kurgu için)</translation>
+    </message>
+</context>
+<context>
+    <name>lumora::looks</name>
+    <message>
+        <source>Vivid</source>
+        <translation>Canlı</translation>
+    </message>
+    <message>
+        <source>Warm</source>
+        <translation>Sıcak</translation>
+    </message>
+    <message>
+        <source>Cool</source>
+        <translation>Soğuk</translation>
+    </message>
+    <message>
+        <source>Cinematic</source>
+        <translation>Sinematik</translation>
+    </message>
+    <message>
+        <source>Golden hour</source>
+        <translation>Altın saat</translation>
+    </message>
+    <message>
+        <source>Fresh</source>
+        <translation>Ferah</translation>
+    </message>
+    <message>
+        <source>Dramatic</source>
+        <translation>Dramatik</translation>
+    </message>
+    <message>
+        <source>Faded</source>
+        <translation>Soluk</translation>
+    </message>
+    <message>
+        <source>Matte</source>
+        <translation>Mat</translation>
+    </message>
+    <message>
+        <source>Vintage</source>
+        <translation>Eski tarz</translation>
+    </message>
+    <message>
+        <source>Pastel</source>
+        <translation>Pastel</translation>
+    </message>
+    <message>
+        <source>Night</source>
+        <translation>Gece</translation>
+    </message>
+    <message>
+        <source>Sepia</source>
+        <translation>Sepya</translation>
+    </message>
+    <message>
+        <source>Black and white</source>
+        <translation>Siyah beyaz</translation>
+    </message>
+    <message>
+        <source>Noir</source>
+        <translation>Kara film</translation>
+    </message>
+</context>
+<context>
+    <name>lumora::titles</name>
+    <message>
+        <source>Headline</source>
+        <translation>Manşet</translation>
+    </message>
+    <message>
+        <source>Big moment</source>
+        <translation>Büyük an</translation>
+    </message>
+    <message>
+        <source>Lower third</source>
+        <translation>Alt bilgi bandı</translation>
+    </message>
+    <message>
+        <source>Name Surname
+Title</source>
+        <translation>Ad Soyad
+Unvan</translation>
+    </message>
+    <message>
+        <source>News band</source>
+        <translation>Haber bandı</translation>
+    </message>
+    <message>
+        <source>BREAKING: something happened</source>
+        <translation>SON DAKİKA: bir şey oldu</translation>
+    </message>
+    <message>
+        <source>Cinema</source>
+        <translation>Sinema</translation>
+    </message>
+    <message>
+        <source>A film by</source>
+        <translation>Bir filmi</translation>
+    </message>
+    <message>
+        <source>Chapter</source>
+        <translation>Bölüm</translation>
+    </message>
+    <message>
+        <source>Chapter 1</source>
+        <translation>Bölüm 1</translation>
+    </message>
+    <message>
+        <source>Quote</source>
+        <translation>Alıntı</translation>
+    </message>
+    <message>
+        <source>“A good quote”</source>
+        <translation>“Güzel bir söz”</translation>
+    </message>
+    <message>
+        <source>Social tag</source>
+        <translation>Sosyal etiket</translation>
+    </message>
+    <message>
+        <source>@username</source>
+        <translation>@kullaniciadi</translation>
+    </message>
+    <message>
+        <source>Neon</source>
+        <translation>Neon</translation>
+    </message>
+    <message>
+        <source>Tonight</source>
+        <translation>Bu gece</translation>
+    </message>
+    <message>
+        <source>Framed</source>
+        <translation>Çerçeveli</translation>
+    </message>
+    <message>
+        <source>Summer 2026</source>
+        <translation>Yaz 2026</translation>
+    </message>
+    <message>
+        <source>Typewriter</source>
+        <translation>Daktilo</translation>
+    </message>
+    <message>
+        <source>Once upon a time...</source>
+        <translation>Bir varmış bir yokmuş...</translation>
+    </message>
+    <message>
+        <source>Minimal</source>
+        <translation>Sade</translation>
+    </message>
+    <message>
+        <source>simple and clean</source>
+        <translation>sade ve temiz</translation>
+    </message>
+    <message>
+        <source>Thank you</source>
+        <translation>Teşekkürler</translation>
+    </message>
+    <message>
+        <source>Thanks for watching</source>
+        <translation>İzlediğiniz için teşekkürler</translation>
     </message>
 </context>
 </TS>

@@ -172,6 +172,10 @@ QJsonObject ColorGrade::toJson() const {
         o["lut"] = lutPath;
         o["lutAmount"] = lutAmount;
     }
+    if (!look.isEmpty()) {
+        o["look"] = look;
+        o["lookAmount"] = lookAmount;
+    }
     return o;
 }
 
@@ -194,6 +198,8 @@ ColorGrade ColorGrade::fromJson(const QJsonObject& o) {
     g.curveBlue = ToneCurve::fromJson(c.value("blue").toArray());
     g.lutPath = o.value("lut").toString();
     g.lutAmount = o.value("lutAmount").toDouble(1.0);
+    g.look = o.value("look").toString();
+    g.lookAmount = o.value("lookAmount").toDouble(1.0);
     return g;
 }
 

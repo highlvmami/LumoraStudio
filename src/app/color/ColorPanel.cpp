@@ -16,7 +16,9 @@
 #include <QVBoxLayout>
 
 #include "Icons.h"
+#include "color/AutoColor.h"
 #include "color/ColorProcessor.h"
+#include "color/LookGallery.h"
 #include "color/ColorWheelWidget.h"
 #include "color/CurvesWidget.h"
 #include "color/Lut.h"
@@ -68,6 +70,19 @@ ColorPanel::ColorPanel(QWidget* parent) : QWidget(parent) {
     auto* rl = new QVBoxLayout(m_body);
     rl->setContentsMargins(0, 0, 0, 0);
     outer->addWidget(m_body);
+
+    auto* filters = new QGroupBox(tr("Filters"));
+    auto* fl = new QVBoxLayout(filters);
+    m_auto = new QPushButton(Icons::smart(), tr("Auto colour and light"));
+    m_auto->setToolTip(tr("Measures the picture and sets exposure, contrast and white balance so it looks natural"));
+    fl->addWidget(m_auto);
+    m_looks = new LookGallery;
+    m_looks->setToolTip(tr("Ready-made looks; all settings below can still be changed"));
+    fl->addWidget(m_looks);
+    m_lookAmount = new SliderRow(tr("Filter strength (%)"), 0, 100, 1, 0);
+    m_lookAmount->setDefault(100);
+    fl->addWidget(m_lookAmount);
+    rl->addWidget(filters);
 
     auto* light = new QGroupBox(tr("Light"));
     auto* lightL = new QVBoxLayout(light);
@@ -231,6 +246,19 @@ ColorPanel::ColorPanel(QWidget* parent) : QWidget(parent) {
         });
     });
     connect(m_saveLut, &QPushButton::clicked, this, &ColorPanel::saveLookAsLut);
+    connect(m_looks, &LookGallery::lookChosen, this, [this](const QString& id) {
+        edit(id.isEmpty() ? tr("Remove filter") : tr("Apply filter"), QString(), [&](ColorGrade& g) {
+            g.look = id;
+            if (g.lookAmount <= 0.0)
+                g.lookAmount = 1.0;
+        });
+    });
+    connect(m_lookAmount, &SliderRow::valueChanged, this, [this](double v) {
+        edit(tr("Filter strength"), QStringLiteral("lookAmount"), [&](ColorGrade& g) { g.lookAmount = v / 100.0; });
+    });
+    connect(m_auto, &QPushButton::clicked, this, [this] {
+        edit(tr("Auto colour and light"), QString(), [&](ColorGrade& g) { g = autoCorrect(m_preview, g); });
+    });
     connect(m_reset, &QToolButton::clicked, this, [this] {
         edit(tr("Reset colour"), QString(), [](ColorGrade& g) { g = ColorGrade{}; });
     });
@@ -240,6 +268,12 @@ ColorPanel::ColorPanel(QWidget* parent) : QWidget(parent) {
 void ColorPanel::setHeader(const QString& text) {
     m_header->setText(text);
     m_header->setVisible(!text.isEmpty());
+}
+
+void ColorPanel::setPreviewImage(const QImage& image) {
+    m_preview = image;
+    m_looks->setPreviewImage(image);
+    m_auto->setEnabled(!image.isNull());
 }
 
 void ColorPanel::setEditable(bool on) {
@@ -278,6 +312,9 @@ void ColorPanel::setGrade(const ColorGrade& g) {
     showHslBand(m_hslBand);
     m_lutAmount->setValue(g.lutAmount * 100.0);
     m_lutAmount->setEnabled(!g.lutPath.isEmpty());
+    m_looks->setCurrentLook(g.look);
+    m_lookAmount->setValue(g.lookAmount * 100.0);
+    m_lookAmount->setEnabled(!g.look.isEmpty());
     refreshLutCombo();
     m_syncing = false;
 }

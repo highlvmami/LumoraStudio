@@ -67,6 +67,11 @@ private:
     void mixRaw(std::int64_t start, int frames, float* out);
     // `n` processed media samples of a clip starting at media sample `from`.
     void readVoice(const Clip& clip, Source* src, std::int64_t from, int n, float* dst);
+    // `n` unprocessed samples of a clip starting at source sample `from`
+    // (zeros before the media); speed changes are applied here.
+    void readSource(const Clip& clip, Source* src, std::int64_t from, int n, float* dst);
+    void readVarispeed(const Clip& clip, Source* src, std::int64_t from, int n, float* dst);
+    void readStretched(const Clip& clip, Source* src, std::int64_t from, int n, float* dst);
 
     const MediaPool* m_pool;
     int m_rate;

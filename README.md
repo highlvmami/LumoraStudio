@@ -22,6 +22,16 @@ Açık tema ("Gündüz", Görünüm → Tema):
 
 Tam yol haritası: [docs/ozellikler.md](docs/ozellikler.md). Mimari: [docs/mimari.md](docs/mimari.md).
 
+## Sürüm 0.7.0: hız, efektler, filtreler ve araçlar
+
+- **Yeni Özellikler paneli:** sağdaki panel sekmelere ayrıldı (Düzenle, Efektler, Akıllı, Ses, Bilgi); bölümler açılıp kapanır, değişen bölümde nokta ve sıfırlama düğmesi çıkar, dar panelde hiçbir şey kesilmez.
+- **Hız:** 0,05× ile 20× arası hız, **ters oynatma**, **hız rampası** (kahraman, mermi, montaj…), **akıcı ağır çekim** (optik akışla ara kare üretir) ve sesin tonunu koruyarak hızlandırma.
+- **Yeşil perde** (perde rengini önizlemeden seçme ile), **gürültü azaltma**, keskinleştirme, bulanıklık, vinyet, film greni, kırpma.
+- **15 hazır renk filtresi** ve **otomatik renk ve ışık** (videoda, Renk çalışma alanında ve fotoğrafta).
+- **11 yeni geçiş** (itme, daire, saat, kapılar, flaş, piksel, döndürme, bozulma, yakınlaşma bulanıklığı…) ve **12 hazır başlık şablonu**.
+- **Araçlar menüsü:** ekran kaydı (isteğe bağlı mikrofonla), sesli anlatım kaydı, video kolaj, GIF olarak kaydet, çok sayıda fotoğrafı tek seferde işle (boyut, renk, filigran, format, ad).
+- Nasıl kullanılır kitapçığına **Hız ve efektler** ile **Araçlar** sayfaları eklendi.
+
 ## Sürüm 0.6.8: önizleme sesi hoparlörü takip eder
 
 - Önizleme sesi artık Windows'ta seçili ses çıkışını takip ediyor. Program açıkken kulaklık ya da Bluetooth takılıp çıkarılırsa veya başka bir hoparlör seçilirse ses kaybolmuyor, yeni çıkıştan devam ediyor.

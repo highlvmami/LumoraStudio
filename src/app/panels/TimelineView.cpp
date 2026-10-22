@@ -2,6 +2,7 @@
 
 #include <QContextMenuEvent>
 #include <QFileInfo>
+#include <QLocale>
 #include <QMenu>
 #include <QMimeData>
 #include <QPainter>
@@ -464,7 +465,7 @@ void TimelineView::paintClip(QPainter& p, const Clip& c, int track, const QRect&
             }
         }
         // Key frame marks: where a lossless cut can start exactly.
-        if (track == 0 && c.kind == ClipKind::Media && media && media->hasKeyframes()) {
+        if (track == 0 && c.kind == ClipKind::Media && !c.hasSpeedChange() && media && media->hasKeyframes()) {
             const auto kf = media->keyframesCopy();
             const double spacing = kf.size() > 1 ? ticksToSeconds(kf[1] - kf[0]) * m_pps : 100;
             if (spacing > 6) {
@@ -490,7 +491,9 @@ void TimelineView::paintClip(QPainter& p, const Clip& c, int track, const QRect&
         wave.moveTo(x0, mid);
         std::vector<QPointF> lower;
         for (int x = x0; x <= x1; x += 2) {
-            const Ticks t0 = c.toSource(timeAt(x)), t1 = c.toSource(timeAt(x + 2));
+            Ticks t0 = c.mediaTime(timeAt(x)), t1 = c.mediaTime(timeAt(x + 2));
+            if (t1 < t0)
+                std::swap(t0, t1); // backwards
             const size_t a = static_cast<size_t>(std::max<Ticks>(0, t0) * MediaCache::kPeaksPerSecond / kTicksPerSecond);
             const size_t b = std::max(
                 a + 1, static_cast<size_t>(std::max<Ticks>(0, t1) * MediaCache::kPeaksPerSecond / kTicksPerSecond));
@@ -539,6 +542,14 @@ void TimelineView::paintClip(QPainter& p, const Clip& c, int track, const QRect&
     name += QStringLiteral("  ·  ") + formatSeconds(c.duration());
     if (c.loops())
         name += QStringLiteral("  ·  ↻");
+    if (c.hasSpeedChange()) {
+        QString speed = c.remap.ramp.empty() ? QStringLiteral("%1×").arg(QLocale().toString(c.remap.speed, 'g', 3)) : tr("ramp");
+        if (c.remap.reverse)
+            speed = QStringLiteral("◀ ") + speed;
+        name += QStringLiteral("  ·  ") + speed;
+    }
+    if (!c.effects.isIdentity())
+        name += QStringLiteral("  ·  ✦");
     if (!video && c.gainDb != 0.0)
         name += QStringLiteral("  ·  %1%2 dB").arg(c.gainDb > 0 ? QStringLiteral("+") : QString()).arg(c.gainDb, 0, 'f', 1);
     if (!c.transform.isIdentity())
@@ -844,7 +855,9 @@ void TimelineView::mouseMoveEvent(QMouseEvent* e) {
         if (!c)
             break;
         auto media = m_pool->find(c->mediaId);
-        const Ticks limit = c->kind != ClipKind::Media ? kNoMediaLimit : media ? media->info.duration : c->sourceOut;
+        const Ticks limit = c->kind != ClipKind::Media ? kNoMediaLimit
+                            : c->hasSpeedChange() ? c->remap.length
+                            : media ? media->info.duration : c->sourceOut;
         const Ticks delta = snapToFrame(ticksFromSeconds((pos.x() - m_pressPos.x()) / m_pps), m_timeline->frameRate());
         if (m_drag == Drag::TrimIn)
             m_timeline->trimIn(m_dragClip, m_dragSourceStart + delta);

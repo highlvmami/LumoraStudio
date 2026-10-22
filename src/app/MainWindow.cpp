@@ -74,6 +74,11 @@
 #include "render/FrameRenderer.h"
 #include "timeline/Subtitles.h"
 #include "undo/TimelineCommands.h"
+#include "render/Collage.h"
+#include "tools/BatchPhotoDialog.h"
+#include "tools/CollageDialog.h"
+#include "tools/GifDialog.h"
+#include "tools/Recorders.h"
 
 namespace lumora {
 
@@ -123,7 +128,13 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
     connect(m_properties, &PropertiesPanel::trackRequested, this, &MainWindow::trackClip);
     connect(m_properties, &PropertiesPanel::redactRequested, this, &MainWindow::redactClip);
     connect(m_properties, &PropertiesPanel::backgroundRequested, this, &MainWindow::removeBackground);
+    connect(m_properties, &PropertiesPanel::keyColorPickRequested, this, &MainWindow::pickKeyColor);
+    connect(m_properties, &PropertiesPanel::colorWorkspaceRequested, this, [this] { setWorkspace(Workspace::Color); });
+    connect(m_properties, &PropertiesPanel::soundWorkspaceRequested, this, [this] { setWorkspace(Workspace::Audio); });
+    m_properties->setThumbnailProvider([this](const QUuid& id) { return m_cache->thumbnail(id); });
     m_clipColor = new ClipColorPanel(m_project, m_videoUndo);
+    m_clipColor->setThumbnailProvider([this](const QUuid& id) { return m_cache->thumbnail(id); });
+    connect(m_cache, &MediaCache::thumbnailReady, m_clipColor, &ClipColorPanel::refresh);
     m_scopes = new ScopesWidget;
     m_audio = new AudioPanel(m_project, m_videoUndo);
 
@@ -228,6 +239,7 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
     connect(m_project->photos(), &PhotoLibrary::adjustmentsChanged, this, &MainWindow::markDirty);
     connect(m_project->photos(), &PhotoLibrary::added, this, &MainWindow::markDirty);
     connect(m_cache, &MediaCache::keyframesReady, m_properties, &PropertiesPanel::refresh);
+    connect(m_cache, &MediaCache::thumbnailReady, m_properties, &PropertiesPanel::refresh);
 
     connect(m_engine, &PlaybackEngine::positionChanged, this, [this](Ticks t) {
         updateTransformBox();
@@ -265,7 +277,7 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
         if (const Clip* c = m_project->timeline()->clip(id); c && c->hasMedia())
             if (auto media = m_project->media()->find(c->mediaId)) {
                 m_monitor->showSource(media);
-                m_engine->seek(c->kind == ClipKind::Freeze ? c->freezeTime : c->sourceIn);
+                m_engine->seek(c->mediaRange().first);
             }
     });
     connect(m_timelineView, &TimelineView::mediaDropped, this,
@@ -440,6 +452,17 @@ void MainWindow::createActions() {
     m_actFullScreenWindow->setCheckable(true);
     m_actHowTo = make(tr("&How to use"), QKeySequence::HelpContents, [this] { setWorkspace(Workspace::Help); });
     m_actHowTo->setToolTip(tr("Open the booklet that explains every part of LumoraStudio (F1)"));
+    m_actGif = make(tr("Save as &GIF…"), {}, &MainWindow::exportGif, Icons::exportFile());
+    m_actGif->setToolTip(tr("Save the video or a part of it as an animated GIF"));
+    m_actCollage = make(tr("Video &collage…"), {}, &MainWindow::makeCollage, Icons::collage());
+    m_actCollage->setToolTip(tr("Show several videos or pictures side by side in one frame"));
+    m_actBatchPhotos = make(tr("Process many &photos…"), {}, &MainWindow::batchPhotos, Icons::batch());
+    m_actBatchPhotos->setToolTip(tr("Resize, colour, watermark and convert many photos at once"));
+    m_actRecordScreen = make(tr("Record the &screen…"), {}, &MainWindow::recordScreen, Icons::screen());
+    m_actRecordScreen->setToolTip(tr("Record what happens on the screen, with your voice if you like"));
+    m_actRecordScreen->setEnabled(ScreenRecordDialog::available());
+    m_actVoiceover = make(tr("Record &voice-over…"), {}, &MainWindow::recordVoiceover, Icons::microphone());
+    m_actVoiceover->setToolTip(tr("Speak over the video while it plays; the recording goes on a sound track"));
 
     auto* tb = m_timelinePanel->toolBar();
     tb->addAction(m_actSplit);
@@ -465,6 +488,7 @@ void MainWindow::createMenus() {
     file->addSeparator();
     file->addAction(m_actExport);
     file->addAction(m_actExportFrame);
+    file->addAction(m_actGif);
     file->addAction(m_actExportPhoto);
     file->addSeparator();
     file->addAction(m_actQuit);
@@ -552,6 +576,15 @@ void MainWindow::createMenus() {
     panels->addAction(m_scopesDock->toggleViewAction());
     panels->addAction(m_audioDock->toggleViewAction());
     view->addAction(m_actResetLayout);
+
+    QMenu* tools = menuBar()->addMenu(tr("&Tools"));
+    tools->addAction(m_actRecordScreen);
+    tools->addAction(m_actVoiceover);
+    tools->addSeparator();
+    tools->addAction(m_actCollage);
+    tools->addAction(m_actGif);
+    tools->addSeparator();
+    tools->addAction(m_actBatchPhotos);
 
     QMenu* help = menuBar()->addMenu(tr("&Help"));
     help->addAction(m_actHowTo);
@@ -1467,7 +1500,7 @@ void MainWindow::stabilizeClip(const QUuid& clipId) {
     if (!c || c->kind != ClipKind::Media || !media || !media->info.video)
         return;
     const QString path = media->path;
-    const Ticks from = c->sourceIn, to = c->sourceOut;
+    const auto [from, to] = c->mediaRange();
     const auto camera = withProgress<std::vector<CameraSample>>(
         this, tr("Measuring the camera movement…"),
         [path, from, to](const motion::Progress& p) { return motion::analyzeCameraPath(path, from, to, p); });
@@ -1498,8 +1531,8 @@ void MainWindow::redactClip(const QUuid& clipId) {
         return;
     const QString path = media->path;
     // A freeze frame only needs its one picture.
-    const Ticks from = c->kind == ClipKind::Freeze ? c->freezeTime : c->sourceIn;
-    const Ticks to = c->kind == ClipKind::Freeze ? c->freezeTime + tl->frameDuration() : c->sourceOut;
+    const Ticks from = c->mediaRange().first;
+    const Ticks to = c->kind == ClipKind::Freeze ? c->freezeTime + tl->frameDuration() : c->mediaRange().second;
     const auto result = withProgress<ai::RedactionResult>(this, tr("Looking for faces and number plates…"),
                                                           [path, from, to](const TaskProgress& p) {
                                                               return ai::findRedactions(path, from, to, ai::RedactionOptions{}, p);
@@ -1582,6 +1615,249 @@ void MainWindow::trackClip(const QUuid& id) {
         disconnect(*cancelled);
     });
     view->startRegionPick(tr("Draw a box around the object to follow (Esc cancels)"));
+}
+
+void MainWindow::pickKeyColor(const QUuid& clipId) {
+    const Clip* c = m_project->timeline()->clip(clipId);
+    if (!c)
+        return;
+    if (m_monitor->mode() != MonitorPanel::Mode::Program)
+        m_monitor->showProgram(PlaybackSequence::fromTimeline(m_project->timeline()->state(), *m_project->media(),
+                                                              m_project->timeline()->frameRate()),
+                               true);
+    m_engine->pause();
+    const Ticks now = m_engine->position();
+    if (now < c->timelineStart || now >= c->timelineEnd())
+        m_engine->seek(c->timelineStart);
+    VideoView* view = m_monitor->view();
+    auto picked = std::make_shared<QMetaObject::Connection>();
+    auto cancelled = std::make_shared<QMetaObject::Connection>();
+    *picked = connect(view, &VideoView::regionPicked, this, [this, clipId, picked, cancelled](const QRectF& region) {
+        disconnect(*picked);
+        disconnect(*cancelled);
+        Timeline* tl = m_project->timeline();
+        const Clip* c = tl->clip(clipId);
+        if (!c)
+            return;
+        // Only this clip, with its green screen off, so the picked colour is
+        // the one in the clip itself.
+        TimelineState state = tl->state();
+        for (Track& track : state.tracks) {
+            const bool own = std::any_of(track.clips.begin(), track.clips.end(), [&](const Clip& x) { return x.id == clipId; });
+            track.hidden = !own;
+            for (Clip& x : track.clips)
+                if (x.id == clipId)
+                    x.effects.chromaKey.enabled = false;
+        }
+        FrameRenderer r(m_project->media());
+        r.setTimeline(state);
+        const QSize canvas = FrameRenderer::defaultCanvasSize(state, *m_project->media());
+        r.setCanvasSize(canvas);
+        const int w = std::min(640, canvas.width());
+        const QSize size(w, std::max(2, canvas.height() * w / std::max(1, canvas.width())));
+        r.setOutputSize(size);
+        r.setPrecision(FrameRenderer::Precision::Preview);
+        Ticks t = m_engine->position();
+        if (t < c->timelineStart || t >= c->timelineEnd())
+            t = c->timelineStart;
+        const QImage frame = r.render(t).convertToFormat(QImage::Format_ARGB32);
+        const QRect px = QRectF(region.x() * size.width(), region.y() * size.height(), region.width() * size.width(),
+                                region.height() * size.height())
+                             .toAlignedRect()
+                             .intersected(frame.rect());
+        double sum[3] = {0, 0, 0};
+        double n = 0;
+        for (int y = px.top(); y <= px.bottom(); ++y)
+            for (int x = px.left(); x <= px.right(); ++x) {
+                const QRgb p = frame.pixel(x, y);
+                const double a = qAlpha(p) / 255.0;
+                if (a <= 0)
+                    continue;
+                sum[0] += qRed(p) / a;
+                sum[1] += qGreen(p) / a;
+                sum[2] += qBlue(p) / a;
+                n += 1;
+            }
+        if (n <= 0)
+            return;
+        const QColor color(std::clamp(int(sum[0] / n + 0.5), 0, 255), std::clamp(int(sum[1] / n + 0.5), 0, 255),
+                           std::clamp(int(sum[2] / n + 0.5), 0, 255));
+        m_properties->setKeyColor(clipId, color);
+    });
+    *cancelled = connect(view, &VideoView::regionPickCancelled, this, [picked, cancelled] {
+        disconnect(*picked);
+        disconnect(*cancelled);
+    });
+    view->startRegionPick(tr("Draw a box over the screen behind the subject (Esc cancels)"));
+}
+
+void MainWindow::runTool(const QString& name) {
+    const std::pair<const char*, QAction*> tools[] = {{"gif", m_actGif},
+                                                      {"collage", m_actCollage},
+                                                      {"batch", m_actBatchPhotos},
+                                                      {"screen", m_actRecordScreen},
+                                                      {"voiceover", m_actVoiceover}};
+    for (const auto& [id, action] : tools)
+        if (name == QLatin1String(id))
+            action->trigger();
+}
+
+void MainWindow::exportGif() {
+    m_engine->pause();
+    Timeline* tl = m_project->timeline();
+    if (tl->isEmpty()) {
+        QMessageBox::information(this, tr("Save as GIF"), tr("The timeline is empty. Add a video first."));
+        return;
+    }
+    Ticks from = kInvalidTicks, to = kInvalidTicks;
+    for (const QUuid& id : m_timelineView->selection())
+        if (const Clip* c = tl->clip(id)) {
+            from = from == kInvalidTicks ? c->timelineStart : std::min(from, c->timelineStart);
+            to = to == kInvalidTicks ? c->timelineEnd() : std::max(to, c->timelineEnd());
+        }
+    GifDialog dlg(m_project, from == kInvalidTicks ? 0 : from, to == kInvalidTicks ? 0 : to, this);
+    if (dlg.exec() == QDialog::Accepted)
+        statusBar()->showMessage(tr("GIF saved to %1").arg(QDir::toNativeSeparators(dlg.savedPath())), 6000);
+}
+
+void MainWindow::makeCollage() {
+    m_engine->pause();
+    CollageDialog dlg(m_project, [this](const QUuid& id) { return m_cache->thumbnail(id); }, this);
+    if (dlg.exec() != QDialog::Accepted)
+        return;
+    const CollageLayout* layout = findCollageLayout(dlg.layoutId());
+    const QList<QUuid> ids = dlg.media();
+    if (!layout || ids.isEmpty())
+        return;
+    Timeline* tl = m_project->timeline();
+    const Ticks at = snapToFrame(m_engine->position(), tl->frameRate());
+    const int count = std::min<int>(ids.size(), int(layout->cells.size()));
+    // As long as the shortest video; pictures only: the chosen length.
+    Ticks length = 0;
+    for (int i = 0; i < count; ++i)
+        if (auto m = m_project->media()->find(ids[i]); m && m->info.kind != MediaKind::Image && m->info.duration > 0)
+            length = length == 0 ? m->info.duration : std::min(length, m->info.duration);
+    if (length == 0)
+        length = ticksFromSeconds(dlg.pictureSeconds());
+    const QSize canvas = FrameRenderer::defaultCanvasSize(tl->state(), *m_project->media());
+    const double frameAspect = canvas.height() > 0 ? double(canvas.width()) / canvas.height() : 16.0 / 9.0;
+    QList<QUuid> placed;
+    bool firstSound = true;
+    runTimelineEdit(m_videoUndo, tl, tr("Video collage"), [&] {
+        for (int i = 0; i < count; ++i) {
+            auto m = m_project->media()->find(ids[i]);
+            if (!m)
+                continue;
+            const bool still = m->info.kind == MediaKind::Image;
+            double aspect = 16.0 / 9.0;
+            if (still && m->info.imageHeight > 0) {
+                aspect = double(m->info.imageWidth) / m->info.imageHeight;
+            } else if (m->info.video && m->info.video->height > 0) {
+                const auto& v = *m->info.video;
+                aspect = double(v.width) / v.height;
+                if (v.sampleAspectRatio.num > 0 && v.sampleAspectRatio.den > 0)
+                    aspect *= double(v.sampleAspectRatio.num) / v.sampleAspectRatio.den;
+                if (v.rotation % 180 != 0)
+                    aspect = 1.0 / aspect;
+            }
+            const ClipTransform transform = collageTransform(layout->cells[i], aspect, frameAspect, dlg.gap());
+            const int target = freeOverlayTrack(at, length);
+            QUuid id;
+            if (still) {
+                id = tl->addStill(m->id, length, target, at, transform);
+            } else {
+                bool sound = m->info.audio.has_value();
+                if (dlg.sound() == CollageDialog::Sound::None || (dlg.sound() == CollageDialog::Sound::First && !firstSound))
+                    sound = false;
+                if (sound)
+                    firstSound = false;
+                id = tl->placeMedia(m->id, 0, length, true, sound, target, at);
+                if (!id.isNull())
+                    tl->setTransform(id, transform);
+            }
+            if (!id.isNull())
+                placed << id;
+        }
+        return !placed.isEmpty();
+    });
+    if (!placed.isEmpty()) {
+        m_timelineView->selectOnly(placed.front());
+        statusBar()->showMessage(tr("Collage of %n clip(s) added at the playhead.", nullptr, int(placed.size())), 5000);
+    }
+}
+
+void MainWindow::batchPhotos() {
+    QStringList files;
+    // The photos open in the Photo workspace, to start with.
+    for (const auto& e : m_project->photos()->entries())
+        files << e.path;
+    BatchPhotoDialog dlg(this, files);
+    dlg.exec();
+}
+
+void MainWindow::recordScreen() {
+    m_engine->pause();
+    auto* dlg = new ScreenRecordDialog(this);
+    dlg->setAttribute(Qt::WA_DeleteOnClose);
+    connect(dlg, &ScreenRecordDialog::recorded, this, [this](const QString& path) {
+        importFiles({path});
+        statusBar()->showMessage(tr("The screen recording is in your files: %1").arg(QDir::toNativeSeparators(path)), 8000);
+    });
+    dlg->open();
+}
+
+void MainWindow::recordVoiceover() {
+    if (m_monitor->mode() != MonitorPanel::Mode::Program)
+        m_monitor->showProgram(PlaybackSequence::fromTimeline(m_project->timeline()->state(), *m_project->media(),
+                                                              m_project->timeline()->frameRate()),
+                               true);
+    m_engine->pause();
+    const Ticks at = snapToFrame(m_engine->position(), m_project->timeline()->frameRate());
+    auto* dlg = new VoiceoverDialog(at, this);
+    dlg->setAttribute(Qt::WA_DeleteOnClose);
+    connect(dlg, &VoiceoverDialog::playRequested, this, [this](Ticks from, bool muted) {
+        m_engine->seek(from);
+        m_engine->setMuted(muted);
+        m_engine->play();
+    });
+    connect(dlg, &VoiceoverDialog::stopRequested, this, [this] {
+        m_engine->pause();
+        m_engine->setMuted(false);
+    });
+    connect(dlg, &QObject::destroyed, this, [this] { m_engine->setMuted(false); });
+    connect(dlg, &VoiceoverDialog::recorded, this, [this](const QString& path, Ticks from) {
+        QString err;
+        auto item = m_project->media()->import(path, &err);
+        if (!item) {
+            QMessageBox::warning(this, tr("Record voice-over"), tr("The recording could not be opened:\n\n%1").arg(err));
+            return;
+        }
+        Timeline* tl = m_project->timeline();
+        const Ticks length = item->info.duration;
+        QUuid id;
+        runTimelineEdit(m_videoUndo, tl, tr("Record voice-over"), [&] {
+            // The first sound track above A1 that is free there, else a new one.
+            int target = -1;
+            for (int ti : tl->state().trackIndices(TrackType::Audio)) {
+                if (ti == tl->state().trackIndices(TrackType::Audio).front() || tl->tracks()[ti].locked)
+                    continue;
+                bool free = true;
+                for (const auto& c : tl->tracks()[ti].clips)
+                    free &= c.timelineEnd() <= from || c.timelineStart >= from + length;
+                if (free) {
+                    target = ti;
+                    break;
+                }
+            }
+            if (target < 0)
+                target = tl->addTrack(TrackType::Audio);
+            id = tl->placeMedia(item->id, 0, length, false, true, target, from);
+            return !id.isNull();
+        });
+        if (!id.isNull())
+            m_timelineView->selectOnly(id);
+    });
+    dlg->show();
 }
 
 void MainWindow::deleteSelection() {

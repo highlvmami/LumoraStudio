@@ -137,6 +137,21 @@ QTabBar::tab:selected { color: @text; border-bottom: 2px solid @accent; }
 QTabBar::tab:hover { color: @text; }
 QTabWidget::pane { border: 1px solid @border; border-radius: 8px; top: -1px; }
 
+/* ---- Properties panel ---- */
+QTabBar#propertyTabs { background: transparent; }
+QTabBar#propertyTabs::tab { background: transparent; color: @textDim; padding: 5px 7px; margin: 2px 1px;
+    border: 1px solid transparent; border-radius: 8px; font-weight: 600; }
+QTabBar#propertyTabs::tab:hover { background: @raised; color: @text; }
+QTabBar#propertyTabs::tab:selected { background: @accentSoft; border-color: @accentLine; color: @text; }
+QWidget#propertySection { background: @groupFill; border-radius: 10px; }
+QToolButton#sectionHeader { font-weight: 600; text-align: left; border: none; border-radius: 8px; padding: 6px 4px; }
+QToolButton#sectionHeader:hover { background: @raised; }
+QToolButton#sectionHeader:checked { background: transparent; border: none; }
+QToolButton#sectionReset { border: none; padding: 2px; }
+QLabel#sectionDot { color: @accent; font-size: 16px; }
+QLabel#propertyHint { color: @textFaint; }
+QFrame#propertyHeader { background: @raised; border: 1px solid @border; border-radius: 10px; }
+
 QGroupBox { font-weight: 600; margin-top: 20px; padding-top: 4px; border: none; border-radius: 10px; background: @groupFill; }
 QGroupBox::title { subcontrol-origin: margin; left: 4px; padding: 0 4px 2px 4px; color: @text; }
 

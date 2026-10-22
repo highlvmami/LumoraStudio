@@ -61,7 +61,9 @@ Ticks TimelineState::transitionDuration(int index, const std::function<Ticks(con
     // Media available after the out point of the outgoing clip and before the
     // in point of the incoming clip. Titles can be extended freely.
     Ticks handleA = unlimited;
-    if (a.kind == ClipKind::Media) {
+    if (a.hasSpeedChange()) {
+        handleA = std::max<Ticks>(0, a.remap.length - a.sourceOut);
+    } else if (a.kind == ClipKind::Media) {
         const Ticks len = mediaDuration ? mediaDuration(a.mediaId) : 0;
         handleA = len > 0 ? std::max<Ticks>(0, len - a.sourceOut) : 0;
     }
@@ -82,9 +84,10 @@ bool TimelineState::hasEffects() const {
         if (ti >= 2 && !t.clips.empty())
             return true;
         for (const auto& c : t.clips) {
-            if (c.kind != ClipKind::Media || c.loops() || !c.transform.isIdentity() || !c.color.isIdentity() || !c.transitionIn.isNone() || c.fadeIn > 0 ||
-                c.fadeOut > 0 || c.gainDb != 0.0 || !c.audio.isIdentity() || c.stabilization.isActive() || !c.motion.isEmpty() ||
-                c.redaction.isActive() || c.background.enabled)
+            if (c.kind != ClipKind::Media || c.loops() || c.hasSpeedChange() || !c.transform.isIdentity() || !c.color.isIdentity() ||
+                !c.transitionIn.isNone() || c.fadeIn > 0 || c.fadeOut > 0 || c.gainDb != 0.0 || !c.audio.isIdentity() ||
+                c.stabilization.isActive() || !c.motion.isEmpty() || c.redaction.isActive() || c.background.enabled ||
+                !c.effects.isIdentity())
                 return true;
         }
     }
@@ -99,9 +102,9 @@ bool TimelineState::hasVideoEffects() const {
         if (ti != 0 && !t.clips.empty())
             return true;
         for (const auto& c : t.clips)
-            if (c.kind != ClipKind::Media || c.loops() || !c.transform.isIdentity() || !c.color.isIdentity() ||
+            if (c.kind != ClipKind::Media || c.loops() || c.hasSpeedChange() || !c.transform.isIdentity() || !c.color.isIdentity() ||
                 !c.transitionIn.isNone() || c.fadeIn > 0 || c.fadeOut > 0 || c.stabilization.isActive() || !c.motion.isEmpty() ||
-                c.redaction.isActive() || c.background.enabled)
+                c.redaction.isActive() || c.background.enabled || !c.effects.isIdentity())
                 return true;
     }
     return false;
@@ -115,7 +118,8 @@ bool TimelineState::hasAudioChanges() const {
         if (!t.isAudio())
             continue;
         for (const auto& c : t.clips)
-            if (ti != 1 || c.linkId.isNull() || c.fadeIn > 0 || c.fadeOut > 0 || c.gainDb != 0.0 || !c.audio.isIdentity())
+            if (ti != 1 || c.linkId.isNull() || c.fadeIn > 0 || c.fadeOut > 0 || c.gainDb != 0.0 || !c.audio.isIdentity() ||
+                c.hasSpeedChange())
                 return true;
     }
     return false;
@@ -743,9 +747,97 @@ bool Timeline::setBackgroundRemoval(const QUuid& clipId, const BackgroundRemoval
     return true;
 }
 
+bool Timeline::setPictureEffects(const QUuid& clipId, const PictureEffects& e) {
+    Clip* c = mutableClip(clipId);
+    if (!c || !c->hasMedia() || c->effects == e)
+        return false;
+    c->effects = e;
+    emit changed();
+    return true;
+}
+
+bool Timeline::setSpeed(const QUuid& clipId, double speed, bool reverse, const std::vector<SpeedPoint>& ramp, Ticks mediaDuration) {
+    const Clip* first = clip(clipId);
+    if (!first || first->kind != ClipKind::Media)
+        return false;
+    speed = std::clamp(speed, 0.05, 20.0);
+    const bool off = std::abs(speed - 1.0) < 1e-9 && !reverse && ramp.empty();
+    const TimelineState before = m_state;
+    for (const auto& id : linkedClips(clipId)) {
+        auto loc = locate(id);
+        Track& tr = m_state.tracks[loc->track];
+        Clip& c = tr.clips[loc->index];
+        if (tr.locked || c.kind != ClipKind::Media)
+            continue;
+        const auto [mIn, mOut] = c.mediaRange();
+        const Ticks span = std::max<Ticks>(1, mOut - mIn);
+        const Ticks len = std::max(mediaDuration, mOut);
+        const Ticks oldIn = c.sourceIn;
+        TimeRemap r = c.remap;
+        r.speed = speed;
+        r.reverse = reverse;
+        r.ramp = ramp;
+        Ticks newIn = 0, newOut = 0;
+        if (off) {
+            const TimeRemap options = r;
+            r = TimeRemap{};
+            r.blending = options.blending;
+            r.keepPitch = options.keepPitch;
+            newIn = mIn;
+            newOut = mOut;
+        } else if (ramp.empty()) {
+            // The whole media is remapped, so the clip can be trimmed out to
+            // its ends afterwards.
+            r.mediaIn = 0;
+            r.mediaOut = len;
+            r.length = std::max<Ticks>(1, std::llround(len / speed));
+            newIn = std::llround((reverse ? len - mOut : mIn) / speed);
+            newOut = newIn + std::max<Ticks>(1, std::llround(span / speed));
+        } else {
+            // A ramp is shaped over exactly the part that is shown.
+            r.mediaIn = mIn;
+            r.mediaOut = mOut;
+            r.length = std::max<Ticks>(1, std::llround(span / (speed * std::max(0.01, r.rampAverage()))));
+            newIn = 0;
+            newOut = r.length;
+        }
+        c.remap = r;
+        c.loopStart = c.loopLength = 0;
+        c.sourceIn = newIn;
+        c.sourceOut = std::max(newIn + 1, newOut);
+        c.fadeIn = std::min(c.fadeIn, c.duration());
+        c.fadeOut = std::min(c.fadeOut, c.duration());
+        // Clips connected to this one keep their distance from its start.
+        for (auto& other : m_state.tracks)
+            for (auto& oc : other.clips)
+                if (oc.anchorId == c.id)
+                    oc.anchorSource = std::clamp(newIn + (oc.anchorSource - oldIn), c.sourceIn, c.sourceOut);
+    }
+    normalize();
+    if (m_state == before)
+        return false;
+    emit changed();
+    return true;
+}
+
+bool Timeline::setSpeedOptions(const QUuid& clipId, FrameBlending blending, bool keepPitch) {
+    bool any = false;
+    for (const auto& id : linkedClips(clipId)) {
+        Clip* c = mutableClip(id);
+        if (!c || c->kind != ClipKind::Media || (c->remap.blending == blending && c->remap.keepPitch == keepPitch))
+            continue;
+        c->remap.blending = blending;
+        c->remap.keepPitch = keepPitch;
+        any = true;
+    }
+    if (any)
+        emit changed();
+    return any;
+}
+
 bool Timeline::setLoop(const QUuid& clipId, bool on, Ticks mediaDuration) {
     Clip* c = mutableClip(clipId);
-    if (!c || c->kind != ClipKind::Media || on == c->loops() || (on && mediaDuration <= c->sourceIn))
+    if (!c || c->kind != ClipKind::Media || on == c->loops() || (on && mediaDuration <= c->sourceIn) || c->hasSpeedChange())
         return false;
     if (on) {
         c->loopStart = c->sourceIn;
@@ -970,6 +1062,7 @@ QUuid Timeline::freezeFrame(const QUuid& clipId, Ticks at, Ticks duration) {
     freeze.stabilization = src.stabilization;
     freeze.redaction = src.redaction;
     freeze.background = src.background;
+    freeze.effects = src.effects;
 
     // Split the clip and its linked partners; the right halves get their own
     // link so they stay together when they move.
@@ -1144,6 +1237,8 @@ bool Timeline::trimOut(const QUuid& clipId, Ticks newSourceOut, Ticks mediaDurat
         return false;
     if (c->kind != ClipKind::Media || c->loops())
         mediaDuration = 0;
+    else if (c->hasSpeedChange())
+        mediaDuration = c->remap.length; // the remapped range ends there
     const Ticks minDur = frameDuration();
     newSourceOut = std::clamp<Ticks>(newSourceOut, c->sourceIn + minDur, mediaDuration > 0 ? mediaDuration : INT64_MAX);
     const Ticks delta = newSourceOut - c->sourceOut;
@@ -1193,7 +1288,7 @@ bool Timeline::canJoinWithNext(const QUuid& clipId) const {
     const Clip& b = clips[loc->index + 1];
     return a.kind == ClipKind::Media && b.kind == ClipKind::Media && a.mediaId == b.mediaId &&
            a.sourceOut == b.sourceIn && a.timelineEnd() == b.timelineStart && a.loopStart == b.loopStart &&
-           a.loopLength == b.loopLength;
+           a.loopLength == b.loopLength && a.remap == b.remap;
 }
 
 bool Timeline::joinWithNext(const QUuid& clipId) {

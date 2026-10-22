@@ -117,9 +117,9 @@ HelpPage::HelpPage(QWidget* parent) : QWidget(parent) {
 }
 
 QStringList HelpPage::sectionIds() {
-    return {QStringLiteral("start"),  QStringLiteral("edit"),      QStringLiteral("titles"), QStringLiteral("stickers"),
+    return {QStringLiteral("start"),  QStringLiteral("edit"),      QStringLiteral("titles"), QStringLiteral("effects"), QStringLiteral("stickers"),
             QStringLiteral("subtitles"), QStringLiteral("smart"), QStringLiteral("color"),  QStringLiteral("audio"),
-            QStringLiteral("photo"),  QStringLiteral("export"),    QStringLiteral("view"),   QStringLiteral("shortcuts")};
+            QStringLiteral("photo"),  QStringLiteral("export"),    QStringLiteral("tools"),  QStringLiteral("view"),   QStringLiteral("shortcuts")};
 }
 
 QString HelpPage::sectionTitle(const QString& id) const {
@@ -129,6 +129,10 @@ QString HelpPage::sectionTitle(const QString& id) const {
         return tr("Editing video");
     if (id == QLatin1String("titles"))
         return tr("Titles, transitions and fades");
+    if (id == QLatin1String("effects"))
+        return tr("Speed and effects");
+    if (id == QLatin1String("tools"))
+        return tr("Tools");
     if (id == QLatin1String("stickers"))
         return tr("Stickers");
     if (id == QLatin1String("subtitles"))
