@@ -180,7 +180,7 @@ void AudioMixer::buildVoices() {
         if (t.muted)
             continue;
         for (const auto& c : t.clips) {
-            if (c.kind != ClipKind::Media)
+            if (c.kind != ClipKind::Media || c.muted)
                 continue;
             Voice v;
             v.clip = &c;

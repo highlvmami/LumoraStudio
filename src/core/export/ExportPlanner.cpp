@@ -306,7 +306,7 @@ ExportPlan ExportPlanner::plan(const TimelineState& tl, const MediaPool& pool, c
     for (int ti : tl.trackIndices(TrackType::Audio))
         if (!tl.tracks[ti].muted)
             for (const auto& c : tl.tracks[ti].clips)
-                if (auto m = pool.find(c.mediaId); m && m->info.audio)
+                if (auto m = pool.find(c.mediaId); m && m->info.audio && !c.muted)
                     audible = true;
     if (mixAudio) {
         if (!audible) {
@@ -636,7 +636,7 @@ ExportPlan ExportPlanner::planRender(const TimelineState& tl, const MediaPool& p
         if (tl.tracks[ti].muted)
             continue;
         for (const auto& c : tl.tracks[ti].clips)
-            if (c.timelineEnd() > plan.rangeStart && c.timelineStart < plan.rangeEnd)
+            if (!c.muted && c.timelineEnd() > plan.rangeStart && c.timelineStart < plan.rangeEnd)
                 if (auto m = pool.find(c.mediaId); m && m->info.audio)
                     audible.push_back(&c);
     }

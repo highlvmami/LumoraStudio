@@ -234,6 +234,7 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
         updateTransformBox();
         refreshProgram();
         markDirty();
+        updateMuteAction();
     });
     connect(m_project->media(), &MediaPool::itemAdded, this, &MainWindow::markDirty);
     connect(m_project->photos(), &PhotoLibrary::adjustmentsChanged, this, &MainWindow::markDirty);
@@ -272,6 +273,7 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
         updateTransformBox();
         m_actDelete->setEnabled(has);
         m_actJoin->setEnabled(has && m_project->timeline()->canJoinWithNext(sel.front()));
+        updateMuteAction();
     });
     connect(m_timelineView, &TimelineView::clipDoubleClicked, this, [this](const QUuid& id) {
         if (const Clip* c = m_project->timeline()->clip(id); c && c->hasMedia())
@@ -291,6 +293,7 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
         menu.addAction(m_actSplit);
         menu.addAction(m_actJoin);
         menu.addAction(m_actFreeze);
+        menu.addAction(m_actMuteClip);
         if (auto loc = m_project->timeline()->locate(id); loc && loc->track == 0) {
             menu.addSeparator();
             menu.addAction(m_actAddTransition);
@@ -348,6 +351,7 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
     refreshProgram();
     updateTitle();
     m_actDelete->setEnabled(false);
+    m_actMuteClip->setEnabled(false);
     m_actJoin->setEnabled(false);
     m_actMarkIn->setEnabled(false);
     m_actMarkOut->setEnabled(false);
@@ -393,6 +397,9 @@ void MainWindow::createActions() {
     m_actJoin->setToolTip(tr("Rejoin a clip with the next one when they are consecutive parts of the same file"));
     m_actFreeze = make(tr("&Freeze frame…"), QKeySequence(Qt::SHIFT | Qt::Key_F), &MainWindow::freezeFrame, Icons::freeze());
     m_actFreeze->setToolTip(tr("Hold the frame under the playhead for a number of seconds; the rest of the clip continues after it"));
+    m_actMuteClip = make(tr("&Mute clip sound"), QKeySequence(Qt::Key_M), &MainWindow::toggleClipMute, Icons::sound());
+    m_actMuteClip->setCheckable(true);
+    m_actMuteClip->setToolTip(tr("Silence only the selected clips; the rest of the track keeps its sound (M)"));
     m_actPlay = make(tr("Play / pause"), QKeySequence(Qt::Key_Space), [this] { m_engine->togglePlay(); }, Icons::play());
     m_actPrevFrame = make(tr("Previous frame"), QKeySequence(Qt::Key_Left), [this] { m_engine->stepFrames(-1); });
     m_actNextFrame = make(tr("Next frame"), QKeySequence(Qt::Key_Right), [this] { m_engine->stepFrames(1); });
@@ -500,6 +507,7 @@ void MainWindow::createMenus() {
     edit->addAction(m_actSplit);
     edit->addAction(m_actJoin);
     edit->addAction(m_actFreeze);
+    edit->addAction(m_actMuteClip);
     edit->addAction(m_actDelete);
     edit->addSeparator();
     edit->addAction(m_actAddTitle);
@@ -696,7 +704,7 @@ void MainWindow::setWorkspace(Workspace w) {
         selectClipAtPlayhead();
     if (!help)
         m_undoGroup->setActiveStack(photo ? m_photoUndo : m_videoUndo);
-    for (QAction* a : {m_actSplit, m_actDelete, m_actJoin, m_actFreeze, m_actPlay, m_actPrevFrame, m_actNextFrame, m_actHome, m_actEnd,
+    for (QAction* a : {m_actSplit, m_actDelete, m_actJoin, m_actFreeze, m_actMuteClip, m_actPlay, m_actPrevFrame, m_actNextFrame, m_actHome, m_actEnd,
                        m_actMarkIn, m_actMarkOut, m_actAddSource, m_actZoomIn, m_actZoomOut, m_actExport, m_actAddTitle, m_actAddSticker,
                        m_actAddTransition, m_actAddVideoTrack, m_actAddAudioTrack, m_actExportFrame, m_actAddSubtitle,
                        m_actAddSubtitleTrack, m_actImportSubtitles, m_actExportSubtitles, m_actAutoSubtitles})
@@ -1868,6 +1876,30 @@ void MainWindow::deleteSelection() {
                     [&] { return m_project->timeline()->removeClips(std::vector<QUuid>(sel.begin(), sel.end())); });
 }
 
+void MainWindow::toggleClipMute() {
+    const auto sel = m_timelineView->selection();
+    if (sel.isEmpty()) {
+        updateMuteAction();
+        return;
+    }
+    Timeline* tl = m_project->timeline();
+    const std::vector<QUuid> ids(sel.begin(), sel.end());
+    const bool mute = !tl->clipsMuted(ids);
+    runTimelineEdit(m_videoUndo, tl, mute ? tr("Mute clip sound") : tr("Unmute clip sound"),
+                    [&] { return tl->setClipsMuted(ids, mute); });
+    updateMuteAction();
+}
+
+void MainWindow::updateMuteAction() {
+    const auto sel = m_timelineView->selection();
+    bool media = false;
+    for (const auto& id : sel)
+        if (const Clip* c = m_project->timeline()->clip(id); c && c->hasMedia())
+            media = true;
+    m_actMuteClip->setEnabled(media);
+    m_actMuteClip->setChecked(media && m_project->timeline()->clipsMuted(std::vector<QUuid>(sel.begin(), sel.end())));
+}
+
 void MainWindow::joinSelection() {
     const auto sel = m_timelineView->selection();
     if (sel.isEmpty())
@@ -1915,7 +1947,7 @@ void MainWindow::showShortcuts() {
 QString MainWindow::shortcutsHtml() const {
     QString html = QStringLiteral("<table cellspacing=6>");
     for (QAction* a : {m_actPlay, m_actPrevFrame, m_actNextFrame, m_actHome, m_actEnd, m_actSplit, m_actDelete, m_actJoin,
-                       m_actFreeze, m_actMarkIn, m_actMarkOut, m_actAddSource, m_actSnap, m_actZoomIn, m_actZoomOut, m_actUndo, m_actRedo,
+                       m_actFreeze, m_actMuteClip, m_actMarkIn, m_actMarkOut, m_actAddSource, m_actSnap, m_actZoomIn, m_actZoomOut, m_actUndo, m_actRedo,
                        m_actFullScreenPreview, m_actFullScreenWindow, m_actAddTitle, m_actAddSubtitle, m_actAddSticker,
                        m_actAddTransition, m_actImport, m_actExport, m_actExportFrame, m_actExportPhoto, m_actSave, m_actOpen,
                        m_actHowTo}) {

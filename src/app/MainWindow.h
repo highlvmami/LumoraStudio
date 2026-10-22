@@ -104,6 +104,8 @@ private:
     void splitAtPlayhead();
     void deleteSelection();
     void joinSelection();
+    void toggleClipMute();
+    void updateMuteAction();
     void freezeFrame();
     void stabilizeClip(const QUuid& clipId);
     void redactClip(const QUuid& clipId);
@@ -174,6 +176,7 @@ private:
     QAction* m_actDelete;
     QAction* m_actJoin;
     QAction* m_actFreeze;
+    QAction* m_actMuteClip;
     QAction* m_actPlay;
     QAction* m_actPrevFrame;
     QAction* m_actNextFrame;

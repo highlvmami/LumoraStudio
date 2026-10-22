@@ -170,6 +170,8 @@ QByteArray Project::toJson() const {
                 co["gainDb"] = c.gainDb;
             if (!c.audio.isIdentity())
                 co["audio"] = c.audio.toJson();
+            if (c.muted)
+                co["muted"] = true;
             clips.append(co);
         }
         to["clips"] = clips;
@@ -330,6 +332,7 @@ bool Project::fromJson(const QByteArray& json, const QString& baseDir, QString* 
             c.fadeOut = ticksFromJson(co.value("fadeOut"));
             c.gainDb = co.value("gainDb").toDouble(0.0);
             c.audio = AudioEffects::fromJson(co.value("audio").toObject());
+            c.muted = co.value("muted").toBool();
             t.clips.push_back(c);
         }
         st.tracks.push_back(t);

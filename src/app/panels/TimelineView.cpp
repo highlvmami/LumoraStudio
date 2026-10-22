@@ -482,7 +482,7 @@ void TimelineView::paintClip(QPainter& p, const Clip& c, int track, const QRect&
         }
     } else if (auto peaks = m_cache->peaks(c.mediaId)) {
         p.setPen(Qt::NoPen);
-        p.setBrush(base.lighter(135));
+        p.setBrush(c.muted ? withAlpha(base.lighter(135), 0.3) : base.lighter(135));
         const int mid = r.top() + r.height() / 2 + 6;
         const double gain = std::pow(10.0, c.gainDb / 20.0);
         const double halfH = (r.height() - 20) / 2.0;
@@ -554,6 +554,8 @@ void TimelineView::paintClip(QPainter& p, const Clip& c, int track, const QRect&
         name += QStringLiteral("  ·  %1%2 dB").arg(c.gainDb > 0 ? QStringLiteral("+") : QString()).arg(c.gainDb, 0, 'f', 1);
     if (!c.transform.isIdentity())
         name += QStringLiteral("  ·  ⤢");
+    if (c.muted)
+        name = tr("Muted") + QStringLiteral("  ·  ") + name;
     p.drawText(QRect(r.left() + 5, r.top(), r.width() - 10, 16), Qt::AlignVCenter | Qt::AlignLeft,
                p.fontMetrics().elidedText(name, Qt::ElideRight, r.width() - 10));
     p.restore();
