@@ -52,6 +52,11 @@ public:
     void setMuted(bool muted);
     bool isMuted() const { return m_muted; }
 
+    // Videos in the preview are decoded on the graphics card when it can
+    // (saved setting, on by default). Exports are not affected.
+    static bool hardwareDecoding();
+    static void setHardwareDecoding(bool on);
+
 signals:
     void frameReady(const QImage& image, lumora::Ticks time);
     void positionChanged(lumora::Ticks time);

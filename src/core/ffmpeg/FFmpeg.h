@@ -61,7 +61,20 @@ inline PacketPtr makePacket() { return PacketPtr(av_packet_alloc()); }
 FormatInputPtr openInput(const QString& path, QString* error = nullptr);
 
 // Opens a decoder for the given stream. `threads` = 0 lets FFmpeg choose.
-CodecContextPtr openDecoder(const AVStream* stream, QString* error = nullptr, int threads = 0);
+// With `hardware` the graphics card decodes when it supports the codec
+// (D3D11VA/DXVA2 on Windows, VideoToolbox on macOS, VA-API/CUDA on Linux);
+// pictures it cannot take (e.g. some 4:2:2 profiles) still decode in
+// software. Hardware frames come out of avcodec_receive_frame() with
+// hw_frames_ctx set and have to be downloaded (av_hwframe_transfer_data).
+CodecContextPtr openDecoder(const AVStream* stream, QString* error = nullptr, int threads = 0, bool hardware = false);
+
+// Scaler whose work is split over `threads` slices (0: one per core); use it
+// with scaleInto(). sws_setColorspaceDetails() works on it as usual.
+SwsPtr makeScaler(int srcW, int srcH, AVPixelFormat srcFmt, int dstW, int dstH, AVPixelFormat dstFmt, int flags,
+                  int threads = 0);
+// Scales `src` into a packed picture the caller owns (e.g. a QImage's bits).
+bool scaleInto(SwsContext* sws, const AVFrame* src, uint8_t* dst, int dstStride, int dstW, int dstH,
+               AVPixelFormat dstFmt);
 
 // Encoded filesystem path suitable for FFmpeg (UTF-8 on every platform).
 std::string toFFmpegPath(const QString& path);

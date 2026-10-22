@@ -68,6 +68,21 @@ private slots:
         QVERIFY(meanLuma(renderAt(tl, frames(80)), QRect(0, 0, 320, 240)) < 1.0);
     }
 
+    void hardwareDecodingShowsTheSameFrames() {
+        // With or without a graphics card that decodes (without one it falls
+        // back to software), the preview shows the same frames.
+        Timeline tl;
+        tl.insertMedia(m_pattern->id, frames(10), frames(60), true, true);
+        FrameRenderer r(&m_pool);
+        r.setTimeline(tl.state());
+        r.setOutputSize(QSize(320, 240));
+        r.setPrecision(FrameRenderer::Precision::Preview);
+        r.setHardwareDecoding(true);
+        QCOMPARE(frameIndexOf(r.render(frames(5))), 15);
+        QCOMPARE(frameIndexOf(r.render(frames(6))), 16);
+        QCOMPARE(frameIndexOf(r.render(frames(49))), 59);
+    }
+
     void prefetchedDecodersShowTheRightFrames() {
         // A cut inside one file and a jump to another part of it: playback
         // prepares both decoders ahead and the frames stay exact.

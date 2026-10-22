@@ -50,6 +50,11 @@ public:
     // (e.g. millisecond based containers) still pick the right frame.
     void setSampleOffset(Ticks offset) { m_sampleOffset = offset; }
 
+    // Decode videos on the graphics card when it can (playback preview; off
+    // by default, exports always decode in software).
+    void setHardwareDecoding(bool on);
+    bool hardwareDecoding() const { return m_hardware; }
+
     // Subtitle cues are drawn on top of the picture (preview, burnt in
     // exports); off by default.
     void setDrawSubtitles(bool on) { m_subtitles = on; }
@@ -110,6 +115,7 @@ private:
     Ticks m_lastTime = 0;
     Ticks m_sampleOffset = 0;
     bool m_subtitles = false;
+    bool m_hardware = false;
     std::unique_ptr<Prefetcher> m_prefetcher; // started on the first prefetch()
     int m_prefetchedUsed = 0;
     // The subtitle cue under `t` on each visible subtitle track.
