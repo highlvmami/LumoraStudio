@@ -22,6 +22,14 @@ Açık tema ("Gündüz", Görünüm → Tema):
 
 Tam yol haritası: [docs/ozellikler.md](docs/ozellikler.md). Mimari: [docs/mimari.md](docs/mimari.md).
 
+## Sürüm 0.6.6: logo ve masaüstü kısayolu
+
+<img src="src/app/resources/logo/lumora-256.png" width="128" alt="LumoraStudio logosu">
+
+- LumoraStudio'nun yeni bir logosu var: turuncudan pembeye ve mora geçen zeminde, ortasında oynat düğmesi olan bir objektif diyaframı. Logo `LumoraStudio.exe` dosyasının simgesi olarak gömülü; Dosya Gezgini'nde, görev çubuğunda ve pencerenin köşesinde görünür. Dosyanın Özellikler → Ayrıntılar sekmesinde sürüm numarası da yazar.
+- İlk açılışta program **masaüstüne kısayol** eklemeyi önerir; "Kısayol ekle" denirse masaüstüne ve Başlat menüsüne (Linux'ta uygulama menüsüne) LumoraStudio kısayolu konur, program çift tıkla açılır.
+- Sonradan da eklenebilir: **Ayarlar → Masaüstü kısayolu → Masaüstüne ekle**. Program klasörü taşınırsa kısayol bir sonraki açılışta kendiliğinden yeni yere çevrilir; silinen kısayol geri getirilmez.
+
 ## Sürüm 0.6.5: iPhone fotoğrafları (HEIC)
 
 - **HEIC / HEIF** (iPhone'un varsayılan fotoğraf biçimi) ve **AVIF** dosyaları artık hem Kurgu'da zaman çizelgesine hem Fotoğraf çalışma alanına sürüklenebilir. Daha önce bu dosyalar video sanılıyor ve bozuk görünüyordu.

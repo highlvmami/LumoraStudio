@@ -7,6 +7,7 @@ set(APP_SOURCES
     MediaCache.h MediaCache.cpp
     Updater.h Updater.cpp
     Tasks.h Tasks.cpp
+    DesktopShortcut.h DesktopShortcut.cpp
     playback/PlaybackSequence.h playback/PlaybackSequence.cpp
     playback/PlaybackEngine.h playback/PlaybackEngine.cpp
     panels/MimeTypes.h
@@ -35,7 +36,14 @@ set(APP_SOURCES
     photo/SmartToolsPanel.h photo/SmartToolsPanel.cpp
 )
 
-qt_add_executable(LumoraStudio WIN32 MACOSX_BUNDLE ${APP_SOURCES})
+# Windows: the logo as the .exe icon and the version in the file properties.
+set(APP_PLATFORM_SOURCES)
+if(WIN32)
+    configure_file(LumoraStudio.rc.in ${CMAKE_CURRENT_BINARY_DIR}/LumoraStudio.rc @ONLY)
+    list(APPEND APP_PLATFORM_SOURCES ${CMAKE_CURRENT_BINARY_DIR}/LumoraStudio.rc)
+endif()
+
+qt_add_executable(LumoraStudio WIN32 MACOSX_BUNDLE ${APP_SOURCES} ${APP_PLATFORM_SOURCES})
 
 # Bundled look: the Inter typeface (SIL Open Font License, see resources/fonts/OFL.txt)
 # and the small arrow images used by the style sheet.
@@ -55,6 +63,20 @@ qt_add_resources(LumoraStudio theme
         resources/theme/down-off.png
         resources/theme/check-dark.png
         resources/theme/check-light.png)
+
+# The logo (window icon, desktop shortcut icon). Made from resources/logo/lumora.svg.
+qt_add_resources(LumoraStudio logo
+    PREFIX /
+    BASE resources
+    FILES
+        resources/logo/lumora-16.png
+        resources/logo/lumora-24.png
+        resources/logo/lumora-32.png
+        resources/logo/lumora-48.png
+        resources/logo/lumora-64.png
+        resources/logo/lumora-128.png
+        resources/logo/lumora-256.png
+        resources/logo/lumora-512.png)
 
 # "How to use" pages, one folder per interface language (see panels/HelpPage).
 file(GLOB HELP_PAGES CONFIGURE_DEPENDS RELATIVE ${CMAKE_CURRENT_SOURCE_DIR}/resources resources/help/*/*.html resources/help/*/img/*.png)
@@ -88,6 +110,7 @@ if(WIN32)
             COMMAND ${CMAKE_COMMAND} -E copy_directory "${FFMPEG_RUNTIME_DIR}" "$<TARGET_FILE_DIR:LumoraStudio>"
             COMMENT "Copying FFmpeg DLLs")
     endif()
+    target_link_libraries(LumoraStudio PRIVATE ole32 uuid)
 endif()
 
 install(TARGETS LumoraStudio RUNTIME DESTINATION . BUNDLE DESTINATION .)

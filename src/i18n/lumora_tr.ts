@@ -3368,7 +3368,66 @@ Orijinal dosya asla değişmez: düzenlemeler projede saklanır ve dışa aktar�
     </message>
 </context>
 <context>
+    <name>lumora::DesktopShortcut</name>
+    <message>
+        <source>Free video and photo editor</source>
+        <translation>Ücretsiz video ve fotoğraf düzenleyici</translation>
+    </message>
+    <message>
+        <source>Not available on this system</source>
+        <translation>Bu sistemde kullanılamıyor</translation>
+    </message>
+    <message>
+        <source>Put LumoraStudio on the desktop?</source>
+        <translation>LumoraStudio masaüstüne konsun mu?</translation>
+    </message>
+    <message>
+        <source>A shortcut on the desktop and in the program menu opens LumoraStudio with a double click. You can add it later from Settings too.</source>
+        <translation>Masaüstündeki ve program menüsündeki kısayol LumoraStudio'yu çift tıkla açar. Sonradan Ayarlar'dan da ekleyebilirsiniz.</translation>
+    </message>
+    <message>
+        <source>Add shortcut</source>
+        <translation>Kısayol ekle</translation>
+    </message>
+    <message>
+        <source>Not now</source>
+        <translation>Şimdi değil</translation>
+    </message>
+    <message>
+        <source>Could not create the shortcut: %1</source>
+        <translation>Kısayol oluşturulamadı: %1</translation>
+    </message>
+</context>
+<context>
     <name>lumora::SettingsDialog</name>
+    <message>
+        <source>Desktop shortcut</source>
+        <translation>Masaüstü kısayolu</translation>
+    </message>
+    <message>
+        <source>Add to desktop</source>
+        <translation>Masaüstüne ekle</translation>
+    </message>
+    <message>
+        <source>Puts a LumoraStudio shortcut on the desktop and in the program menu</source>
+        <translation>Masaüstüne ve program menüsüne LumoraStudio kısayolu koyar</translation>
+    </message>
+    <message>
+        <source>LumoraStudio is on the desktop.</source>
+        <translation>LumoraStudio masaüstünde.</translation>
+    </message>
+    <message>
+        <source>Open LumoraStudio with a double click from the desktop.</source>
+        <translation>LumoraStudio'yu masaüstünden çift tıkla açın.</translation>
+    </message>
+    <message>
+        <source>Renew shortcut</source>
+        <translation>Kısayolu yenile</translation>
+    </message>
+    <message>
+        <source>Could not create the shortcut: %1</source>
+        <translation>Kısayol oluşturulamadı: %1</translation>
+    </message>
     <message>
         <source>Settings</source>
         <translation>Ayarlar</translation>

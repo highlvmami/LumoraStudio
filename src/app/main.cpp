@@ -22,6 +22,8 @@
 #include <QTranslator>
 #include <QWindow>
 
+#include "DesktopShortcut.h"
+#include "Icons.h"
 #include "MainWindow.h"
 #include "Updater.h"
 #include "Theme.h"
@@ -97,6 +99,7 @@ int main(int argc, char* argv[]) {
     QApplication app(argc, argv);
     QApplication::setOrganizationName(QStringLiteral("LumoraStudio"));
     QApplication::setApplicationName(QStringLiteral("LumoraStudio"));
+    QApplication::setWindowIcon(Icons::appIcon());
     QApplication::setApplicationVersion(QStringLiteral(LUMORA_VERSION));
     av_log_set_level(AV_LOG_ERROR);
     qRegisterMetaType<lumora::Ticks>("lumora::Ticks");
@@ -184,6 +187,7 @@ int main(int argc, char* argv[]) {
     if (!parser.isSet(shotOpt)) {
         Updater::removeLeftovers();
         w.checkForUpdatesOnStartup();
+        QTimer::singleShot(600, &w, [&w] { DesktopShortcut::offerOrRefresh(&w); });
     }
 
     if (parser.isSet(shotOpt)) {
