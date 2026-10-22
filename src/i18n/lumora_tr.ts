@@ -1262,6 +1262,14 @@
         <source>Each section explains one part of the program step by step. The menu stays where it is, so you can jump between sections while you read. Go back to Edit, Color, Audio or Photo with the tabs at the top whenever you like.</source>
         <translation>Her bölüm programın bir kısmını adım adım anlatır. Menü yerinde kalır, okurken bölümler arasında geçebilirsiniz. Kurgu, Renk, Ses ya da Fotoğraf sekmesine üstteki sekmelerle istediğiniz an dönebilirsiniz.</translation>
     </message>
+    <message>
+        <source>Speed and effects</source>
+        <translation>Hız ve efektler</translation>
+    </message>
+    <message>
+        <source>Tools</source>
+        <translation>Araçlar</translation>
+    </message>
 </context>
 <context>
     <name>lumora::LayersPanel</name>
