@@ -414,32 +414,10 @@ QIcon exitFullScreen(const QColor& color) {
 }
 
 QIcon appIcon() {
+    // The logo, drawn from resources/logo/lumora.svg (and lumora-small.svg for the tiny sizes).
     QIcon icon;
-    for (int size : {16, 32, 48, 64, 128, 256}) {
-        QPixmap pm(size, size);
-        pm.fill(Qt::transparent);
-        QPainter p(&pm);
-        p.setRenderHint(QPainter::Antialiasing);
-        p.scale(size / 64.0, size / 64.0);
-        QLinearGradient g(0, 0, 64, 64);
-        g.setColorAt(0, QColor(255, 180, 84));
-        g.setColorAt(0.55, QColor(240, 86, 140));
-        g.setColorAt(1, QColor(124, 126, 246));
-        p.setBrush(g);
-        p.setPen(Qt::NoPen);
-        p.drawRoundedRect(QRectF(2, 2, 60, 60), 14, 14);
-        // A lens-like ring with a play triangle: video + photo.
-        p.setPen(QPen(QColor(255, 255, 255, 235), 5));
-        p.setBrush(Qt::NoBrush);
-        p.drawEllipse(QPointF(32, 32), 18, 18);
-        QPainterPath tri;
-        tri.moveTo(27, 22);
-        tri.lineTo(43, 32);
-        tri.lineTo(27, 42);
-        tri.closeSubpath();
-        p.fillPath(tri, QColor(255, 255, 255, 235));
-        icon.addPixmap(pm);
-    }
+    for (int size : {16, 24, 32, 48, 64, 128, 256, 512})
+        icon.addFile(QStringLiteral(":/logo/lumora-%1.png").arg(size), QSize(size, size));
     return icon;
 }
 

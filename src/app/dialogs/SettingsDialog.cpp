@@ -10,6 +10,7 @@
 #include <QPushButton>
 #include <QVBoxLayout>
 
+#include "DesktopShortcut.h"
 #include "Updater.h"
 
 namespace lumora {
@@ -34,6 +35,36 @@ SettingsDialog::SettingsDialog(Updater* updater, QWidget* parent) : QDialog(pare
     daily->setChecked(Updater::autoCheck());
     ul->addWidget(daily);
     layout->addWidget(updates);
+
+    if (DesktopShortcut::supported()) {
+        auto* shortcut = new QGroupBox(tr("Desktop shortcut"));
+        auto* sl = new QVBoxLayout(shortcut);
+        auto* state = new QLabel;
+        state->setWordWrap(true);
+        state->setStyleSheet(QStringLiteral("color: palette(placeholder-text);"));
+        auto* srow = new QHBoxLayout;
+        auto* make = new QPushButton(tr("Add to desktop"));
+        make->setToolTip(tr("Puts a LumoraStudio shortcut on the desktop and in the program menu"));
+        srow->addWidget(make);
+        srow->addStretch(1);
+        sl->addWidget(state);
+        sl->addLayout(srow);
+        layout->addWidget(shortcut);
+        auto refresh = [state, make] {
+            const bool there = DesktopShortcut::exists();
+            state->setText(there ? tr("LumoraStudio is on the desktop.")
+                                 : tr("Open LumoraStudio with a double click from the desktop."));
+            make->setText(there ? tr("Renew shortcut") : tr("Add to desktop"));
+        };
+        connect(make, &QPushButton::clicked, this, [this, state, refresh] {
+            QString error;
+            if (DesktopShortcut::create(&error))
+                refresh();
+            else
+                state->setText(tr("Could not create the shortcut: %1").arg(error));
+        });
+        refresh();
+    }
     layout->addStretch(1);
 
     auto* buttons = new QDialogButtonBox(QDialogButtonBox::Close);

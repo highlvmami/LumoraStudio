@@ -8,7 +8,7 @@ namespace lumora {
 
 class Updater;
 
-// Application settings. For now: updates (check now, daily check).
+// Application settings: updates (check now, daily check) and the desktop shortcut.
 class SettingsDialog : public QDialog {
     Q_OBJECT
 public:
