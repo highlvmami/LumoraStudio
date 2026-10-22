@@ -200,5 +200,5 @@ Hedef: kullanıcı istemedikçe hiçbir aşamada kalite düşmez.
 3. ✅ **Sürüm 0.3:** Renk paneli, kapsamlar, LUT; fotoğrafta katmanlar ve maskeler.
 4. ✅ **Sürüm 0.4:** Ses araçları, altyazı, RAW desteği; eğriler, HSL ve fırça maskesi. 0.4.1: dondurma karesi.
 5. ✅ **Sürüm 0.5 (ilk dilim):** Görüntü sabitleme, hareket takibi, Whisper ile yerel otomatik altyazı.
-6. ✅ **Sürüm 0.6 (ilk dilim):** Yüz ve plaka bulanıklaştırma (otomatik takip ile), arka plan kaldırma (video ve fotoğraf); hepsi yerel modellerle (ONNX Runtime). 0.6.1: tek tıkla arka plan silme; 0.6.2: tam ekran; 0.6.3: çıkartmalar; 0.6.4: nasıl kullanılır kitapçığı; 0.6.5: HEIC/HEIF (iPhone) ve AVIF fotoğraflar; 0.6.6: logo (exe simgesi) ve masaüstü kısayolu.
+6. ✅ **Sürüm 0.6 (ilk dilim):** Yüz ve plaka bulanıklaştırma (otomatik takip ile), arka plan kaldırma (video ve fotoğraf); hepsi yerel modellerle (ONNX Runtime). 0.6.1: tek tıkla arka plan silme; 0.6.2: tam ekran; 0.6.3: çıkartmalar; 0.6.4: nasıl kullanılır kitapçığı; 0.6.5: HEIC/HEIF (iPhone) ve AVIF fotoğraflar; 0.6.6: logo (exe simgesi) ve masaüstü kısayolu; 0.6.7: tekerlekle kaydırırken ayarlar kazara değişmez; 0.6.8: önizleme sesi değişen ses çıkışını takip eder.
 7. **Sonrası:** Süper çözünürlük, içeriğe duyarlı nesne silme, maske takibi, çoklu kamera (ses ile eşitleme), OpenFX eklentileri, HDR10/HLG ve ton eşleme, OpenColorIO/ACES.

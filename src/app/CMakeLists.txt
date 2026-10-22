@@ -8,6 +8,7 @@ set(APP_SOURCES
     Updater.h Updater.cpp
     Tasks.h Tasks.cpp
     DesktopShortcut.h DesktopShortcut.cpp
+    WheelGuard.h WheelGuard.cpp
     playback/PlaybackSequence.h playback/PlaybackSequence.cpp
     playback/PlaybackEngine.h playback/PlaybackEngine.cpp
     panels/MimeTypes.h
