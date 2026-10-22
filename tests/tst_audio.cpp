@@ -186,6 +186,39 @@ private slots:
         QVERIFY(during / before > 0.9);
     }
 
+    void mutedClipsAreSilentOthersPlay() {
+        // Two videos with sound on V2; only the first one is muted.
+        Timeline tl;
+        const int v2 = tl.addTrack(TrackType::Video);
+        const QUuid first = tl.placeMedia(m_tone->id, 0, sec(2), true, true, v2, 0);
+        const QUuid second = tl.placeMedia(m_tone->id, 0, sec(2), true, true, v2, sec(2));
+        QVERIFY(!first.isNull() && !second.isNull());
+        QVERIFY(!tl.clipsMuted({first}));
+        QVERIFY(tl.setClipsMuted({first}, true));
+        QVERIFY(tl.clipsMuted({first}));
+        QVERIFY(!tl.clipsMuted({first, second}));
+        QVERIFY(!tl.setClipsMuted({first}, true)); // nothing changes
+        // The linked sound clip is muted too, the picture stays.
+        int mutedAudio = 0;
+        for (const auto& id : tl.linkedClips(first))
+            mutedAudio += tl.clip(id)->muted ? 1 : 0;
+        QCOMPARE(mutedAudio, 2);
+        QVERIFY(tl.state().hasAudioChanges());
+
+        AudioMixer mixer(&m_pool, 48000, 2);
+        mixer.setTimeline(tl.state());
+        std::vector<float> buf(48000 * 4 * 2);
+        for (int s = 0; s < 4; ++s)
+            mixer.mix(s * 48000, 48000, buf.data() + static_cast<size_t>(s) * 48000 * 2);
+        QVERIFY2(rms(buf, 0, 90000 * 2) < 1e-4, qPrintable(QString::number(rms(buf, 0, 90000 * 2))));
+        QVERIFY(rms(buf, 100000 * 2, 190000 * 2) > 0.05);
+
+        QVERIFY(tl.setClipsMuted({first}, false));
+        mixer.setTimeline(tl.state());
+        mixer.mix(48000, 9600, buf.data());
+        QVERIFY(rms(buf, 0, 9600 * 2) > 0.05);
+    }
+
     void normalisationReachesTheTarget() {
         Timeline tl;
         tl.insertMedia(m_tone->id, 0, sec(4), true, true);

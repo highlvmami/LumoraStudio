@@ -22,6 +22,10 @@ Açık tema ("Gündüz", Görünüm → Tema):
 
 Tam yol haritası: [docs/ozellikler.md](docs/ozellikler.md). Mimari: [docs/mimari.md](docs/mimari.md).
 
+## Sürüm 0.7.1
+
+- **Klibin sesini kapat:** zaman çizelgesinde seçtiğin kliplerin sesini tek tuşla (**M**) ya da sağ tık menüsünden kapat; aynı izdeki diğer klipler sesli kalır, görüntü değişmez.
+
 ## Sürüm 0.7.0: hız, efektler, filtreler ve araçlar
 
 - **Yeni Özellikler paneli:** sağdaki panel sekmelere ayrıldı (Düzenle, Efektler, Akıllı, Ses, Bilgi); bölümler açılıp kapanır, değişen bölümde nokta ve sıfırlama düğmesi çıkar, dar panelde hiçbir şey kesilmez.

@@ -85,7 +85,7 @@ bool TimelineState::hasEffects() const {
             return true;
         for (const auto& c : t.clips) {
             if (c.kind != ClipKind::Media || c.loops() || c.hasSpeedChange() || !c.transform.isIdentity() || !c.color.isIdentity() ||
-                !c.transitionIn.isNone() || c.fadeIn > 0 || c.fadeOut > 0 || c.gainDb != 0.0 || !c.audio.isIdentity() ||
+                !c.transitionIn.isNone() || c.fadeIn > 0 || c.fadeOut > 0 || c.gainDb != 0.0 || !c.audio.isIdentity() || c.muted ||
                 c.stabilization.isActive() || !c.motion.isEmpty() || c.redaction.isActive() || c.background.enabled ||
                 !c.effects.isIdentity())
                 return true;
@@ -119,7 +119,7 @@ bool TimelineState::hasAudioChanges() const {
             continue;
         for (const auto& c : t.clips)
             if (ti != 1 || c.linkId.isNull() || c.fadeIn > 0 || c.fadeOut > 0 || c.gainDb != 0.0 || !c.audio.isIdentity() ||
-                c.hasSpeedChange())
+                c.hasSpeedChange() || c.muted)
                 return true;
     }
     return false;
@@ -894,6 +894,31 @@ bool Timeline::setGain(const QUuid& clipId, double gainDb) {
     c->gainDb = gainDb;
     emit changed();
     return true;
+}
+
+bool Timeline::setClipsMuted(const std::vector<QUuid>& ids, bool muted) {
+    bool any = false;
+    for (const auto& id : ids)
+        for (const auto& l : linkedClips(id))
+            if (Clip* c = mutableClip(l); c && c->hasMedia() && c->muted != muted) {
+                c->muted = muted;
+                any = true;
+            }
+    if (any)
+        emit changed();
+    return any;
+}
+
+bool Timeline::clipsMuted(const std::vector<QUuid>& ids) const {
+    bool found = false;
+    for (const auto& id : ids)
+        for (const auto& l : linkedClips(id))
+            if (const Clip* c = clip(l); c && c->hasMedia()) {
+                if (!c->muted)
+                    return false;
+                found = true;
+            }
+    return found;
 }
 
 bool Timeline::setAudioEffects(const QUuid& clipId, const AudioEffects& fx) {

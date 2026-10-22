@@ -1573,6 +1573,22 @@
 <context>
     <name>lumora::MainWindow</name>
     <message>
+        <source>&amp;Mute clip sound</source>
+        <translation>Klibin sesini &amp;kapat</translation>
+    </message>
+    <message>
+        <source>Silence only the selected clips; the rest of the track keeps its sound (M)</source>
+        <translation>Yalnızca seçili kliplerin sesini kapatır; kanaldaki diğer klipler sesli kalır (M)</translation>
+    </message>
+    <message>
+        <source>Mute clip sound</source>
+        <translation>Klibin sesini kapat</translation>
+    </message>
+    <message>
+        <source>Unmute clip sound</source>
+        <translation>Klibin sesini aç</translation>
+    </message>
+    <message>
         <source>Edit</source>
         <translation>Kurgu</translation>
     </message>
@@ -4197,6 +4213,10 @@ Orijinal dosya asla değişmez: düzenlemeler projede saklanır ve dışa aktar�
 </context>
 <context>
     <name>lumora::TimelineView</name>
+    <message>
+        <source>Muted</source>
+        <translation>Sessiz</translation>
+    </message>
     <message>
         <source>Missing media</source>
         <translation>Eksik medya</translation>

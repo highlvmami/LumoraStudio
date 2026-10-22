@@ -58,6 +58,9 @@ struct Clip {
     Ticks fadeIn = 0;            // opacity (video) / volume (audio) ramps
     Ticks fadeOut = 0;
     double gainDb = 0.0;         // audio clips
+    // Silenced: the clip (and the clips linked to it) make no sound. Lets
+    // single clips be quiet while the rest of their track plays.
+    bool muted = false;
     AudioEffects audio;          // audio clips
     TitleData title;             // ClipKind::Title
     QString text;                // ClipKind::Subtitle
@@ -252,6 +255,10 @@ public:
     bool setLoop(const QUuid& clipId, bool on, Ticks mediaDuration);
     bool setFades(const QUuid& clipId, Ticks fadeIn, Ticks fadeOut);
     bool setGain(const QUuid& clipId, double gainDb);
+    // Mutes or unmutes the sound of the clips and the clips linked to them.
+    bool setClipsMuted(const std::vector<QUuid>& ids, bool muted);
+    // True when every clip given (with its linked clips) is muted.
+    bool clipsMuted(const std::vector<QUuid>& ids) const;
     bool setAudioEffects(const QUuid& clipId, const AudioEffects& fx);
     bool setAudioMaster(const AudioMaster& master);
     // Subtitles. A cue is placed on a subtitle track at `at`, overwriting.
