@@ -76,7 +76,12 @@ QByteArray Project::toJson() const {
             return std::any_of(p.adjustments.layers.begin(), p.adjustments.layers.end(),
                                [](const PhotoLayer& l) { return l.rotation != 0.0 || l.frameTime != 0; });
         });
-    root["version"] = stickers ? 7 : ai ? 6 : motion ? 5 : freezes ? 4 : subtitles ? 3 : 2;
+    // 0.7 tools: speed changes, picture effects, cropped clips, new titles.
+    const bool tools = anyClip([](const Clip& c) {
+        return c.remap.isActive() || !c.effects.isIdentity() || c.transform.hasCrop() ||
+               (c.kind == ClipKind::Title && (c.title.decoration != TitleDecoration::None || c.title.letterSpacing != 0.0 || c.title.uppercase));
+    });
+    root["version"] = tools ? 8 : stickers ? 7 : ai ? 6 : motion ? 5 : freezes ? 4 : subtitles ? 3 : 2;
     root["application"] = QCoreApplication::applicationVersion();
 
     QJsonArray media;
@@ -147,6 +152,10 @@ QByteArray Project::toJson() const {
                 co["redaction"] = c.redaction.toJson();
             if (c.background.enabled)
                 co["background"] = c.background.toJson();
+            if (!c.effects.isIdentity())
+                co["effects"] = c.effects.toJson();
+            if (c.remap.isActive())
+                co["speed"] = c.remap.toJson();
             if (!c.transitionIn.isNone())
                 co["transition"] = c.transitionIn.toJson();
             if (c.loops()) {
@@ -309,6 +318,10 @@ bool Project::fromJson(const QByteArray& json, const QString& baseDir, QString* 
                 c.redaction = Redaction::fromJson(co.value("redaction").toObject());
             if (co.contains("background"))
                 c.background = BackgroundRemoval::fromJson(co.value("background").toObject());
+            if (co.contains("effects"))
+                c.effects = PictureEffects::fromJson(co.value("effects").toObject());
+            if (co.contains("speed"))
+                c.remap = TimeRemap::fromJson(co.value("speed").toObject());
             if (co.contains("transition"))
                 c.transitionIn = Transition::fromJson(co.value("transition").toObject());
             c.loopStart = ticksFromJson(co.value("loopStart"));

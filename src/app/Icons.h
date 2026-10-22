@@ -40,5 +40,20 @@ QIcon popOut();
 QIcon fullScreen(const QColor& color = {});
 QIcon exitFullScreen(const QColor& color = {});
 QIcon appIcon();
+// 0.7 tools and the properties panel tabs.
+QIcon smart();      // sparkles: automatic / AI tools
+QIcon speed();      // gauge
+QIcon effects();    // magic wand
+QIcon sliders();    // edit settings
+QIcon sound();      // speaker
+QIcon info();       // i in a circle
+QIcon filter();     // overlapping circles
+QIcon keyColor();   // green screen
+QIcon collage();    // grid of pictures
+QIcon record(const QColor& color = {}); // filled circle
+QIcon microphone();
+QIcon screen();     // monitor
+QIcon batch();      // stacked photos
+QIcon chevron(bool open);
 
 } // namespace lumora::Icons

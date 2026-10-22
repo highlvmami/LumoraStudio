@@ -95,8 +95,11 @@ struct ColorGrade {
     ToneCurve curveBlue;
     QString lutPath;          // .cube file; empty = none
     double lutAmount = 1.0;   // 0 .. 1 mix of the LUT result
+    QString look;             // ready-made colour filter (color/Looks.h), added to the settings above
+    double lookAmount = 1.0;  // 0 .. 1 strength of the filter
 
     bool hasLut() const { return !lutPath.isEmpty() && lutAmount > 0.0; }
+    bool hasLook() const { return !look.isEmpty() && lookAmount > 0.0; }
     bool hasWheels() const { return !lift.isIdentity() || !gamma.isIdentity() || !gain.isIdentity(); }
     bool hasHsl() const {
         for (const auto& b : hsl)
@@ -110,7 +113,7 @@ struct ColorGrade {
     bool isIdentity() const {
         return exposure == 0.0 && contrast == 0.0 && highlights == 0.0 && shadows == 0.0 && whites == 0.0 &&
                blacks == 0.0 && temperature == 0.0 && tint == 0.0 && saturation == 0.0 && vibrance == 0.0 &&
-               !hasWheels() && !hasHsl() && !hasCurves() && !hasLut();
+               !hasWheels() && !hasHsl() && !hasCurves() && !hasLut() && !hasLook();
     }
     bool operator==(const ColorGrade&) const = default;
 

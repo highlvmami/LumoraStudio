@@ -283,16 +283,7 @@ void AudioMixer::mix(std::int64_t start, int frames, float* out) {
 }
 
 void AudioMixer::readVoice(const Clip& c, Source* src, std::int64_t from, int n, float* dst) {
-    auto readPadded = [&](std::int64_t pos, int count, float* buf) {
-        if (pos < 0) {
-            const int pad = static_cast<int>(std::min<std::int64_t>(count, -pos));
-            std::fill(buf, buf + static_cast<size_t>(pad) * m_channels, 0.0f);
-            if (count > pad)
-                src->read(0, count - pad, buf + static_cast<size_t>(pad) * m_channels);
-        } else {
-            src->read(pos, count, buf);
-        }
-    };
+    auto readPadded = [&](std::int64_t pos, int count, float* buf) { readSource(c, src, pos, count, buf); };
     if (c.audio.chainIsIdentity()) {
         readPadded(from, n, dst);
         return;
@@ -331,6 +322,126 @@ void AudioMixer::readVoice(const Clip& c, Source* src, std::int64_t from, int n,
     std::copy(fx->pending.begin(), fx->pending.begin() + static_cast<long>(n) * m_channels, dst);
     fx->pending.erase(fx->pending.begin(), fx->pending.begin() + static_cast<long>(n) * m_channels);
     fx->outPos = from + n;
+}
+
+void AudioMixer::readSource(const Clip& c, Source* src, std::int64_t pos, int count, float* buf) {
+    if (c.hasSpeedChange()) {
+        const TimeRemap& r = c.remap;
+        if (r.keepPitch && r.ramp.empty() && !r.reverse && r.speed >= 0.25 && r.speed <= 4.0)
+            readStretched(c, src, pos, count, buf);
+        else
+            readVarispeed(c, src, pos, count, buf);
+        return;
+    }
+    if (pos < 0) {
+        const int pad = static_cast<int>(std::min<std::int64_t>(count, -pos));
+        std::fill(buf, buf + static_cast<size_t>(pad) * m_channels, 0.0f);
+        if (count > pad)
+            src->read(0, count - pad, buf + static_cast<size_t>(pad) * m_channels);
+    } else {
+        src->read(pos, count, buf);
+    }
+}
+
+// Speed changes that change the pitch too (backwards, ramps, or when asked):
+// the media is resampled along the remapped time.
+void AudioMixer::readVarispeed(const Clip& c, Source* src, std::int64_t pos, int count, float* buf) {
+    const TimeRemap& r = c.remap;
+    auto mediaPos = [&](std::int64_t v) {
+        // Media sample position (fractional) of source sample v.
+        const Ticks t = av_rescale(v, kTicksPerSecond, m_rate);
+        return static_cast<double>(r.map(t)) * m_rate / kTicksPerSecond;
+    };
+    constexpr int step = 64;
+    std::vector<double> positions(static_cast<size_t>(count) + 1);
+    for (int i = 0; i <= count; i += step) {
+        const int j = std::min(count, i + step);
+        const double a = mediaPos(pos + i), b = mediaPos(pos + j);
+        for (int k = i; k <= j; ++k)
+            positions[static_cast<size_t>(k)] = a + (b - a) * (k - i) / std::max(1, j - i);
+    }
+    double lo = positions[0], hi = positions[0];
+    for (double p : positions) {
+        lo = std::min(lo, p);
+        hi = std::max(hi, p);
+    }
+    const std::int64_t first = static_cast<std::int64_t>(std::floor(lo)) - 1;
+    const int span = static_cast<int>(std::ceil(hi) - first) + 3;
+    std::vector<float> media(static_cast<size_t>(span) * m_channels, 0.0f);
+    const std::int64_t readFrom = std::max<std::int64_t>(0, first);
+    if (first + span > 0)
+        src->read(readFrom, static_cast<int>(first + span - readFrom), media.data() + (readFrom - first) * m_channels);
+    for (int i = 0; i < count; ++i) {
+        const double p = positions[static_cast<size_t>(i)] - first;
+        const int k = std::clamp(static_cast<int>(std::floor(p)), 0, span - 2);
+        const float f = static_cast<float>(std::clamp(p - k, 0.0, 1.0));
+        for (int ch = 0; ch < m_channels; ++ch) {
+            const float a = media[static_cast<size_t>(k) * m_channels + ch];
+            const float b = media[static_cast<size_t>(k + 1) * m_channels + ch];
+            buf[static_cast<size_t>(i) * m_channels + ch] = a + (b - a) * f;
+        }
+    }
+}
+
+// Constant speed that keeps the pitch: overlapping 40 ms grains of the media
+// are laid out at the new speed (WSOLA: each grain is shifted by up to 10 ms
+// to where it continues the previous one best, so voices do not warble).
+// Every grain depends only on its own position, so any range can be read.
+void AudioMixer::readStretched(const Clip& c, Source* src, std::int64_t pos, int count, float* buf) {
+    const TimeRemap& r = c.remap;
+    const int hop = std::max(64, m_rate / 50);      // output distance between grains
+    const int search = std::max(16, m_rate / 100);  // alignment range
+    const int win = 2 * hop;
+    std::fill(buf, buf + static_cast<size_t>(count) * m_channels, 0.0f);
+    auto centre = [&](std::int64_t k) {
+        const Ticks t = av_rescale(k * hop, kTicksPerSecond, m_rate);
+        return static_cast<std::int64_t>(std::llround(static_cast<double>(r.map(t)) * m_rate / kTicksPerSecond));
+    };
+    // Media samples [from, from + n) into a buffer (zeros outside the media).
+    std::vector<float> grain, target;
+    auto readMedia = [&](std::int64_t from, int n, std::vector<float>& out) {
+        out.assign(static_cast<size_t>(n) * m_channels, 0.0f);
+        const std::int64_t a = std::max<std::int64_t>(0, from);
+        if (from + n > a)
+            src->read(a, static_cast<int>(from + n - a), out.data() + (a - from) * m_channels);
+    };
+    const std::int64_t kFirst = static_cast<std::int64_t>(std::floor(static_cast<double>(pos - hop) / hop)) + 1;
+    const std::int64_t kLast = static_cast<std::int64_t>(std::floor(static_cast<double>(pos + count + hop) / hop));
+    std::vector<float> window(static_cast<size_t>(win));
+    for (int j = 0; j < win; ++j)
+        window[static_cast<size_t>(j)] = static_cast<float>(0.5 - 0.5 * std::cos(2 * M_PI * j / win));
+    for (std::int64_t k = kFirst; k <= kLast; ++k) {
+        const std::int64_t ck = centre(k);
+        // Natural continuation of the previous grain over the overlap.
+        const std::int64_t prev = centre(k - 1);
+        readMedia(prev, hop, target);
+        readMedia(ck - hop - search, win + 2 * search, grain);
+        int best = search;
+        double bestScore = -1e300;
+        if (k > 0 && ck != prev + hop) {
+            for (int d = 0; d <= 2 * search; d += 2) {
+                double score = 0;
+                for (int j = 0; j < hop; j += 4)
+                    for (int ch = 0; ch < m_channels; ++ch)
+                        score += static_cast<double>(target[static_cast<size_t>(j) * m_channels + ch]) *
+                                 grain[static_cast<size_t>(d + j) * m_channels + ch];
+                if (score > bestScore) {
+                    bestScore = score;
+                    best = d;
+                }
+            }
+        }
+        // Overlap-add the grain centred at output sample k * hop.
+        const std::int64_t outStart = k * hop - hop;
+        for (int j = 0; j < win; ++j) {
+            const std::int64_t o = outStart + j - pos;
+            if (o < 0 || o >= count)
+                continue;
+            const float w = window[static_cast<size_t>(j)];
+            for (int ch = 0; ch < m_channels; ++ch)
+                buf[static_cast<size_t>(o) * m_channels + ch] += w * grain[static_cast<size_t>(best + j) * m_channels + ch];
+        }
+    }
 }
 
 void AudioMixer::mixRaw(std::int64_t start, int frames, float* out) {

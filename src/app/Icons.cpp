@@ -421,4 +421,175 @@ QIcon appIcon() {
     return icon;
 }
 
+QIcon smart() {
+    return draw([](QPainter& p, QColor c) {
+        auto star = [&](QPointF o, double r) {
+            QPainterPath path;
+            path.moveTo(o.x(), o.y() - r);
+            path.quadTo(o, QPointF(o.x() + r, o.y()));
+            path.quadTo(o, QPointF(o.x(), o.y() + r));
+            path.quadTo(o, QPointF(o.x() - r, o.y()));
+            path.quadTo(o, QPointF(o.x(), o.y() - r));
+            p.fillPath(path, c);
+        };
+        star(QPointF(10, 13), 7.5);
+        star(QPointF(18.5, 5.5), 3.5);
+        star(QPointF(19, 18.5), 2.8);
+    });
+}
+
+QIcon speed() {
+    return draw([](QPainter& p, QColor c) {
+        p.setPen(pen(c));
+        p.setBrush(Qt::NoBrush);
+        p.drawArc(QRectF(3, 5, 18, 18), 0 * 16, 180 * 16);
+        p.drawLine(QPointF(3, 14), QPointF(21, 14));
+        p.drawLine(QPointF(12, 14), QPointF(17, 8.5));
+        p.setBrush(c);
+        p.drawEllipse(QPointF(12, 14), 1.6, 1.6);
+    });
+}
+
+QIcon effects() {
+    return draw([](QPainter& p, QColor c) {
+        p.setPen(pen(c, 2.2));
+        p.drawLine(QPointF(4, 20), QPointF(15, 9));
+        p.setPen(pen(c, 1.4));
+        p.drawLine(QPointF(17, 3), QPointF(17, 7));
+        p.drawLine(QPointF(15, 5), QPointF(19, 5));
+        p.drawLine(QPointF(20, 10), QPointF(20, 13));
+        p.drawLine(QPointF(18.5, 11.5), QPointF(21.5, 11.5));
+        p.drawLine(QPointF(9, 3), QPointF(9, 6));
+        p.drawLine(QPointF(7.5, 4.5), QPointF(10.5, 4.5));
+    });
+}
+
+QIcon sliders() {
+    return draw([](QPainter& p, QColor c) {
+        p.setPen(pen(c));
+        for (int i = 0; i < 3; ++i) {
+            const double y = 6 + i * 6;
+            p.drawLine(QPointF(4, y), QPointF(20, y));
+        }
+        p.setBrush(c);
+        p.drawEllipse(QPointF(8, 6), 2.2, 2.2);
+        p.drawEllipse(QPointF(15, 12), 2.2, 2.2);
+        p.drawEllipse(QPointF(10, 18), 2.2, 2.2);
+    });
+}
+
+QIcon sound() {
+    return draw([](QPainter& p, QColor c) {
+        p.setPen(Qt::NoPen);
+        p.setBrush(c);
+        p.drawPolygon(QPolygonF{QPointF(3, 9), QPointF(7, 9), QPointF(12, 5), QPointF(12, 19), QPointF(7, 15), QPointF(3, 15)});
+        p.setPen(pen(c));
+        p.setBrush(Qt::NoBrush);
+        p.drawArc(QRectF(10, 8, 6, 8), -60 * 16, 120 * 16);
+        p.drawArc(QRectF(10, 4.5, 11, 15), -60 * 16, 120 * 16);
+    });
+}
+
+QIcon info() {
+    return draw([](QPainter& p, QColor c) {
+        p.setPen(pen(c));
+        p.setBrush(Qt::NoBrush);
+        p.drawEllipse(QPointF(12, 12), 9, 9);
+        p.drawLine(QPointF(12, 11), QPointF(12, 17));
+        p.setBrush(c);
+        p.setPen(Qt::NoPen);
+        p.drawEllipse(QPointF(12, 7.5), 1.3, 1.3);
+    });
+}
+
+QIcon filter() {
+    return draw([](QPainter& p, QColor c) {
+        p.setPen(pen(c, 1.6));
+        p.setBrush(Qt::NoBrush);
+        p.drawEllipse(QPointF(9, 9.5), 5.5, 5.5);
+        p.drawEllipse(QPointF(15, 9.5), 5.5, 5.5);
+        p.drawEllipse(QPointF(12, 15), 5.5, 5.5);
+    });
+}
+
+QIcon keyColor() {
+    return draw([](QPainter& p, QColor c) {
+        p.setPen(pen(c, 1.6));
+        p.setBrush(QColor(0, 177, 64));
+        p.drawRoundedRect(QRectF(3, 4, 18, 14), 2, 2);
+        p.setBrush(c);
+        p.setPen(Qt::NoPen);
+        p.drawEllipse(QPointF(12, 9.5), 2.6, 2.6);
+        p.drawRoundedRect(QRectF(8, 12.5, 8, 5.5), 2.5, 2.5);
+        p.setPen(pen(c, 1.6));
+        p.drawLine(QPointF(9, 21), QPointF(15, 21));
+    });
+}
+
+QIcon collage() {
+    return draw([](QPainter& p, QColor c) {
+        p.setPen(pen(c, 1.5));
+        p.setBrush(Qt::NoBrush);
+        p.drawRoundedRect(QRectF(3, 4, 18, 16), 2, 2);
+        p.drawLine(QPointF(12, 4), QPointF(12, 20));
+        p.drawLine(QPointF(12, 12), QPointF(21, 12));
+    });
+}
+
+QIcon record(const QColor& color) {
+    return draw(
+        [](QPainter& p, QColor c) {
+            p.setPen(pen(c, 1.5));
+            p.setBrush(Qt::NoBrush);
+            p.drawEllipse(QPointF(12, 12), 8.5, 8.5);
+            p.setPen(Qt::NoPen);
+            p.setBrush(QColor(230, 60, 60));
+            p.drawEllipse(QPointF(12, 12), 5.5, 5.5);
+        },
+        color);
+}
+
+QIcon microphone() {
+    return draw([](QPainter& p, QColor c) {
+        p.setPen(pen(c));
+        p.setBrush(Qt::NoBrush);
+        p.drawRoundedRect(QRectF(9, 3, 6, 11), 3, 3);
+        p.drawArc(QRectF(6, 7, 12, 10), 180 * 16, 180 * 16);
+        p.drawLine(QPointF(12, 17), QPointF(12, 21));
+        p.drawLine(QPointF(9, 21), QPointF(15, 21));
+    });
+}
+
+QIcon screen() {
+    return draw([](QPainter& p, QColor c) {
+        p.setPen(pen(c));
+        p.setBrush(Qt::NoBrush);
+        p.drawRoundedRect(QRectF(3, 4, 18, 12), 1.5, 1.5);
+        p.drawLine(QPointF(12, 16), QPointF(12, 20));
+        p.drawLine(QPointF(8, 20), QPointF(16, 20));
+    });
+}
+
+QIcon batch() {
+    return draw([](QPainter& p, QColor c) {
+        p.setPen(pen(c, 1.5));
+        p.setBrush(Qt::NoBrush);
+        p.drawRoundedRect(QRectF(7, 3, 14, 11), 1.5, 1.5);
+        p.drawLine(QPointF(5, 6), QPointF(5, 16));
+        p.drawLine(QPointF(5, 16), QPointF(18, 16));
+        p.drawLine(QPointF(3, 9), QPointF(3, 19));
+        p.drawLine(QPointF(3, 19), QPointF(15, 19));
+    });
+}
+
+QIcon chevron(bool open) {
+    return draw([open](QPainter& p, QColor c) {
+        p.setPen(pen(c, 2.0));
+        if (open)
+            p.drawPolyline(QPolygonF{QPointF(7, 10), QPointF(12, 15), QPointF(17, 10)});
+        else
+            p.drawPolyline(QPolygonF{QPointF(10, 7), QPointF(15, 12), QPointF(10, 17)});
+    });
+}
+
 } // namespace lumora::Icons

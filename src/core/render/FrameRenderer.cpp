@@ -1,6 +1,7 @@
 #include "FrameRenderer.h"
 
 #include <QPainter>
+#include <QPainterPath>
 #include <algorithm>
 #include <cmath>
 #include <condition_variable>
@@ -15,6 +16,7 @@
 #include "ffmpeg/FFmpeg.h"
 #include "image/PhotoProcessor.h"
 #include "media/VideoDecoder.h"
+#include "render/Effects.h"
 #include "render/TitleRenderer.h"
 
 namespace lumora {
@@ -60,7 +62,14 @@ struct FrameRenderer::Slot {
     ColorGrade imageGrade;
     Redaction imageRedaction;
     BackgroundRemoval imageBackground;
+    PictureEffects imageEffects;
+    double imageMix = 0.0;
     std::unique_ptr<ColorProcessor> color; // for the clip's current grade
+    // Clips that play backwards: decoded frames around the current position
+    // (by media time), so stepping back does not seek and decode a whole
+    // group of pictures for every frame.
+    std::map<Ticks, av::FramePtr> back;
+    size_t backBytes = 0;
     // Subject matte of the last frame (background removal is the slow part).
     QImage matte;
     Ticks mattePts = kInvalidTicks;
@@ -366,18 +375,97 @@ QImage FrameRenderer::convertFrame(Slot& slot, const AVFrame* f, QSize size) {
     return img;
 }
 
+const AVFrame* FrameRenderer::reverseFrameAt(Slot& slot, Ticks t, Ticks* pts, const AVFrame** next, Ticks* nextPts) {
+    auto lookup = [&]() -> const AVFrame* {
+        auto it = slot.back.upper_bound(t);
+        if (it == slot.back.begin() || it == slot.back.end())
+            return nullptr; // not covered on both sides
+        auto after = it;
+        --it;
+        *pts = it->first;
+        if (next) {
+            *next = after->second.get();
+            *nextPts = after->first;
+        }
+        return it->second.get();
+    };
+    if (const AVFrame* f = lookup())
+        return f;
+    // Decode the second before `t` (from the key frame before it) and keep
+    // those frames: playing backwards then walks through them.
+    slot.back.clear();
+    slot.backBytes = 0;
+    VideoDecoder& dec = *slot.decoder;
+    dec.seek(std::max<Ticks>(0, t - kTicksPerSecond));
+    constexpr size_t kMaxBytes = size_t(384) << 20;
+    DecodedFrame f;
+    while (dec.next(f)) {
+        const AVFrame* af = f.frame.get();
+        size_t bytes = 0;
+        for (int i = 0; i < AV_NUM_DATA_POINTERS && af->buf[i]; ++i)
+            bytes += af->buf[i]->size;
+        const Ticks p = f.pts;
+        slot.back[p] = std::move(f.frame);
+        slot.backBytes += bytes;
+        // Keep the newest frames when the memory cap is reached.
+        while (slot.backBytes > kMaxBytes && slot.back.size() > 2) {
+            const AVFrame* old = slot.back.begin()->second.get();
+            for (int i = 0; i < AV_NUM_DATA_POINTERS && old->buf[i]; ++i)
+                slot.backBytes -= std::min(slot.backBytes, size_t(old->buf[i]->size));
+            slot.back.erase(slot.back.begin());
+        }
+        if (p > t)
+            break;
+        f = {};
+    }
+    // The decoder's own position is now somewhere else.
+    dec.seek(t);
+    if (const AVFrame* found = lookup())
+        return found;
+    // Past the last frame: show the last one.
+    if (!slot.back.empty() && slot.back.rbegin()->first <= t) {
+        *pts = slot.back.rbegin()->first;
+        if (next)
+            *next = nullptr;
+        return slot.back.rbegin()->second.get();
+    }
+    return slot.back.empty() ? nullptr : (*pts = slot.back.begin()->first, slot.back.begin()->second.get());
+}
+
 QImage FrameRenderer::clipImage(const Clip& clip, Ticks sourceTime, QSize* fitSize, int* rotation) {
     Slot* slot = slotFor(clip);
     if (slot->failed)
         return {};
     Ticks pts = 0;
     const AVFrame* f = nullptr;
+    // Slow motion with frame blending: the next frame and how far between
+    // the two frames this moment is.
+    const AVFrame* f2 = nullptr;
+    Ticks pts2 = 0;
+    double mix = 0.0;
     int rot = 0;
     double dw = slot->still.width(), dh = slot->still.height();
     if (slot->decoder) {
-        f = slot->decoder->frameAt(sourceTime + m_sampleOffset, &pts);
+        const bool blending = clip.hasSpeedChange() && clip.remap.blending != FrameBlending::None;
+        if (clip.hasSpeedChange() && clip.remap.reverse) {
+            f = reverseFrameAt(*slot, sourceTime + m_sampleOffset, &pts, blending ? &f2 : nullptr, &pts2);
+        } else {
+            slot->back.clear();
+            slot->backBytes = 0;
+            f = slot->decoder->frameAt(sourceTime + m_sampleOffset, &pts);
+            if (f && blending)
+                f2 = slot->decoder->peekNext(&pts2);
+        }
         if (!f || f->width <= 0 || f->height <= 0)
             return {};
+        if (f2 && pts2 > pts && f2->width == f->width && f2->height == f->height && f2->format == f->format)
+            mix = std::clamp(static_cast<double>(sourceTime - pts) / (pts2 - pts), 0.0, 1.0);
+        // Steps too small to see (or a clip that is not slowed down).
+        if (mix < 0.02 || mix > 0.98 || std::abs(clip.remap.mediaRate(clip.remap.unmap(sourceTime))) >= 1.0) {
+            mix = 0.0;
+            f2 = nullptr;
+        }
+        mix = std::round(mix * 64) / 64; // reuse the picture for nearly equal moments
         rot = slot->decoder->info().rotation;
         // Display size of the picture (square pixels, rotated).
         dw = f->width;
@@ -401,8 +489,9 @@ QImage FrameRenderer::clipImage(const Clip& clip, Ticks sourceTime, QSize* fitSi
         target.transpose();
     const int tw = std::max(2, static_cast<int>(std::lround(target.width())));
     const int th = std::max(2, static_cast<int>(std::lround(target.height())));
-    if (slot->imagePts == pts && slot->imageSize == QSize(tw, th) && slot->imageGrade == clip.color &&
-        slot->imageRedaction == clip.redaction && slot->imageBackground == clip.background && !slot->image.isNull())
+    if (slot->imagePts == pts && slot->imageMix == mix && slot->imageSize == QSize(tw, th) && slot->imageGrade == clip.color &&
+        slot->imageRedaction == clip.redaction && slot->imageBackground == clip.background && slot->imageEffects == clip.effects &&
+        !slot->image.isNull())
         return slot->image;
 
     const bool final = m_precision == Precision::Final;
@@ -413,6 +502,12 @@ QImage FrameRenderer::clipImage(const Clip& clip, Ticks sourceTime, QSize* fitSi
                                                                           : QImage::Format_RGB32);
     if (img.isNull())
         return {};
+    if (f2) {
+        const QImage next = convertFrame(*slot, f2, QSize(tw, th));
+        if (!next.isNull())
+            img = clip.remap.blending == FrameBlending::OpticalFlow ? fx::interpolateFrames(img, next, mix)
+                                                                    : fx::blendFrames(img, next, mix);
+    }
     // The subject is found on the picture as shot, before grading, so colour
     // changes do not move the cut-out edge.
     QImage matte;
@@ -436,12 +531,16 @@ QImage FrameRenderer::clipImage(const Clip& clip, Ticks sourceTime, QSize* fitSi
     }
     if (clip.redaction.isActive())
         ai::hideRegions(img, clip.redaction.regionsAt(pts), clip.redaction.style, clip.redaction.strength);
+    if (!clip.effects.isIdentity())
+        fx::applyPictureEffects(img, clip.effects, static_cast<std::uint32_t>(pts / 1000));
     if (!matte.isNull())
         ai::applyMatte(img, matte, clip.background.softness);
     slot->image = img;
     slot->imageGrade = clip.color;
     slot->imageRedaction = clip.redaction;
     slot->imageBackground = clip.background;
+    slot->imageEffects = clip.effects;
+    slot->imageMix = mix;
     slot->imagePts = pts;
     slot->imageSize = QSize(tw, th);
     return img;
@@ -482,9 +581,16 @@ void FrameRenderer::drawLayer(QPainter& p, const Clip& clip, Ticks t, Ticks sour
     p.setOpacity(alpha);
     p.translate(centre);
     const double angle = tr.rotation + rotation;
-    p.rotate(angle);
+    p.rotate(tr.rotation);
     const double scale = std::clamp(tr.scale, 0.0, 100.0);
     QSizeF size = QSizeF(fit) * scale;
+    if (tr.hasCrop()) {
+        // Crop window in the picture as shown (before its own rotation).
+        const QRectF c = tr.crop.intersected(QRectF(0, 0, 1, 1));
+        p.setClipRect(QRectF(-size.width() / 2 + c.x() * size.width(), -size.height() / 2 + c.y() * size.height(),
+                             c.width() * size.width(), c.height() * size.height()));
+    }
+    p.rotate(rotation);
     if (rotation == 90 || rotation == 270)
         size.transpose();
     bool stabilized = false;
@@ -622,6 +728,142 @@ QImage FrameRenderer::renderStoryline(Ticks t) {
         painter.drawImage(0, 0, blurred(lb, radius));
         break;
     }
+    case TransitionType::PushUp:
+        painter.drawImage(QPointF(0, -e * h), la);
+        painter.drawImage(QPointF(0, (1 - e) * h), lb);
+        break;
+    case TransitionType::PushDown:
+        painter.drawImage(QPointF(0, e * h), la);
+        painter.drawImage(QPointF(0, -(1 - e) * h), lb);
+        break;
+    case TransitionType::Iris: {
+        painter.drawImage(0, 0, la);
+        const double r = e * std::hypot(w, h) / 2;
+        QPainterPath circle;
+        circle.addEllipse(QPointF(w / 2, h / 2), r, r);
+        painter.setRenderHint(QPainter::Antialiasing);
+        painter.setClipPath(circle);
+        painter.drawImage(0, 0, lb);
+        break;
+    }
+    case TransitionType::ClockWipe: {
+        painter.drawImage(0, 0, la);
+        const double r = std::hypot(w, h);
+        QPainterPath pie;
+        pie.moveTo(w / 2, h / 2);
+        pie.arcTo(QRectF(w / 2 - r, h / 2 - r, 2 * r, 2 * r), 90, -360 * e);
+        pie.closeSubpath();
+        painter.setRenderHint(QPainter::Antialiasing);
+        painter.setClipPath(pie);
+        painter.drawImage(0, 0, lb);
+        break;
+    }
+    case TransitionType::BarnDoor: {
+        painter.drawImage(0, 0, lb);
+        const double half = w / 2;
+        painter.drawImage(QRectF(-e * half, 0, half, h), la, QRectF(0, 0, half, h));
+        painter.drawImage(QRectF(half + e * half, 0, w - half, h), la, QRectF(half, 0, w - half, h));
+        break;
+    }
+    case TransitionType::DiagonalWipe: {
+        painter.drawImage(0, 0, la);
+        // The edge runs from bottom left to top right and sweeps from the
+        // top left corner to the bottom right one.
+        const double d = 2 * e;
+        QPolygonF poly;
+        poly << QPointF(0, 0) << QPointF(std::min(d, 1.0) * w, 0);
+        if (d > 1.0)
+            poly << QPointF(w, (d - 1.0) * h) << QPointF(w, h) << QPointF(0, h);
+        poly << QPointF(0, std::min(d, 1.0) * h);
+        if (d > 1.0) {
+            poly.clear();
+            poly << QPointF(0, 0) << QPointF(w, 0) << QPointF(w, (d - 1.0) * h) << QPointF((d - 1.0) * w, h) << QPointF(0, h);
+        }
+        QPainterPath path;
+        path.addPolygon(poly);
+        painter.setRenderHint(QPainter::Antialiasing);
+        painter.setClipPath(path);
+        painter.drawImage(0, 0, lb);
+        break;
+    }
+    case TransitionType::Flash: {
+        painter.drawImage(0, 0, p < 0.5 ? la : lb);
+        const double white = std::clamp(1.0 - std::abs(p - 0.5) * 3.0, 0.0, 1.0);
+        painter.setOpacity(white);
+        painter.fillRect(out.rect(), Qt::white);
+        break;
+    }
+    case TransitionType::Pixelate: {
+        const QImage& src = p < 0.5 ? la : lb;
+        const double block = 1.0 + std::sin(M_PI * p) * w / 24.0;
+        const QSize small(std::max(1, static_cast<int>(w / block)), std::max(1, static_cast<int>(h / block)));
+        const QImage tiny = src.scaled(small, Qt::IgnoreAspectRatio, Qt::SmoothTransformation);
+        painter.setRenderHint(QPainter::SmoothPixmapTransform, false);
+        painter.drawImage(QRectF(0, 0, w, h), tiny);
+        break;
+    }
+    case TransitionType::Spin: {
+        auto drawTurned = [&](const QImage& img, double angle, double s, double opacity) {
+            painter.save();
+            painter.setOpacity(opacity);
+            painter.translate(w / 2, h / 2);
+            painter.rotate(angle);
+            painter.scale(s, s);
+            painter.drawImage(QPointF(-w / 2, -h / 2), img);
+            painter.restore();
+        };
+        if (p < 0.5) {
+            drawTurned(lb, -120 * (1 - e), 0.4 + 0.6 * e, smoothstep(2 * p));
+            drawTurned(la, 120 * e, 1.0 - 0.6 * e, 1.0);
+        } else {
+            drawTurned(la, 120 * e, 1.0 - 0.6 * e, 1.0 - smoothstep(2 * p - 1));
+            drawTurned(lb, -120 * (1 - e), 0.4 + 0.6 * e, 1.0);
+        }
+        break;
+    }
+    case TransitionType::Glitch: {
+        const QImage& base = p < 0.5 ? la : lb;
+        const QImage& other = p < 0.5 ? lb : la;
+        painter.drawImage(0, 0, base);
+        const double amount = std::sin(M_PI * p);
+        // Stripes of the picture jump sideways; some show the other clip.
+        const int step = static_cast<int>(p * 24);
+        std::uint32_t seed = 0x9e3779b9u * (step + 1);
+        auto rnd = [&seed] {
+            seed ^= seed << 13;
+            seed ^= seed >> 17;
+            seed ^= seed << 5;
+            return (seed & 0xffff) / 65535.0;
+        };
+        const int stripes = 6 + static_cast<int>(amount * 10);
+        for (int k = 0; k < stripes; ++k) {
+            const double y = rnd() * h, sh = (0.01 + 0.06 * rnd()) * h;
+            const double dx = (rnd() - 0.5) * 0.2 * w * amount;
+            const QImage& src = rnd() < 0.35 ? other : base;
+            painter.drawImage(QRectF(dx, y, w, sh), src, QRectF(0, y, w, sh));
+        }
+        // A ghost of the picture shifted sideways.
+        painter.setCompositionMode(QPainter::CompositionMode_Screen);
+        painter.setOpacity(0.3 * amount);
+        painter.drawImage(QPointF(0.015 * w * amount, 0), base);
+        painter.setCompositionMode(QPainter::CompositionMode_SourceOver);
+        painter.setOpacity(1.0);
+        break;
+    }
+    case TransitionType::ZoomBlur: {
+        auto drawZoomed = [&](const QImage& img, double s, double radius, double opacity) {
+            painter.save();
+            painter.setOpacity(opacity);
+            painter.translate(w / 2, h / 2);
+            painter.scale(s, s);
+            painter.drawImage(QPointF(-w / 2, -h / 2), blurred(img, radius));
+            painter.restore();
+        };
+        const double radius = std::sin(M_PI * p) * 0.03 * w;
+        drawZoomed(la, 1.0 + 0.8 * e, radius, 1.0);
+        drawZoomed(lb, 1.8 - 0.8 * e, radius, smoothstep((p - 0.3) / 0.4));
+        break;
+    }
     }
     return out;
 }
@@ -679,7 +921,8 @@ const AVFrame* FrameRenderer::passthroughFrame(Ticks t) {
         if (!c.contains(t))
             continue;
         if (!c.hasMedia() || !c.transform.isIdentity() || !c.color.isIdentity() || fadeFactor(c, t) != 1.0 ||
-            c.stabilization.isActive() || !c.motion.isEmpty() || c.redaction.isActive() || c.background.enabled)
+            c.stabilization.isActive() || !c.motion.isEmpty() || c.redaction.isActive() || c.background.enabled ||
+            !c.effects.isIdentity() || c.hasSpeedChange())
             return nullptr;
         const Ticks dIn = m_state.transitionDuration(k, dur);
         if (dIn > 0 && t < c.timelineStart + dIn / 2)

@@ -1,5 +1,6 @@
 #pragma once
 
+#include <QImage>
 #include <QWidget>
 
 #include "color/ColorGrade.h"
@@ -13,6 +14,7 @@ class QPushButton;
 namespace lumora {
 
 class SliderRow;
+class LookGallery;
 class ColorWheelWidget;
 class CurvesWidget;
 
@@ -31,6 +33,9 @@ public:
     // Shown above the controls, e.g. the clip or layer being edited.
     void setHeader(const QString& text);
     void setEditable(bool on);
+    // The picture before any colour settings: filter previews and the
+    // automatic correction are made from it.
+    void setPreviewImage(const QImage& image);
 
     // Most recently used LUT files (QSettings).
     static QStringList recentLuts();
@@ -76,6 +81,10 @@ private:
     SliderRow* m_lutAmount;
     QPushButton* m_saveLut;
     QToolButton* m_reset;
+    LookGallery* m_looks;
+    SliderRow* m_lookAmount;
+    QPushButton* m_auto;
+    QImage m_preview;
 };
 
 } // namespace lumora

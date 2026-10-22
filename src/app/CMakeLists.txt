@@ -19,6 +19,7 @@ set(APP_SOURCES
     panels/TimelineView.h panels/TimelineView.cpp
     panels/TimelinePanel.h panels/TimelinePanel.cpp
     panels/PropertiesPanel.h panels/PropertiesPanel.cpp
+    panels/CollapsibleSection.h panels/CollapsibleSection.cpp
     panels/HelpPage.h panels/HelpPage.cpp
     dialogs/ExportDialog.h dialogs/ExportDialog.cpp
     dialogs/PhotoExportDialog.h dialogs/PhotoExportDialog.cpp
@@ -28,12 +29,17 @@ set(APP_SOURCES
     color/CurvesWidget.h color/CurvesWidget.cpp
     audio/AudioPanel.h audio/AudioPanel.cpp
     color/ColorPanel.h color/ColorPanel.cpp
+    color/LookGallery.h color/LookGallery.cpp
     color/ClipColorPanel.h color/ClipColorPanel.cpp
     color/ScopesWidget.h color/ScopesWidget.cpp
     photo/LayersPanel.h photo/LayersPanel.cpp
     photo/PhotoView.h photo/PhotoView.cpp
     photo/PhotoWorkspace.h photo/PhotoWorkspace.cpp
     photo/SmartToolsPanel.h photo/SmartToolsPanel.cpp
+    tools/GifDialog.h tools/GifDialog.cpp
+    tools/CollageDialog.h tools/CollageDialog.cpp
+    tools/BatchPhotoDialog.h tools/BatchPhotoDialog.cpp
+    tools/Recorders.h tools/Recorders.cpp
 )
 
 # Windows: the logo as the .exe icon and the version in the file properties.

@@ -45,6 +45,9 @@ public:
 
     void setPreviewSize(QSize size);
     bool audioAvailable() const { return m_audioOk; }
+    // Plays without sound (while a voice-over is recorded).
+    void setMuted(bool muted);
+    bool isMuted() const { return m_muted; }
 
 signals:
     void frameReady(const QImage& image, lumora::Ticks time);
@@ -86,6 +89,7 @@ private:
     QAudioSink* m_sink = nullptr;
     AudioRingDevice* m_ring = nullptr;
     bool m_audioOk = false;
+    bool m_muted = false;
 };
 
 } // namespace lumora

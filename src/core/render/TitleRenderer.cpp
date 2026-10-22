@@ -5,6 +5,7 @@
 #include <QStringList>
 #include <algorithm>
 #include <cmath>
+#include <memory>
 
 namespace lumora {
 
@@ -26,6 +27,8 @@ struct AnimState {
     double offsetY = 0.0; // fraction of frame height
     double scale = 1.0;
     double reveal = 1.0;  // typewriter: fraction of characters shown
+    double offsetX = 0.0; // fraction of frame width
+    double blur = 0.0;    // fraction of the font size
 };
 
 void applyAnimation(AnimState& s, TitleAnimation a, double p) {
@@ -41,6 +44,18 @@ void applyAnimation(AnimState& s, TitleAnimation a, double p) {
         s.scale *= 0.6 + 0.4 * easeOutBack(p);
         break;
     case TitleAnimation::Typewriter: s.reveal = std::min(s.reveal, p); break;
+    case TitleAnimation::SlideLeft:
+        s.opacity *= smoothstep(p);
+        s.offsetX += (1.0 - smoothstep(p)) * 0.08;
+        break;
+    case TitleAnimation::Zoom:
+        s.opacity *= smoothstep(p);
+        s.scale *= 1.0 + 0.6 * (1.0 - smoothstep(p));
+        break;
+    case TitleAnimation::Blur:
+        s.opacity *= smoothstep(std::min(1.0, p * 1.5));
+        s.blur += 0.6 * (1.0 - smoothstep(p));
+        break;
     }
 }
 
@@ -91,12 +106,15 @@ void drawTitle(QPainter& p, QSize frame, const TitleData& t, Ticks local, Ticks 
     font.setPixelSize(static_cast<int>(std::lround(fontPx)));
     font.setBold(t.bold);
     font.setItalic(t.italic);
+    if (t.letterSpacing != 0.0)
+        font.setLetterSpacing(QFont::AbsoluteSpacing, t.letterSpacing * fontPx);
     const QFontMetricsF fm(font);
 
-    QString text = t.text;
+    const QString full = t.uppercase ? t.text.toUpper() : t.text;
+    QString text = full;
     if (s.reveal < 1.0)
         text = text.left(static_cast<int>(std::ceil(s.reveal * text.size())));
-    const QStringList lines = t.text.split(QLatin1Char('\n'));
+    const QStringList lines = full.split(QLatin1Char('\n'));
     const QStringList shown = text.split(QLatin1Char('\n'));
     // Lay out with the full text so the block does not move while it types.
     double blockW = 0;
@@ -116,31 +134,95 @@ void drawTitle(QPainter& p, QSize frame, const TitleData& t, Ticks local, Ticks 
         path.addText(x, i * lineH + fm.ascent(), font, shown[i]);
     }
 
-    p.save();
-    p.setRenderHint(QPainter::Antialiasing);
-    p.setRenderHint(QPainter::TextAntialiasing);
-    const QPointF centre(t.x * frame.width(), (t.y + s.offsetY) * frame.height());
-    p.translate(centre);
-    p.scale(s.scale, s.scale);
-    p.translate(-blockW / 2, -blockH / 2);
-    p.setOpacity(p.opacity() * s.opacity);
+    // With a blur animation the title is drawn into a picture first.
+    const double blurPx = s.blur * fontPx;
+    QImage layer;
+    QPainter* target = &p;
+    std::unique_ptr<QPainter> layerPainter;
+    if (blurPx > 0.5) {
+        layer = QImage(frame, QImage::Format_ARGB32_Premultiplied);
+        layer.fill(Qt::transparent);
+        layerPainter = std::make_unique<QPainter>(&layer);
+        target = layerPainter.get();
+    }
+    QPainter& d = *target;
+    d.save();
+    d.setRenderHint(QPainter::Antialiasing);
+    d.setRenderHint(QPainter::TextAntialiasing);
+    const QPointF centre((t.x + s.offsetX) * frame.width(), (t.y + s.offsetY) * frame.height());
+    d.translate(centre);
+    d.scale(s.scale, s.scale);
+    d.translate(-blockW / 2, -blockH / 2);
+    if (!layerPainter)
+        d.setOpacity(d.opacity() * s.opacity);
 
-    if (t.backgroundOpacity > 0) {
-        const double pad = fontPx * 0.3;
+    const double pad = fontPx * 0.3;
+    const QRectF block(0, 0, blockW, blockH);
+    QColor accent = t.accentColor;
+    switch (t.decoration) {
+    case TitleDecoration::None: break;
+    case TitleDecoration::Band: {
+        // Across the whole frame, behind the text.
+        QColor band = t.backgroundOpacity > 0 ? t.backgroundColor : accent;
+        if (t.backgroundOpacity > 0)
+            band.setAlphaF(std::clamp(t.backgroundOpacity, 0.0, 1.0));
+        const double left = -(centre.x() / s.scale - blockW / 2) - 2;
+        d.fillRect(QRectF(left, -pad * 0.6, frame.width() / s.scale + 4, blockH + 1.2 * pad), band);
+        d.fillRect(QRectF(left, -pad * 0.6, frame.width() / s.scale + 4, fontPx * 0.08), accent);
+        break;
+    }
+    case TitleDecoration::Bar:
+        d.fillRect(QRectF(-pad * 1.6, -pad * 0.4, fontPx * 0.12, blockH + 0.8 * pad), accent);
+        break;
+    case TitleDecoration::Underline:
+        d.fillRect(QRectF(t.align == 1 ? blockW * 0.25 : t.align == 2 ? blockW * 0.5 : 0, blockH + pad * 0.2,
+                          blockW * 0.5, fontPx * 0.08),
+                   accent);
+        break;
+    case TitleDecoration::Frame: {
+        d.setPen(QPen(accent, fontPx * 0.05));
+        d.setBrush(Qt::NoBrush);
+        d.drawRect(block.adjusted(-pad * 1.5, -pad, pad * 1.5, pad));
+        break;
+    }
+    case TitleDecoration::Brackets: {
+        d.setPen(QPen(accent, fontPx * 0.06, Qt::SolidLine, Qt::SquareCap, Qt::MiterJoin));
+        const QRectF r = block.adjusted(-pad * 1.5, -pad, pad * 1.5, pad);
+        const double arm = std::min(r.width(), r.height()) * 0.3;
+        d.drawPolyline(QPolygonF{QPointF(r.left(), r.top() + arm), r.topLeft(), QPointF(r.left() + arm, r.top())});
+        d.drawPolyline(QPolygonF{QPointF(r.right() - arm, r.top()), r.topRight(), QPointF(r.right(), r.top() + arm)});
+        d.drawPolyline(QPolygonF{QPointF(r.left(), r.bottom() - arm), r.bottomLeft(), QPointF(r.left() + arm, r.bottom())});
+        d.drawPolyline(QPolygonF{QPointF(r.right() - arm, r.bottom()), r.bottomRight(), QPointF(r.right(), r.bottom() - arm)});
+        break;
+    }
+    }
+    if (t.backgroundOpacity > 0 && t.decoration != TitleDecoration::Band) {
         QColor bg = t.backgroundColor;
         bg.setAlphaF(std::clamp(t.backgroundOpacity, 0.0, 1.0));
-        p.setPen(Qt::NoPen);
-        p.setBrush(bg);
-        p.drawRoundedRect(QRectF(-pad, -pad * 0.6, blockW + 2 * pad, blockH + 1.2 * pad), pad * 0.6, pad * 0.6);
+        d.setPen(Qt::NoPen);
+        d.setBrush(bg);
+        d.drawRoundedRect(QRectF(-pad, -pad * 0.6, blockW + 2 * pad, blockH + 1.2 * pad), pad * 0.6, pad * 0.6);
     }
     if (t.shadow)
-        drawSoftShadow(p, path, fontPx, 1.0);
+        drawSoftShadow(d, path, fontPx, 1.0);
     if (t.outlineWidth > 0) {
         QPen pen(t.outlineColor, 2.0 * t.outlineWidth * fontPx, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin);
-        p.strokePath(path, pen);
+        d.strokePath(path, pen);
     }
-    p.fillPath(path, t.color);
-    p.restore();
+    d.fillPath(path, t.color);
+    d.restore();
+    if (layerPainter) {
+        layerPainter.reset();
+        // Cheap blur: down and up again.
+        const double factor = std::clamp(blurPx / 2.0, 1.0, 48.0);
+        const QSize small(std::max(1, static_cast<int>(layer.width() / factor)), std::max(1, static_cast<int>(layer.height() / factor)));
+        layer = layer.scaled(small, Qt::IgnoreAspectRatio, Qt::SmoothTransformation)
+                    .scaled(layer.size(), Qt::IgnoreAspectRatio, Qt::SmoothTransformation);
+        p.save();
+        p.setOpacity(p.opacity() * s.opacity);
+        p.drawImage(0, 0, layer);
+        p.restore();
+    }
 }
 
 void drawSubtitle(QPainter& p, QSize frame, const SubtitleStyle& style, const QString& text) {

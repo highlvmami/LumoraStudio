@@ -8,25 +8,39 @@
 #include <QFileInfo>
 #include <QFontComboBox>
 #include <QFormLayout>
+#include <QFrame>
+#include <QGridLayout>
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QLineEdit>
 #include <QListWidget>
 #include <QLocale>
+#include <QPainter>
+#include <QPainterPath>
 #include <QPlainTextEdit>
 #include <QPushButton>
 #include <QScrollArea>
+#include <QSettings>
 #include <QSpinBox>
+#include <QStackedWidget>
+#include <QTabBar>
 #include <QToolButton>
 #include <QUndoStack>
 #include <QVBoxLayout>
 #include <cmath>
 
+#include "Icons.h"
 #include "Theme.h"
 #include "ai/Vision.h"
+#include "color/AutoColor.h"
+#include "color/LookGallery.h"
+#include "color/SliderRow.h"
 #include "export/ExportPlanner.h"
 #include "motion/Analysis.h"
+#include "panels/CollapsibleSection.h"
 #include "project/Project.h"
+#include "render/TitleRenderer.h"
+#include "render/TitleTemplates.h"
 #include "timeline/Subtitles.h"
 #include "undo/TimelineCommands.h"
 
@@ -35,6 +49,51 @@ extern "C" {
 }
 
 namespace lumora {
+
+// The shape of a speed ramp: relative speed along the clip.
+class SpeedRampView : public QWidget {
+public:
+    explicit SpeedRampView(QWidget* parent = nullptr) : QWidget(parent) { setFixedHeight(46); }
+    void setRamp(const TimeRemap& r) {
+        m_remap = r;
+        update();
+    }
+
+protected:
+    void paintEvent(QPaintEvent*) override {
+        QPainter p(this);
+        p.setRenderHint(QPainter::Antialiasing);
+        const ThemeColors& tc = themeColors();
+        const QRectF r = QRectF(rect()).adjusted(1, 1, -1, -1);
+        p.setPen(Qt::NoPen);
+        p.setBrush(tc.raised);
+        p.drawRoundedRect(r, 6, 6);
+        if (m_remap.ramp.empty())
+            return;
+        double maxRate = 1.0;
+        for (const auto& pt : m_remap.ramp)
+            maxRate = std::max(maxRate, pt.rate);
+        // Speed on a log scale so slow and fast parts read alike.
+        const double top = std::log2(maxRate) + 0.5, bottom = -3.5;
+        auto yOf = [&](double rate) { return r.bottom() - 4 - (std::log2(std::max(0.05, rate)) - bottom) / (top - bottom) * (r.height() - 8); };
+        p.setPen(QPen(tc.textFaint, 1, Qt::DashLine));
+        p.drawLine(QPointF(r.left() + 4, yOf(1.0)), QPointF(r.right() - 4, yOf(1.0)));
+        QPainterPath path;
+        for (int i = 0; i <= 60; ++i) {
+            const double pos = i / 60.0;
+            const QPointF pt(r.left() + 4 + pos * (r.width() - 8), yOf(m_remap.rateAt(pos)));
+            if (i == 0)
+                path.moveTo(pt);
+            else
+                path.lineTo(pt);
+        }
+        p.setPen(QPen(tc.accent, 2));
+        p.drawPath(path);
+    }
+
+private:
+    TimeRemap m_remap;
+};
 
 namespace {
 
@@ -59,24 +118,120 @@ QString bitrate(std::int64_t bps) {
 
 QString nameOr(const char* s) { return s ? QString::fromUtf8(s) : QStringLiteral("—"); }
 
+QLabel* hint(const QString& text = {}) {
+    auto* l = new QLabel(text);
+    l->setWordWrap(true);
+    l->setObjectName(QStringLiteral("propertyHint"));
+    return l;
+}
+
+const char* const kTabKey = "properties/tab";
+
 } // namespace
+
+QString transitionName(TransitionType t) {
+    switch (t) {
+    case TransitionType::None: return PropertiesPanel::tr("None (cut)");
+    case TransitionType::CrossDissolve: return PropertiesPanel::tr("Cross dissolve");
+    case TransitionType::DipToBlack: return PropertiesPanel::tr("Dip to black");
+    case TransitionType::DipToWhite: return PropertiesPanel::tr("Dip to white");
+    case TransitionType::WipeLeft: return PropertiesPanel::tr("Wipe left");
+    case TransitionType::WipeRight: return PropertiesPanel::tr("Wipe right");
+    case TransitionType::WipeUp: return PropertiesPanel::tr("Wipe up");
+    case TransitionType::WipeDown: return PropertiesPanel::tr("Wipe down");
+    case TransitionType::SlideLeft: return PropertiesPanel::tr("Push left");
+    case TransitionType::SlideRight: return PropertiesPanel::tr("Push right");
+    case TransitionType::Zoom: return PropertiesPanel::tr("Zoom");
+    case TransitionType::Blur: return PropertiesPanel::tr("Blur");
+    case TransitionType::PushUp: return PropertiesPanel::tr("Push up");
+    case TransitionType::PushDown: return PropertiesPanel::tr("Push down");
+    case TransitionType::Iris: return PropertiesPanel::tr("Circle");
+    case TransitionType::ClockWipe: return PropertiesPanel::tr("Clock wipe");
+    case TransitionType::BarnDoor: return PropertiesPanel::tr("Doors");
+    case TransitionType::DiagonalWipe: return PropertiesPanel::tr("Diagonal wipe");
+    case TransitionType::Flash: return PropertiesPanel::tr("Flash");
+    case TransitionType::Pixelate: return PropertiesPanel::tr("Pixelate");
+    case TransitionType::Spin: return PropertiesPanel::tr("Spin");
+    case TransitionType::Glitch: return PropertiesPanel::tr("Glitch");
+    case TransitionType::ZoomBlur: return PropertiesPanel::tr("Zoom blur");
+    }
+    return {};
+}
 
 PropertiesPanel::PropertiesPanel(Project* project, QUndoStack* undo, QWidget* parent)
     : QWidget(parent), m_project(project), m_undo(undo) {
     auto* outer = new QVBoxLayout(this);
-    outer->setContentsMargins(0, 0, 0, 0);
-    auto* scroll = new QScrollArea;
-    scroll->setWidgetResizable(true);
-    scroll->setFrameShape(QFrame::NoFrame);
-    scroll->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
-    auto* content = new QWidget;
-    auto* layout = new QVBoxLayout(content);
-    layout->setContentsMargins(10, 8, 10, 10);
-    layout->setSpacing(6);
+    outer->setContentsMargins(8, 6, 8, 4);
+    outer->setSpacing(6);
 
-    m_header = new QLabel;
-    m_header->setTextFormat(Qt::RichText);
-    layout->addWidget(m_header);
+    // What is selected: kind, track and name.
+    m_headerCard = new QFrame;
+    m_headerCard->setObjectName(QStringLiteral("propertyHeader"));
+    auto* hl = new QVBoxLayout(m_headerCard);
+    hl->setContentsMargins(10, 6, 10, 6);
+    hl->setSpacing(0);
+    m_headerKind = new QLabel;
+    m_headerKind->setObjectName(QStringLiteral("propertyHint"));
+    m_headerName = new QLabel;
+    QFont nf = m_headerName->font();
+    nf.setBold(true);
+    m_headerName->setFont(nf);
+    m_headerName->setTextFormat(Qt::PlainText);
+    hl->addWidget(m_headerKind);
+    hl->addWidget(m_headerName);
+    outer->addWidget(m_headerCard);
+
+    m_tabs = new QTabBar;
+    m_tabs->setObjectName(QStringLiteral("propertyTabs"));
+    m_tabs->setExpanding(false);
+    m_tabs->setDrawBase(false);
+    m_tabs->setUsesScrollButtons(true);
+    m_tabs->setElideMode(Qt::ElideNone);
+    m_tabs->setIconSize(QSize(16, 16));
+    m_tabNames[EditPage] = tr("Edit");
+    m_tabNames[EffectsPage] = tr("Effects");
+    m_tabNames[SmartPage] = tr("Smart");
+    m_tabNames[SoundPage] = tr("Sound");
+    m_tabNames[InfoPage] = tr("Info");
+    const QIcon tabIcons[PageCount] = {Icons::sliders(), Icons::effects(), Icons::smart(), Icons::sound(), Icons::info()};
+    const QString tabTips[PageCount] = {
+        tr("Text, length, speed, position, transitions and fades"),
+        tr("Colour filters, green screen and picture effects"),
+        tr("Automatic tools: stabilise, follow, hide faces, remove the background"),
+        tr("Volume of the clip"),
+        tr("Details of the file"),
+    };
+    for (int i = 0; i < PageCount; ++i) {
+        m_tabs->addTab(tabIcons[i], m_tabNames[i]);
+        m_tabs->setTabToolTip(i, QStringLiteral("<b>%1</b><br>%2").arg(m_tabNames[i].toHtmlEscaped(), tabTips[i].toHtmlEscaped()));
+    }
+    outer->addWidget(m_tabs);
+
+    m_pages = new QStackedWidget;
+    for (int i = 0; i < PageCount; ++i) {
+        auto* scroll = new QScrollArea;
+        scroll->setWidgetResizable(true);
+        scroll->setFrameShape(QFrame::NoFrame);
+        scroll->setHorizontalScrollBarPolicy(Qt::ScrollBarAsNeeded);
+        auto* content = new QWidget;
+        auto* layout = new QVBoxLayout(content);
+        layout->setContentsMargins(0, 2, 2, 8);
+        layout->setSpacing(8);
+        m_emptyHints[i] = hint();
+        m_emptyHints[i]->setAlignment(Qt::AlignCenter);
+        m_emptyHints[i]->setContentsMargins(8, 20, 8, 8);
+        layout->addWidget(m_emptyHints[i]);
+        m_pageLayouts[i] = layout;
+        scroll->setWidget(content);
+        m_pages->addWidget(scroll);
+    }
+    outer->addWidget(m_pages, 1);
+    connect(m_tabs, &QTabBar::currentChanged, this, [this](int i) {
+        m_pages->setCurrentIndex(i);
+        updateTabLabels();
+        if (!m_updating && i >= 0)
+            QSettings().setValue(QLatin1String(kTabKey), i);
+    });
 
     auto dspin = [](double min, double max, double step, int decimals, const QString& suffix) {
         auto* sb = new QDoubleSpinBox;
@@ -88,11 +243,37 @@ PropertiesPanel::PropertiesPanel(Project* project, QUndoStack* undo, QWidget* pa
         sb->setAccelerated(true);
         return sb;
     };
+    auto percent = [] {
+        auto* sb = new QSpinBox;
+        sb->setRange(0, 100);
+        sb->setSuffix(QStringLiteral(" %"));
+        sb->setKeyboardTracking(false);
+        return sb;
+    };
     const QString sec = QStringLiteral(" s");
+    QFormLayout* f = nullptr;
+
+    // ===== Edit =====
+
+    // --- title templates ---
+    m_templateSection = makeSection(EditPage, QStringLiteral("titleTemplates"), tr("Title templates"), &f);
+    m_templates = new QListWidget;
+    m_templates->setViewMode(QListView::IconMode);
+    m_templates->setWrapping(true);
+    m_templates->setResizeMode(QListView::Adjust);
+    m_templates->setMovement(QListView::Static);
+    m_templates->setIconSize(QSize(96, 54));
+    m_templates->setGridSize(QSize(104, 78));
+    m_templates->setUniformItemSizes(true);
+    m_templates->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+    m_templates->setFrameShape(QFrame::NoFrame);
+    m_templates->setFixedHeight(2 * 78 + 8);
+    m_templates->setToolTip(tr("Click a style: the title keeps its text"));
+    f->addRow(m_templates);
+    rebuildTemplateGallery();
 
     // --- title ---
-    QFormLayout* f = nullptr;
-    m_titleSection = makeSection(tr("Title"), &f);
+    m_titleSection = makeSection(EditPage, QStringLiteral("title"), tr("Title"), &f);
     m_titleText = new QPlainTextEdit;
     m_titleText->setFixedHeight(64);
     m_titleText->setPlaceholderText(tr("Type the title text"));
@@ -140,23 +321,43 @@ PropertiesPanel::PropertiesPanel(Project* project, QUndoStack* undo, QWidget* pa
     outlineRow->addWidget(m_titleOutlineColor);
     f->addRow(tr("Outline"), outlineRow);
     auto* backRow = new QHBoxLayout;
-    m_titleBackOpacity = new QSpinBox;
-    m_titleBackOpacity->setRange(0, 100);
-    m_titleBackOpacity->setSuffix(QStringLiteral(" %"));
-    m_titleBackOpacity->setKeyboardTracking(false);
+    m_titleBackOpacity = percent();
     m_titleBackColor = makeColorButton();
     backRow->addWidget(m_titleBackOpacity, 1);
     backRow->addWidget(m_titleBackColor);
     f->addRow(tr("Background"), backRow);
+    auto* decoRow = new QHBoxLayout;
+    m_titleDecoration = new QComboBox;
+    m_titleDecoration->addItem(tr("None"), static_cast<int>(TitleDecoration::None));
+    m_titleDecoration->addItem(tr("Side bar"), static_cast<int>(TitleDecoration::Bar));
+    m_titleDecoration->addItem(tr("Underline"), static_cast<int>(TitleDecoration::Underline));
+    m_titleDecoration->addItem(tr("Frame"), static_cast<int>(TitleDecoration::Frame));
+    m_titleDecoration->addItem(tr("Band"), static_cast<int>(TitleDecoration::Band));
+    m_titleDecoration->addItem(tr("Corners"), static_cast<int>(TitleDecoration::Brackets));
+    m_titleAccent = makeColorButton();
+    m_titleAccent->setToolTip(tr("Colour of the shape"));
+    decoRow->addWidget(m_titleDecoration, 1);
+    decoRow->addWidget(m_titleAccent);
+    f->addRow(tr("Shape"), decoRow);
+    auto* letterRow = new QHBoxLayout;
+    m_titleSpacing = dspin(-10, 100, 1, 0, QStringLiteral(" %"));
+    m_titleSpacing->setToolTip(tr("Extra space between letters"));
+    m_titleUpper = new QCheckBox(tr("CAPITALS"));
+    letterRow->addWidget(m_titleSpacing, 1);
+    letterRow->addWidget(m_titleUpper);
+    f->addRow(tr("Spacing"), letterRow);
     m_titleShadow = new QCheckBox(tr("Soft shadow"));
-    f->addRow(QString(), m_titleShadow);
+    f->addRow(m_titleShadow);
     m_titleAnimIn = new QComboBox;
     m_titleAnimOut = new QComboBox;
     for (QComboBox* c : {m_titleAnimIn, m_titleAnimOut}) {
         c->addItem(tr("None"), static_cast<int>(TitleAnimation::None));
         c->addItem(tr("Fade"), static_cast<int>(TitleAnimation::Fade));
         c->addItem(tr("Slide up"), static_cast<int>(TitleAnimation::SlideUp));
+        c->addItem(tr("Slide in from the side"), static_cast<int>(TitleAnimation::SlideLeft));
         c->addItem(tr("Pop"), static_cast<int>(TitleAnimation::Pop));
+        c->addItem(tr("Zoom"), static_cast<int>(TitleAnimation::Zoom));
+        c->addItem(tr("Blur"), static_cast<int>(TitleAnimation::Blur));
         c->addItem(tr("Typewriter"), static_cast<int>(TitleAnimation::Typewriter));
     }
     f->addRow(tr("Animation in"), m_titleAnimIn);
@@ -165,46 +366,29 @@ PropertiesPanel::PropertiesPanel(Project* project, QUndoStack* undo, QWidget* pa
     f->addRow(tr("Animation length"), m_titleAnimDuration);
     m_titleDuration = dspin(0.04, 3600, 0.5, 2, sec);
     f->addRow(tr("Duration"), m_titleDuration);
-    layout->addWidget(m_titleSection);
 
     // --- freeze frame ---
-    m_freezeSection = makeSection(tr("Freeze frame"), &f);
+    m_freezeSection = makeSection(EditPage, QStringLiteral("freeze"), tr("Freeze frame"), &f);
     m_freezeDuration = dspin(0.04, 3600, 0.5, 2, sec);
     f->addRow(tr("Hold for"), m_freezeDuration);
-    m_freezeInfo = new QLabel;
-    m_freezeInfo->setWordWrap(true);
-    m_freezeInfo->setStyleSheet(QStringLiteral("color: palette(placeholder-text);"));
+    m_freezeInfo = hint();
     f->addRow(m_freezeInfo);
-    layout->addWidget(m_freezeSection);
 
     // --- picture (stills and stickers) ---
-    m_stillSection = makeSection(tr("Picture"), &f);
+    m_stillSection = makeSection(EditPage, QStringLiteral("picture"), tr("Picture"), &f);
     m_stillDuration = dspin(0.04, 3600, 0.5, 2, sec);
     f->addRow(tr("Duration"), m_stillDuration);
-    layout->addWidget(m_stillSection);
-
-    // --- repeat ---
-    m_loopSection = makeSection(tr("Repeat"), &f);
-    m_loop = new QCheckBox(tr("Play over and over"));
-    m_loop->setToolTip(tr("Repeat the clip, e.g. an animated sticker; drag its end on the timeline to make it longer"));
-    f->addRow(m_loop);
-    m_loopInfo = new QLabel(tr("Drag the end of the clip on the timeline to make it as long as you like. The sound is not repeated."));
-    m_loopInfo->setWordWrap(true);
-    m_loopInfo->setStyleSheet(QStringLiteral("color: palette(placeholder-text);"));
-    f->addRow(m_loopInfo);
-    layout->addWidget(m_loopSection);
 
     // --- subtitle ---
-    m_subSection = makeSection(tr("Subtitle"), &f);
+    m_subSection = makeSection(EditPage, QStringLiteral("subtitle"), tr("Subtitle"), &f);
     m_subText = new QPlainTextEdit;
     m_subText->setFixedHeight(56);
     m_subText->setPlaceholderText(tr("Type what is said; two lines at most read best"));
     f->addRow(m_subText);
     m_subDuration = dspin(0.04, 600, 0.1, 2, sec);
     f->addRow(tr("Duration"), m_subDuration);
-    layout->addWidget(m_subSection);
 
-    m_subTrackSection = makeSection(tr("Subtitle track"), &f);
+    m_subTrackSection = makeSection(EditPage, QStringLiteral("subtitleTrack"), tr("Subtitle track"), &f);
     m_subLanguage = new QLineEdit;
     m_subLanguage->setPlaceholderText(tr("e.g. tur, eng"));
     m_subLanguage->setToolTip(tr("Language of the track (ISO 639-2 code or a name); players show it in their subtitle menu"));
@@ -230,24 +414,71 @@ PropertiesPanel::PropertiesPanel(Project* project, QUndoStack* undo, QWidget* pa
     subOutlineRow->addWidget(m_subOutline, 1);
     subOutlineRow->addWidget(m_subOutlineColor);
     f->addRow(tr("Outline"), subOutlineRow);
-    m_subBackOpacity = new QSpinBox;
-    m_subBackOpacity->setRange(0, 100);
-    m_subBackOpacity->setSuffix(QStringLiteral(" %"));
-    m_subBackOpacity->setKeyboardTracking(false);
+    m_subBackOpacity = percent();
     m_subBackOpacity->setToolTip(tr("A dark box behind the text"));
     f->addRow(tr("Background"), m_subBackOpacity);
     m_subY = dspin(5, 100, 1, 0, QStringLiteral(" %"));
     m_subY->setToolTip(tr("Where the bottom line sits, from the top of the frame"));
     f->addRow(tr("Height in frame"), m_subY);
-    auto* subNote = new QLabel(tr("The style is used when subtitles are burnt into the picture and in the preview. "
-                                  "Embedded subtitles are styled by the player."));
-    subNote->setWordWrap(true);
-    subNote->setStyleSheet(QStringLiteral("color: palette(placeholder-text);"));
-    f->addRow(subNote);
-    layout->addWidget(m_subTrackSection);
+    f->addRow(hint(tr("The style is used when subtitles are burnt into the picture and in the preview. "
+                      "Embedded subtitles are styled by the player.")));
+
+    // --- speed ---
+    m_speedSection = makeSection(EditPage, QStringLiteral("speed"), tr("Speed"), &f);
+    auto* speedReset = m_speedSection->addResetButton(tr("Normal speed"));
+    m_speed = dspin(0.05, 20, 0.05, 2, QStringLiteral(" ×"));
+    m_speed->setToolTip(tr("2 × plays twice as fast, 0.5 × at half speed (slow motion)"));
+    f->addRow(tr("Speed"), m_speed);
+    auto* presetRow = new QHBoxLayout;
+    presetRow->setSpacing(3);
+    for (double v : {0.25, 0.5, 1.0, 2.0, 4.0}) {
+        auto* b = new QToolButton;
+        b->setText(QStringLiteral("%1×").arg(QLocale().toString(v)));
+        b->setToolTip(tr("Play at %1 × speed").arg(QLocale().toString(v)));
+        b->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Fixed);
+        b->setMinimumWidth(30);
+        connect(b, &QToolButton::clicked, this, [this, v] { m_speed->setValue(v); });
+        presetRow->addWidget(b, 1);
+    }
+    f->addRow(presetRow);
+    m_speedReverse = new QCheckBox(tr("Play backwards"));
+    f->addRow(m_speedReverse);
+    m_speedRamp = new QComboBox;
+    m_speedRamp->setToolTip(tr("Gets gradually faster and slower within the clip"));
+    m_speedRamp->addItem(tr("Even speed"), static_cast<int>(SpeedRampPreset::None));
+    m_speedRamp->addItem(tr("Montage: fast, slow, fast"), static_cast<int>(SpeedRampPreset::Montage));
+    m_speedRamp->addItem(tr("Hero: slows down for the moment"), static_cast<int>(SpeedRampPreset::Hero));
+    m_speedRamp->addItem(tr("Bullet: very slow in the middle"), static_cast<int>(SpeedRampPreset::Bullet));
+    m_speedRamp->addItem(tr("Rush in: fast, then normal"), static_cast<int>(SpeedRampPreset::FlashIn));
+    m_speedRamp->addItem(tr("Rush out: normal, then fast"), static_cast<int>(SpeedRampPreset::FlashOut));
+    m_speedRamp->addItem(tr("Speed up"), static_cast<int>(SpeedRampPreset::SlowIn));
+    m_speedRamp->addItem(tr("Slow down"), static_cast<int>(SpeedRampPreset::SlowOut));
+    f->addRow(tr("Speed ramp"), m_speedRamp);
+    m_rampView = new SpeedRampView;
+    f->addRow(m_rampView);
+    m_speedBlend = new QComboBox;
+    m_speedBlend->addItem(tr("Off: repeat frames"), static_cast<int>(FrameBlending::None));
+    m_speedBlend->addItem(tr("Mix neighbouring frames"), static_cast<int>(FrameBlending::Blend));
+    m_speedBlend->addItem(tr("Make in-between frames (optical flow)"), static_cast<int>(FrameBlending::OpticalFlow));
+    m_speedBlend->setToolTip(tr("For slow motion: new pictures are drawn between the filmed frames, so it plays smoothly"));
+    f->addRow(tr("Smooth slow motion"), m_speedBlend);
+    m_speedPitch = new QCheckBox(tr("Keep the voice's pitch"));
+    m_speedPitch->setToolTip(tr("The sound gets faster or slower without sounding higher or lower"));
+    f->addRow(m_speedPitch);
+    m_speedInfo = hint();
+    f->addRow(m_speedInfo);
+
+    // --- repeat ---
+    m_loopSection = makeSection(EditPage, QStringLiteral("repeat"), tr("Repeat"), &f);
+    m_loop = new QCheckBox(tr("Play over and over"));
+    m_loop->setToolTip(tr("Repeat the clip, e.g. an animated sticker; drag its end on the timeline to make it longer"));
+    f->addRow(m_loop);
+    m_loopInfo = hint(tr("Drag the end of the clip on the timeline to make it as long as you like. The sound is not repeated."));
+    f->addRow(m_loopInfo);
 
     // --- transform ---
-    m_transformSection = makeSection(tr("Position and size"), &f);
+    m_transformSection = makeSection(EditPage, QStringLiteral("transform"), tr("Position and size"), &f);
+    auto* resetTransform = m_transformSection->addResetButton(tr("Reset position, size and crop"));
     auto* xy = new QHBoxLayout;
     m_posX = dspin(-200, 200, 1, 1, QStringLiteral(" %"));
     m_posY = dspin(-200, 200, 1, 1, QStringLiteral(" %"));
@@ -260,37 +491,112 @@ PropertiesPanel::PropertiesPanel(Project* project, QUndoStack* undo, QWidget* pa
     f->addRow(tr("Scale"), m_scale);
     m_rotation = dspin(-360, 360, 1, 1, QStringLiteral("°"));
     f->addRow(tr("Rotation"), m_rotation);
-    m_opacity = new QSpinBox;
-    m_opacity->setRange(0, 100);
-    m_opacity->setSuffix(QStringLiteral(" %"));
-    m_opacity->setKeyboardTracking(false);
+    m_opacity = percent();
     f->addRow(tr("Opacity"), m_opacity);
-    auto* resetTransform = new QPushButton(tr("Reset"));
-    f->addRow(QString(), resetTransform);
-    layout->addWidget(m_transformSection);
+    auto* cropGrid = new QGridLayout;
+    cropGrid->setSpacing(3);
+    int cropCell = 0;
+    m_cropLeft = new QSpinBox;
+    m_cropTop = new QSpinBox;
+    m_cropRight = new QSpinBox;
+    m_cropBottom = new QSpinBox;
+    const std::pair<QSpinBox*, QString> crops[] = {{m_cropLeft, tr("Left")}, {m_cropTop, tr("Top")},
+                                                   {m_cropRight, tr("Right")}, {m_cropBottom, tr("Bottom")}};
+    for (const auto& [sb, name] : crops) {
+        sb->setRange(0, 95);
+        sb->setSuffix(QStringLiteral("%"));
+        sb->setKeyboardTracking(false);
+        sb->setButtonSymbols(QAbstractSpinBox::NoButtons);
+        sb->setToolTip(tr("Cut away from the %1 edge").arg(name.toLower()));
+        sb->setPrefix(name + QLatin1Char(' '));
+        sb->setMinimumWidth(40);
+        cropGrid->addWidget(sb, cropCell / 2, cropCell % 2);
+        ++cropCell;
+    }
+    f->addRow(tr("Crop"), cropGrid);
 
     // --- transition ---
-    m_transitionSection = makeSection(tr("Transition from the previous clip"), &f);
+    m_transitionSection = makeSection(EditPage, QStringLiteral("transition"), tr("Transition from the previous clip"), &f);
     m_transitionType = new QComboBox;
-    const std::pair<TransitionType, QString> types[] = {
-        {TransitionType::None, tr("None (cut)")},          {TransitionType::CrossDissolve, tr("Cross dissolve")},
-        {TransitionType::DipToBlack, tr("Dip to black")},  {TransitionType::DipToWhite, tr("Dip to white")},
-        {TransitionType::WipeLeft, tr("Wipe left")},       {TransitionType::WipeRight, tr("Wipe right")},
-        {TransitionType::WipeUp, tr("Wipe up")},           {TransitionType::WipeDown, tr("Wipe down")},
-        {TransitionType::SlideLeft, tr("Push left")},      {TransitionType::SlideRight, tr("Push right")},
-        {TransitionType::Zoom, tr("Zoom")},                {TransitionType::Blur, tr("Blur")}};
-    for (const auto& [t, label] : types)
-        m_transitionType->addItem(label, static_cast<int>(t));
+    m_transitionType->setMaxVisibleItems(24);
+    for (TransitionType t : allTransitionTypes())
+        m_transitionType->addItem(transitionName(t), static_cast<int>(t));
     f->addRow(tr("Type"), m_transitionType);
     m_transitionDuration = dspin(0.04, 10, 0.1, 2, sec);
     f->addRow(tr("Duration"), m_transitionDuration);
     m_transitionNote = new QLabel;
     m_transitionNote->setWordWrap(true);
     f->addRow(m_transitionNote);
-    layout->addWidget(m_transitionSection);
+
+    // --- fades ---
+    m_fadeSection = makeSection(EditPage, QStringLiteral("fades"), tr("Fades"), &f);
+    m_fadeIn = dspin(0, 600, 0.1, 2, sec);
+    m_fadeOut = dspin(0, 600, 0.1, 2, sec);
+    f->addRow(tr("Fade in"), m_fadeIn);
+    f->addRow(tr("Fade out"), m_fadeOut);
+
+    // ===== Effects =====
+
+    m_filterSection = makeSection(EffectsPage, QStringLiteral("filters"), tr("Colour filters"), &f);
+    m_autoColor = new QPushButton(Icons::smart(), tr("Auto colour and light"));
+    m_autoColor->setToolTip(tr("Measures the picture and sets exposure, contrast and white balance so it looks natural"));
+    f->addRow(m_autoColor);
+    m_looks = new LookGallery;
+    f->addRow(m_looks);
+    m_lookAmount = new SliderRow(tr("Strength (%)"), 0, 100, 1, 0);
+    m_lookAmount->setDefault(100);
+    f->addRow(m_lookAmount);
+    auto* moreColor = new QPushButton(tr("More colour settings…"));
+    moreColor->setToolTip(tr("Opens the Colour workspace: light, wheels, curves, HSL and LUTs"));
+    f->addRow(moreColor);
+    connect(moreColor, &QPushButton::clicked, this, &PropertiesPanel::colorWorkspaceRequested);
+
+    m_keySection = makeSection(EffectsPage, QStringLiteral("chromaKey"), tr("Green screen"), &f);
+    m_keyOn = new QCheckBox(tr("Remove the screen colour"));
+    m_keyOn->setToolTip(tr("Makes the green (or blue) background transparent, so the clip below shows through"));
+    f->addRow(m_keyOn);
+    auto* keyRow = new AdaptiveRow;
+    m_keyColor = makeColorButton();
+    m_keyColor->setToolTip(tr("Screen colour"));
+    auto* keyGreen = new QToolButton;
+    keyGreen->setText(tr("Green"));
+    auto* keyBlue = new QToolButton;
+    keyBlue->setText(tr("Blue"));
+    m_keyPick = new QPushButton(tr("Pick…"));
+    m_keyPick->setToolTip(tr("Draw a small box over the screen in the viewer to take its exact colour"));
+    keyRow->addWidget(m_keyColor);
+    keyRow->addWidget(keyGreen);
+    keyRow->addWidget(keyBlue);
+    keyRow->addWidget(m_keyPick, 1);
+    f->addRow(tr("Colour"), keyRow);
+    m_keyTolerance = new SliderRow(tr("Tolerance (%)"), 0, 100, 1, 0);
+    m_keyTolerance->setDefault(35);
+    m_keySoftness = new SliderRow(tr("Edge softness (%)"), 0, 100, 1, 0);
+    m_keySoftness->setDefault(15);
+    m_keySpill = new SliderRow(tr("Remove colour spill (%)"), 0, 100, 1, 0);
+    m_keySpill->setDefault(50);
+    m_keySpill->setToolTip(tr("Takes away the green glow the screen leaves on hair and edges"));
+    f->addRow(m_keyTolerance);
+    f->addRow(m_keySoftness);
+    f->addRow(m_keySpill);
+    f->addRow(hint(tr("Put the clip on a track above the new background.")));
+
+    m_fxSection = makeSection(EffectsPage, QStringLiteral("pictureEffects"), tr("Picture effects"), &f);
+    auto* fxReset = m_fxSection->addResetButton(tr("Turn all picture effects off"));
+    m_fxDenoise = new SliderRow(tr("Reduce noise (%)"), 0, 100, 1, 0);
+    m_fxDenoise->setToolTip(tr("Smooths grain and speckles, e.g. in dark phone videos, and keeps edges sharp"));
+    m_fxSharpen = new SliderRow(tr("Sharpen (%)"), 0, 100, 1, 0);
+    m_fxBlur = new SliderRow(tr("Blur (%)"), 0, 100, 1, 0);
+    m_fxVignette = new SliderRow(tr("Vignette (%)"), 0, 100, 1, 0);
+    m_fxVignette->setToolTip(tr("Darkens the corners"));
+    m_fxGrain = new SliderRow(tr("Film grain (%)"), 0, 100, 1, 0);
+    for (SliderRow* s : {m_fxDenoise, m_fxSharpen, m_fxBlur, m_fxVignette, m_fxGrain})
+        f->addRow(s);
+
+    // ===== Smart =====
 
     // --- stabilisation ---
-    m_stabSection = makeSection(tr("Stabilisation"), &f);
+    m_stabSection = makeSection(SmartPage, QStringLiteral("stabilise"), tr("Stabilisation"), &f);
     m_stabOn = new QCheckBox(tr("Steady the shaky camera"));
     f->addRow(m_stabOn);
     m_stabSmoothing = dspin(0.2, 5, 0.1, 1, sec);
@@ -301,37 +607,29 @@ PropertiesPanel::PropertiesPanel(Project* project, QUndoStack* undo, QWidget* pa
     m_stabZoom->setSuffix(QStringLiteral(" %"));
     m_stabZoom->setToolTip(tr("Enlarges the picture so its moving edges stay outside the frame"));
     f->addRow(tr("Zoom"), m_stabZoom);
-    m_stabInfo = new QLabel;
-    m_stabInfo->setWordWrap(true);
-    m_stabInfo->setStyleSheet(QStringLiteral("color: palette(placeholder-text);"));
+    m_stabInfo = hint();
     f->addRow(m_stabInfo);
-    layout->addWidget(m_stabSection);
 
     // --- motion tracking ---
-    m_trackSection = makeSection(tr("Motion tracking"), &f);
-    m_trackInfo = new QLabel;
-    m_trackInfo->setWordWrap(true);
-    m_trackInfo->setStyleSheet(QStringLiteral("color: palette(placeholder-text);"));
+    m_trackSection = makeSection(SmartPage, QStringLiteral("follow"), tr("Motion tracking"), &f);
+    m_trackInfo = hint();
     f->addRow(m_trackInfo);
     m_trackStart = new QPushButton(tr("Follow an object…"));
     m_trackStart->setToolTip(tr("Draw a box around something in the picture; this clip then moves with it"));
     m_trackClear = new QPushButton(tr("Stop following"));
-    auto* trackRow = new QHBoxLayout;
+    auto* trackRow = new AdaptiveRow;
     trackRow->addWidget(m_trackStart);
     trackRow->addWidget(m_trackClear);
     f->addRow(trackRow);
-    layout->addWidget(m_trackSection);
 
     // --- faces and number plates ---
-    m_redactSection = makeSection(tr("Hide faces and plates"), &f);
-    m_redactInfo = new QLabel;
-    m_redactInfo->setWordWrap(true);
-    m_redactInfo->setStyleSheet(QStringLiteral("color: palette(placeholder-text);"));
+    m_redactSection = makeSection(SmartPage, QStringLiteral("redact"), tr("Hide faces and plates"), &f);
+    m_redactInfo = hint();
     f->addRow(m_redactInfo);
     m_redactFind = new QPushButton(tr("Find faces and plates"));
     m_redactFind->setToolTip(tr("Looks through the clip on this computer and follows every face and number plate"));
     m_redactClear = new QPushButton(tr("Remove"));
-    auto* redactRow = new QHBoxLayout;
+    auto* redactRow = new AdaptiveRow;
     redactRow->addWidget(m_redactFind, 1);
     redactRow->addWidget(m_redactClear);
     f->addRow(redactRow);
@@ -347,17 +645,14 @@ PropertiesPanel::PropertiesPanel(Project* project, QUndoStack* undo, QWidget* pa
     m_redactStyle->addItem(tr("Pixelate"), static_cast<int>(RedactionStyle::Pixelate));
     m_redactStyle->addItem(tr("Black box"), static_cast<int>(RedactionStyle::Fill));
     f->addRow(tr("Look"), m_redactStyle);
-    m_redactStrength = new QSpinBox;
-    m_redactStrength->setRange(0, 100);
-    m_redactStrength->setSuffix(QStringLiteral(" %"));
+    m_redactStrength = percent();
     f->addRow(tr("Strength"), m_redactStrength);
     m_redactList = new QListWidget;
     m_redactList->setToolTip(tr("Untick what should stay visible"));
     f->addRow(m_redactList);
-    layout->addWidget(m_redactSection);
 
     // --- background removal ---
-    m_bgSection = makeSection(tr("Background"), &f);
+    m_bgSection = makeSection(SmartPage, QStringLiteral("background"), tr("Background"), &f);
     m_bgOn = new QCheckBox(tr("Remove the background"));
     m_bgOn->setToolTip(tr("Keeps the person or object in front and makes the rest transparent"));
     f->addRow(m_bgOn);
@@ -366,47 +661,42 @@ PropertiesPanel::PropertiesPanel(Project* project, QUndoStack* undo, QWidget* pa
     m_bgModel->addItem(tr("Detailed (slow)"), QStringLiteral("quality"));
     m_bgModel->setToolTip(tr("The detailed model finds hair and fine edges better; the preview uses the fast one"));
     f->addRow(tr("Model"), m_bgModel);
-    m_bgSoftness = new QSpinBox;
-    m_bgSoftness->setRange(0, 100);
-    m_bgSoftness->setSuffix(QStringLiteral(" %"));
+    m_bgSoftness = percent();
     f->addRow(tr("Edge softness"), m_bgSoftness);
-    m_bgInfo = new QLabel;
-    m_bgInfo->setWordWrap(true);
-    m_bgInfo->setStyleSheet(QStringLiteral("color: palette(placeholder-text);"));
+    m_bgInfo = hint();
     f->addRow(m_bgInfo);
-    layout->addWidget(m_bgSection);
 
-    // --- fades ---
-    m_fadeSection = makeSection(tr("Fades"), &f);
-    m_fadeIn = dspin(0, 600, 0.1, 2, sec);
-    m_fadeOut = dspin(0, 600, 0.1, 2, sec);
-    f->addRow(tr("Fade in"), m_fadeIn);
-    f->addRow(tr("Fade out"), m_fadeOut);
-    layout->addWidget(m_fadeSection);
+    // ===== Sound =====
 
-    // --- audio ---
-    m_audioSection = makeSection(tr("Sound"), &f);
+    m_audioSection = makeSection(SoundPage, QStringLiteral("volume"), tr("Sound"), &f);
     m_gain = dspin(-60, 24, 0.5, 1, QStringLiteral(" dB"));
     f->addRow(tr("Volume"), m_gain);
-    layout->addWidget(m_audioSection);
+    auto* moreSound = new QPushButton(tr("Sound tools…"));
+    moreSound->setToolTip(tr("Opens the Sound workspace: noise reduction, equaliser, compressor, ducking"));
+    f->addRow(moreSound);
+    connect(moreSound, &QPushButton::clicked, this, &PropertiesPanel::soundWorkspaceRequested);
+
+    // ===== Info =====
 
     m_info = new QLabel;
     m_info->setTextFormat(Qt::RichText);
     m_info->setAlignment(Qt::AlignTop | Qt::AlignLeft);
     m_info->setWordWrap(true);
     m_info->setTextInteractionFlags(Qt::TextSelectableByMouse);
-    layout->addWidget(m_info);
-    layout->addStretch(1);
-    scroll->setWidget(content);
-    outer->addWidget(scroll);
+    m_info->setContentsMargins(6, 0, 6, 0);
+    m_pageLayouts[InfoPage]->addWidget(m_info);
+
+    for (QVBoxLayout* l : m_pageLayouts)
+        l->addStretch(1);
 
     // Let the panel be narrow: combo boxes and spin boxes shrink with it.
-    for (QComboBox* c : content->findChildren<QComboBox*>()) {
+    for (QComboBox* c : m_pages->findChildren<QComboBox*>()) {
         c->setSizeAdjustPolicy(QComboBox::AdjustToMinimumContentsLengthWithIcon);
         c->setMinimumContentsLength(6);
     }
-    for (QAbstractSpinBox* sb : content->findChildren<QAbstractSpinBox*>())
-        sb->setMinimumWidth(60);
+    for (QAbstractSpinBox* sb : m_pages->findChildren<QAbstractSpinBox*>())
+        if (sb->buttonSymbols() != QAbstractSpinBox::NoButtons)
+            sb->setMinimumWidth(60);
     // Paired X / Y fields: the arrows would leave no room for the value; the
     // wheel and arrow keys still step them.
     for (QDoubleSpinBox* sb : {m_titleX, m_titleY, m_posX, m_posY})
@@ -416,15 +706,16 @@ PropertiesPanel::PropertiesPanel(Project* project, QUndoStack* undo, QWidget* pa
     auto titleChanged = [this] { applyTitle(); };
     connect(m_titleText, &QPlainTextEdit::textChanged, this, titleChanged);
     connect(m_titleFont, &QFontComboBox::currentFontChanged, this, titleChanged);
-    for (QDoubleSpinBox* sb : {m_titleSize, m_titleOutline, m_titleX, m_titleY, m_titleAnimDuration})
+    for (QDoubleSpinBox* sb : {m_titleSize, m_titleOutline, m_titleX, m_titleY, m_titleAnimDuration, m_titleSpacing})
         connect(sb, &QDoubleSpinBox::valueChanged, this, titleChanged);
     connect(m_titleBackOpacity, &QSpinBox::valueChanged, this, titleChanged);
     for (QToolButton* b : {m_titleBold, m_titleItalic})
         connect(b, &QToolButton::toggled, this, titleChanged);
-    connect(m_titleShadow, &QCheckBox::toggled, this, titleChanged);
-    for (QComboBox* c : {m_titleAlign, m_titleAnimIn, m_titleAnimOut})
+    for (QCheckBox* cb : {m_titleShadow, m_titleUpper})
+        connect(cb, &QCheckBox::toggled, this, titleChanged);
+    for (QComboBox* c : {m_titleAlign, m_titleAnimIn, m_titleAnimOut, m_titleDecoration})
         connect(c, &QComboBox::currentIndexChanged, this, titleChanged);
-    for (QToolButton* b : {m_titleColor, m_titleOutlineColor, m_titleBackColor})
+    for (QToolButton* b : {m_titleColor, m_titleOutlineColor, m_titleBackColor, m_titleAccent})
         connect(b, &QToolButton::clicked, this, [this, b] {
             const QColor c = QColorDialog::getColor(b->property("color").value<QColor>(), this, tr("Choose a colour"));
             if (c.isValid()) {
@@ -432,6 +723,15 @@ PropertiesPanel::PropertiesPanel(Project* project, QUndoStack* undo, QWidget* pa
                 applyTitle();
             }
         });
+    connect(m_templates, &QListWidget::itemClicked, this, [this](QListWidgetItem* item) {
+        const TitleTemplate* t = findTitleTemplate(item->data(Qt::UserRole).toString());
+        if (!t)
+            return;
+        edit(tr("Title template"), {}, [&](const Clip& c) {
+            const TitleData d = applyTitleTemplate(c.title, *t);
+            return m_project->timeline()->setTitle(c.id, d);
+        });
+    });
     connect(m_subText, &QPlainTextEdit::textChanged, this, [this] {
         edit(tr("Edit subtitle"), QStringLiteral("subtitle"),
              [&](const Clip& c) { return m_project->timeline()->setSubtitleText(c.id, m_subText->toPlainText()); });
@@ -461,6 +761,101 @@ PropertiesPanel::PropertiesPanel(Project* project, QUndoStack* undo, QWidget* pa
                 applySubtitleStyle();
             }
         });
+
+    // Speed.
+    connect(m_speed, &QDoubleSpinBox::valueChanged, this, [this](double v) {
+        applySpeed(v, m_speedReverse->isChecked(), static_cast<SpeedRampPreset>(m_speedRamp->currentData().toInt()));
+    });
+    connect(m_speedReverse, &QCheckBox::toggled, this, [this](bool on) {
+        applySpeed(m_speed->value(), on, static_cast<SpeedRampPreset>(m_speedRamp->currentData().toInt()));
+    });
+    connect(m_speedRamp, &QComboBox::currentIndexChanged, this, [this] {
+        applySpeed(m_speed->value(), m_speedReverse->isChecked(), static_cast<SpeedRampPreset>(m_speedRamp->currentData().toInt()));
+    });
+    connect(speedReset, &QToolButton::clicked, this, [this] { applySpeed(1.0, false, SpeedRampPreset::None); });
+    auto speedOptions = [this] {
+        edit(tr("Slow motion options"), {}, [&](const Clip& c) {
+            return m_project->timeline()->setSpeedOptions(c.id, static_cast<FrameBlending>(m_speedBlend->currentData().toInt()),
+                                                          m_speedPitch->isChecked());
+        });
+    };
+    connect(m_speedBlend, &QComboBox::currentIndexChanged, this, speedOptions);
+    connect(m_speedPitch, &QCheckBox::toggled, this, speedOptions);
+
+    // Effects.
+    connect(m_looks, &LookGallery::lookChosen, this, [this](const QString& id) {
+        edit(id.isEmpty() ? tr("Remove filter") : tr("Apply filter"), {}, [&](const Clip& c) {
+            ColorGrade g = c.color;
+            g.look = id;
+            if (g.lookAmount <= 0.0)
+                g.lookAmount = 1.0;
+            return m_project->timeline()->setColor(c.id, g);
+        });
+    });
+    connect(m_lookAmount, &SliderRow::valueChanged, this, [this](double v) {
+        edit(tr("Filter strength"), QStringLiteral("lookAmount"), [&](const Clip& c) {
+            ColorGrade g = c.color;
+            g.lookAmount = v / 100.0;
+            return m_project->timeline()->setColor(c.id, g);
+        });
+    });
+    connect(m_autoColor, &QPushButton::clicked, this, [this] {
+        const Clip* c = m_clip.isNull() ? nullptr : m_project->timeline()->clip(m_clip);
+        if (!c || !m_thumbnail)
+            return;
+        const QImage picture = m_thumbnail(c->mediaId);
+        edit(tr("Auto colour and light"), {}, [&](const Clip& c) {
+            return m_project->timeline()->setColor(c.id, autoCorrect(picture, c.color));
+        });
+    });
+    connect(m_keyOn, &QCheckBox::toggled, this, [this](bool on) {
+        applyEffects(on ? tr("Green screen") : tr("Turn off green screen"), {}, [&](PictureEffects& e) { e.chromaKey.enabled = on; });
+    });
+    connect(m_keyColor, &QToolButton::clicked, this, [this] {
+        const QColor c = QColorDialog::getColor(m_keyColor->property("color").value<QColor>(), this, tr("Screen colour"));
+        if (c.isValid())
+            applyEffects(tr("Screen colour"), {}, [&](PictureEffects& e) {
+                e.chromaKey.color = c;
+                e.chromaKey.enabled = true;
+            });
+    });
+    connect(keyGreen, &QToolButton::clicked, this, [this] {
+        applyEffects(tr("Screen colour"), {}, [&](PictureEffects& e) {
+            e.chromaKey.color = ChromaKey{}.color;
+            e.chromaKey.enabled = true;
+        });
+    });
+    connect(keyBlue, &QToolButton::clicked, this, [this] {
+        applyEffects(tr("Screen colour"), {}, [&](PictureEffects& e) {
+            e.chromaKey.color = QColor(0, 71, 187);
+            e.chromaKey.enabled = true;
+        });
+    });
+    connect(m_keyPick, &QPushButton::clicked, this, [this] {
+        if (!m_clip.isNull())
+            emit keyColorPickRequested(m_clip);
+    });
+    auto bindEffect = [this](SliderRow* s, const QString& text, const QString& field, auto setter) {
+        connect(s, &SliderRow::valueChanged, this, [this, text, field, setter](double v) {
+            applyEffects(text, field, [&](PictureEffects& e) { setter(e, v / 100.0); });
+        });
+    };
+    bindEffect(m_keyTolerance, tr("Key tolerance"), QStringLiteral("keyTolerance"), [](PictureEffects& e, double v) { e.chromaKey.tolerance = v; });
+    bindEffect(m_keySoftness, tr("Key edge softness"), QStringLiteral("keySoftness"), [](PictureEffects& e, double v) { e.chromaKey.softness = v; });
+    bindEffect(m_keySpill, tr("Remove colour spill"), QStringLiteral("keySpill"), [](PictureEffects& e, double v) { e.chromaKey.spill = v; });
+    bindEffect(m_fxDenoise, tr("Reduce noise"), QStringLiteral("denoise"), [](PictureEffects& e, double v) { e.denoise = v; });
+    bindEffect(m_fxSharpen, tr("Sharpen"), QStringLiteral("sharpen"), [](PictureEffects& e, double v) { e.sharpen = v; });
+    bindEffect(m_fxBlur, tr("Blur"), QStringLiteral("blur"), [](PictureEffects& e, double v) { e.blur = v; });
+    bindEffect(m_fxVignette, tr("Vignette"), QStringLiteral("vignette"), [](PictureEffects& e, double v) { e.vignette = v; });
+    bindEffect(m_fxGrain, tr("Film grain"), QStringLiteral("grain"), [](PictureEffects& e, double v) { e.grain = v; });
+    connect(fxReset, &QToolButton::clicked, this, [this] {
+        applyEffects(tr("Turn off picture effects"), {}, [](PictureEffects& e) {
+            const ChromaKey key = e.chromaKey;
+            e = PictureEffects{};
+            e.chromaKey = key;
+        });
+    });
+
     connect(m_stabOn, &QCheckBox::toggled, this, [this](bool on) {
         if (m_updating || m_clip.isNull())
             return;
@@ -604,8 +999,9 @@ PropertiesPanel::PropertiesPanel(Project* project, QUndoStack* undo, QWidget* pa
 
     for (QDoubleSpinBox* sb : {m_posX, m_posY, m_scale, m_rotation})
         connect(sb, &QDoubleSpinBox::valueChanged, this, [this] { applyTransform(); });
-    connect(m_opacity, &QSpinBox::valueChanged, this, [this] { applyTransform(); });
-    connect(resetTransform, &QPushButton::clicked, this, [this] {
+    for (QSpinBox* sb : {m_opacity, m_cropLeft, m_cropTop, m_cropRight, m_cropBottom})
+        connect(sb, &QSpinBox::valueChanged, this, [this] { applyTransform(); });
+    connect(resetTransform, &QToolButton::clicked, this, [this] {
         edit(tr("Reset position and size"), QStringLiteral("transform-reset"),
              [&](const Clip& c) { return m_project->timeline()->setTransform(c.id, ClipTransform{}); });
     });
@@ -622,24 +1018,11 @@ PropertiesPanel::PropertiesPanel(Project* project, QUndoStack* undo, QWidget* pa
     showNothing();
 }
 
-QWidget* PropertiesPanel::makeSection(const QString& title, QFormLayout** form) {
-    auto* box = new QWidget;
-    auto* v = new QVBoxLayout(box);
-    v->setContentsMargins(0, 6, 0, 4);
-    v->setSpacing(4);
-    auto* label = new QLabel(QStringLiteral("<b>%1</b>").arg(title.toHtmlEscaped()));
-    v->addWidget(label);
-    auto* line = new QFrame;
-    line->setFrameShape(QFrame::HLine);
-    line->setFrameShadow(QFrame::Plain);
-    line->setStyleSheet(QStringLiteral("color: palette(mid);"));
-    v->addWidget(line);
-    *form = new QFormLayout;
-    (*form)->setLabelAlignment(Qt::AlignLeft);
-    (*form)->setFieldGrowthPolicy(QFormLayout::AllNonFixedFieldsGrow);
-    (*form)->setContentsMargins(0, 2, 0, 0);
-    v->addLayout(*form);
-    return box;
+CollapsibleSection* PropertiesPanel::makeSection(Page page, const QString& id, const QString& title, QFormLayout** form) {
+    auto* s = new CollapsibleSection(id, title);
+    *form = s->form();
+    m_pageLayouts[page]->addWidget(s);
+    return s;
 }
 
 QToolButton* PropertiesPanel::makeColorButton() {
@@ -653,6 +1036,25 @@ void PropertiesPanel::setButtonColor(QToolButton* b, const QColor& c) {
     b->setProperty("color", c);
     b->setStyleSheet(QStringLiteral("QToolButton { background: %1; border: 1px solid palette(mid); border-radius: 3px; }")
                          .arg(c.name()));
+}
+
+void PropertiesPanel::rebuildTemplateGallery() {
+    m_templates->clear();
+    const QSize size(192, 108);
+    for (const TitleTemplate& t : titleTemplates()) {
+        QImage img(size, QImage::Format_ARGB32_Premultiplied);
+        QPainter p(&img);
+        QLinearGradient bg(0, 0, size.width(), size.height());
+        bg.setColorAt(0, QColor(58, 66, 92));
+        bg.setColorAt(1, QColor(28, 30, 42));
+        p.fillRect(img.rect(), bg);
+        // Shown in the middle of its animation, with its sample text.
+        drawTitle(p, size, t.title, ticksFromSeconds(t.seconds / 2), ticksFromSeconds(t.seconds), 1.0);
+        p.end();
+        auto* item = new QListWidgetItem(QIcon(QPixmap::fromImage(img)), t.name, m_templates);
+        item->setData(Qt::UserRole, t.id);
+        item->setToolTip(t.name);
+    }
 }
 
 void PropertiesPanel::showClip(const QUuid& clipId) {
@@ -674,6 +1076,20 @@ void PropertiesPanel::showNothing() {
     m_media = {};
     ++m_session;
     refresh();
+}
+
+void PropertiesPanel::showPage(Page page) {
+    if (m_tabs->isTabVisible(page))
+        m_tabs->setCurrentIndex(page);
+}
+
+void PropertiesPanel::setKeyColor(const QUuid& clipId, const QColor& color) {
+    if (clipId != m_clip || !color.isValid())
+        return;
+    applyEffects(tr("Screen colour"), {}, [&](PictureEffects& e) {
+        e.chromaKey.color = color;
+        e.chromaKey.enabled = true;
+    });
 }
 
 void PropertiesPanel::edit(const QString& text, const QString& field, const std::function<bool(const Clip&)>& op) {
@@ -709,6 +1125,10 @@ void PropertiesPanel::applyTitle() {
         t.align = m_titleAlign->currentIndex();
         t.x = m_titleX->value() / 100.0;
         t.y = m_titleY->value() / 100.0;
+        t.decoration = static_cast<TitleDecoration>(m_titleDecoration->currentData().toInt());
+        t.accentColor = m_titleAccent->property("color").value<QColor>();
+        t.letterSpacing = m_titleSpacing->value() / 100.0;
+        t.uppercase = m_titleUpper->isChecked();
         t.animationIn = static_cast<TitleAnimation>(m_titleAnimIn->currentData().toInt());
         t.animationOut = static_cast<TitleAnimation>(m_titleAnimOut->currentData().toInt());
         t.animationDuration = ticksFromSeconds(m_titleAnimDuration->value());
@@ -736,7 +1156,23 @@ void PropertiesPanel::applySubtitleStyle() {
     });
 }
 
+void PropertiesPanel::applySpeed(double speed, bool reverse, SpeedRampPreset ramp) {
+    edit(tr("Change speed"), QStringLiteral("speed"), [&](const Clip& c) {
+        auto m = m_project->media()->find(c.mediaId);
+        return m_project->timeline()->setSpeed(c.id, speed, reverse, speedRampPoints(ramp), m ? m->info.duration : 0);
+    });
+}
+
+void PropertiesPanel::applyEffects(const QString& text, const QString& field, const std::function<void(PictureEffects&)>& change) {
+    edit(text, field, [&](const Clip& c) {
+        PictureEffects e = c.effects;
+        change(e);
+        return m_project->timeline()->setPictureEffects(c.id, e);
+    });
+}
+
 void PropertiesPanel::focusText() {
+    showPage(EditPage);
     if (m_subSection->isVisible())
         m_subText->setFocus();
     else if (m_titleSection->isVisible())
@@ -751,6 +1187,10 @@ void PropertiesPanel::applyTransform() {
         t.scale = m_scale->value() / 100.0;
         t.rotation = m_rotation->value();
         t.opacity = m_opacity->value() / 100.0;
+        const double l = m_cropLeft->value() / 100.0, tp = m_cropTop->value() / 100.0;
+        const double r = m_cropRight->value() / 100.0, b = m_cropBottom->value() / 100.0;
+        if (l > 0 || tp > 0 || r > 0 || b > 0)
+            t.crop = QRectF(l, tp, std::max(0.05, 1.0 - l - r), std::max(0.05, 1.0 - tp - b));
         return m_project->timeline()->setTransform(c.id, t);
     });
 }
@@ -777,6 +1217,59 @@ void PropertiesPanel::refresh() {
     const Clip* clip = m_clip.isNull() ? nullptr : m_project->timeline()->clip(m_clip);
     refreshEditors(clip);
     refreshInfo(clip);
+    refreshTabs();
+}
+
+void PropertiesPanel::refreshTabs() {
+    m_updating = true;
+    const bool any = !m_clip.isNull() || !m_media.isNull();
+    int firstVisible = -1;
+    for (int p = 0; p < PageCount; ++p) {
+        bool visible = false;
+        for (CollapsibleSection* s : m_pages->widget(p)->findChildren<CollapsibleSection*>())
+            visible |= !s->isHidden();
+        if (p == InfoPage)
+            visible = any;
+        m_tabs->setTabVisible(p, visible);
+        if (visible && firstVisible < 0)
+            firstVisible = p;
+    }
+    m_emptyHints[EditPage]->setText(any ? QString() : tr("Select a clip on the timeline to change it, or a file to see its details."));
+    for (QLabel* h : m_emptyHints)
+        h->setVisible(!h->text().isEmpty());
+    if (firstVisible < 0) {
+        // Nothing selected: one page with the hint.
+        m_tabs->setTabVisible(EditPage, true);
+        m_tabs->setCurrentIndex(EditPage);
+    } else {
+        const int wanted = QSettings().value(QLatin1String(kTabKey), 0).toInt();
+        if (wanted >= 0 && wanted < PageCount && m_tabs->isTabVisible(wanted))
+            m_tabs->setCurrentIndex(wanted);
+        else if (!m_tabs->isTabVisible(m_tabs->currentIndex()))
+            m_tabs->setCurrentIndex(firstVisible);
+    }
+    m_tabs->setVisible(any);
+    m_pages->setCurrentIndex(m_tabs->currentIndex());
+    m_updating = false;
+    updateTabLabels();
+}
+
+void PropertiesPanel::resizeEvent(QResizeEvent* e) {
+    QWidget::resizeEvent(e);
+    updateTabLabels();
+}
+
+void PropertiesPanel::updateTabLabels() {
+    const int room = m_pages->width() > 0 ? m_pages->width() : width();
+    for (int i = 0; i < PageCount; ++i)
+        m_tabs->setTabText(i, m_tabNames[i]);
+    if (m_tabs->sizeHint().width() <= room)
+        return;
+    for (int i = 0; i < PageCount; ++i)
+        if (i != m_tabs->currentIndex())
+            m_tabs->setTabText(i, QString());
+    if (m_tabs->sizeHint().width() > room)
+        m_tabs->setTabText(m_tabs->currentIndex(), QString());
 }
 
 void PropertiesPanel::refreshEditors(const Clip* clip) {
@@ -797,25 +1290,33 @@ void PropertiesPanel::refreshEditors(const Clip* clip) {
     const bool video = clip && track >= 0 && tl->tracks()[track].type == TrackType::Video;
     const bool audio = clip && track >= 0 && tl->tracks()[track].type == TrackType::Audio;
 
+    // Header card.
+    auto selectedMedia = !m_media.isNull() ? m_project->media()->find(m_media) : nullptr;
     if (clip) {
         const QString trackName = track >= 0 ? tl->tracks()[track].name : QString();
-        m_header->setText(QStringLiteral("<span style='color:%3'>%1 · %2</span>")
-                              .arg(trackName,
-                                   isTitle      ? tr("Title")
-                                   : isSubtitle ? tr("Subtitle")
-                                   : isFreeze   ? tr("Freeze frame")
-                                   : isStill    ? tr("Picture")
-                                   : video      ? tr("Video clip")
-                                                : tr("Audio clip"),
-                                   g_dim));
+        const QString kind = isTitle      ? tr("Title")
+                             : isSubtitle ? tr("Subtitle")
+                             : isFreeze   ? tr("Freeze frame")
+                             : isStill    ? tr("Picture")
+                             : video      ? tr("Video clip")
+                                          : tr("Audio clip");
+        m_headerKind->setText(QStringLiteral("%1 · %2 · %3").arg(trackName, kind, formatSeconds(clip->duration())));
+        QString name = isTitle ? clip->title.text.simplified() : isSubtitle ? clip->text.simplified()
+                       : clipMedia ? QFileInfo(clipMedia->path).fileName() : tr("Missing media");
+        m_headerName->setText(m_headerName->fontMetrics().elidedText(name, Qt::ElideRight, std::max(80, width() - 40)));
+        m_headerName->setToolTip(name);
+    } else if (selectedMedia) {
+        m_headerKind->setText(tr("File"));
+        m_headerName->setText(QFileInfo(selectedMedia->path).fileName());
     }
-    m_header->setVisible(clip != nullptr);
+    m_headerCard->setVisible(clip || selectedMedia);
 
     auto setSpin = [](QDoubleSpinBox* sb, double v) {
         if (std::abs(sb->value() - v) > 1e-9)
             sb->setValue(v);
     };
     m_titleSection->setVisible(isTitle);
+    m_templateSection->setVisible(isTitle);
     if (isTitle) {
         const TitleData& t = clip->title;
         if (m_titleText->toPlainText() != t.text)
@@ -834,6 +1335,11 @@ void PropertiesPanel::refreshEditors(const Clip* clip) {
         m_titleAlign->setCurrentIndex(std::clamp(t.align, 0, 2));
         setSpin(m_titleX, t.x * 100);
         setSpin(m_titleY, t.y * 100);
+        m_titleDecoration->setCurrentIndex(std::max(0, m_titleDecoration->findData(static_cast<int>(t.decoration))));
+        setButtonColor(m_titleAccent, t.accentColor);
+        m_titleAccent->setEnabled(t.decoration != TitleDecoration::None);
+        setSpin(m_titleSpacing, t.letterSpacing * 100);
+        m_titleUpper->setChecked(t.uppercase);
         m_titleAnimIn->setCurrentIndex(m_titleAnimIn->findData(static_cast<int>(t.animationIn)));
         m_titleAnimOut->setCurrentIndex(m_titleAnimOut->findData(static_cast<int>(t.animationOut)));
         setSpin(m_titleAnimDuration, ticksToSeconds(t.animationDuration));
@@ -851,6 +1357,7 @@ void PropertiesPanel::refreshEditors(const Clip* clip) {
         m_stabZoom->setValue(qRound(s.zoom * 100));
         m_stabInfo->setText(s.path.size() > 1 ? QString() : tr("The camera movement is measured once when you turn it on."));
         m_stabInfo->setVisible(s.path.size() < 2);
+        m_stabSection->setModified(s.isActive());
     }
     const bool ai = video && clip->hasMedia();
     // Faces are searched in video frames; a picture can still lose its background.
@@ -867,8 +1374,9 @@ void PropertiesPanel::refreshEditors(const Clip* clip) {
             info = tr("No faces or number plates were found in this clip.");
         else
             info = tr("Found %1 face(s) and %2 number plate(s).").arg(faces).arg(plates);
+        const auto [mediaIn, mediaOut] = clip->mediaRange();
         const bool partial = r.enabled && clip->kind == ClipKind::Media &&
-                             (clip->sourceIn < r.analyzedFrom - tl->frameDuration() || clip->sourceOut > r.analyzedTo + tl->frameDuration());
+                             (mediaIn < r.analyzedFrom - tl->frameDuration() || mediaOut > r.analyzedTo + tl->frameDuration());
         if (partial)
             info += QLatin1Char(' ') + tr("The clip was lengthened since: search again to cover the new part.");
         m_redactInfo->setText(info);
@@ -883,7 +1391,7 @@ void PropertiesPanel::refreshEditors(const Clip* clip) {
         m_redactList->setVisible(found);
         m_redactList->clear();
         int faceNo = 0, plateNo = 0;
-        const Ticks origin = clip->kind == ClipKind::Media ? clip->sourceIn : clip->freezeTime;
+        const Ticks origin = mediaIn;
         for (int i = 0; i < static_cast<int>(r.tracks.size()); ++i) {
             const RedactionTrack& t = r.tracks[i];
             const bool face = t.kind != RedactionKind::Plate;
@@ -898,6 +1406,7 @@ void PropertiesPanel::refreshEditors(const Clip* clip) {
             item->setData(Qt::UserRole, i);
         }
         m_redactList->setFixedHeight(std::min(130, m_redactList->count() * m_redactList->fontMetrics().height() * 3 / 2 + 8));
+        m_redactSection->setModified(r.isActive());
 
         const BackgroundRemoval& b = clip->background;
         m_bgOn->setChecked(b.enabled);
@@ -914,6 +1423,7 @@ void PropertiesPanel::refreshEditors(const Clip* clip) {
             bgInfo = tr("Cuts the person or object out of every frame. Playback gets slower.");
         m_bgInfo->setText(bgInfo);
         m_bgInfo->setVisible(!bgInfo.isEmpty());
+        m_bgSection->setModified(b.enabled);
     }
 
     const bool follow = video && track != 0 && (clip->hasMedia() || clip->kind == ClipKind::Title);
@@ -923,6 +1433,7 @@ void PropertiesPanel::refreshEditors(const Clip* clip) {
         m_trackInfo->setText(clip->motion.isEmpty()
                                  ? tr("Make this clip move with something in the picture below it, e.g. a name above a person.")
                                  : tr("This clip follows a tracked object (%1 positions).").arg(clip->motion.points.size()));
+        m_trackSection->setModified(!clip->motion.isEmpty());
     }
 
     m_freezeSection->setVisible(isFreeze);
@@ -934,11 +1445,40 @@ void PropertiesPanel::refreshEditors(const Clip* clip) {
     m_stillSection->setVisible(isStill);
     if (isStill)
         setSpin(m_stillDuration, ticksToSeconds(clip->duration()));
-    const bool loopable = video && clip->kind == ClipKind::Media && clipMedia && clipMedia->info.duration > 0;
+    const bool loopable = video && clip->kind == ClipKind::Media && clipMedia && clipMedia->info.duration > 0 && !clip->hasSpeedChange();
     m_loopSection->setVisible(loopable);
     if (loopable) {
         m_loop->setChecked(clip->loops());
         m_loopInfo->setVisible(clip->loops());
+        m_loopSection->setModified(clip->loops());
+    }
+
+    // Speed: video and sound clips with media (not repeating ones).
+    const bool speed = clip && clip->kind == ClipKind::Media && (video || audio) && clipMedia && clipMedia->info.duration > 0 && !clip->loops();
+    m_speedSection->setVisible(speed);
+    if (speed) {
+        const TimeRemap& r = clip->remap;
+        const bool on = clip->hasSpeedChange();
+        setSpin(m_speed, on ? r.speed : 1.0);
+        m_speedReverse->setChecked(on && r.reverse);
+        const SpeedRampPreset preset = on ? speedRampPresetOf(r.ramp) : SpeedRampPreset::None;
+        m_speedRamp->setCurrentIndex(std::max(0, m_speedRamp->findData(static_cast<int>(preset))));
+        m_rampView->setRamp(r);
+        m_rampView->setVisible(on && !r.ramp.empty());
+        m_speedBlend->setCurrentIndex(std::max(0, m_speedBlend->findData(static_cast<int>(r.blending))));
+        m_speedPitch->setChecked(r.keepPitch);
+        const bool slow = on && (r.speed < 1.0 || !r.ramp.empty());
+        m_speedBlend->setEnabled(slow && video);
+        m_speedPitch->setEnabled(on && !r.reverse && r.ramp.empty() && r.speed >= 0.25 && r.speed <= 4.0);
+        const auto [mediaIn, mediaOut] = clip->mediaRange();
+        QString info;
+        if (on)
+            info = tr("%1 of footage plays in %2.").arg(formatSeconds(mediaOut - mediaIn), formatSeconds(clip->duration()));
+        if (on && r.reverse)
+            info += QLatin1Char(' ') + tr("Playing backwards can make the preview slower.");
+        m_speedInfo->setText(info);
+        m_speedInfo->setVisible(!info.isEmpty());
+        m_speedSection->setModified(on);
     }
 
     m_subSection->setVisible(isSubtitle);
@@ -970,6 +1510,12 @@ void PropertiesPanel::refreshEditors(const Clip* clip) {
         setSpin(m_scale, t.scale * 100);
         setSpin(m_rotation, t.rotation);
         m_opacity->setValue(qRound(t.opacity * 100));
+        const QRectF crop = t.hasCrop() ? t.crop : QRectF(0, 0, 1, 1);
+        m_cropLeft->setValue(qRound(crop.left() * 100));
+        m_cropTop->setValue(qRound(crop.top() * 100));
+        m_cropRight->setValue(qRound((1.0 - crop.right()) * 100));
+        m_cropBottom->setValue(qRound((1.0 - crop.bottom()) * 100));
+        m_transformSection->setModified(!t.isIdentity());
     }
 
     const bool transition = video && track == 0 && index > 0;
@@ -995,6 +1541,7 @@ void PropertiesPanel::refreshEditors(const Clip* clip) {
         m_transitionNote->setText(note.isEmpty() ? QString()
                                                  : QStringLiteral("<span style='color:%1'>%2</span>").arg(themeColors().warning.name(), note.toHtmlEscaped()));
         m_transitionNote->setVisible(!note.isEmpty());
+        m_transitionSection->setModified(!t.isNone());
     }
 
     m_fadeSection->setVisible(clip && !isSubtitle);
@@ -1004,10 +1551,49 @@ void PropertiesPanel::refreshEditors(const Clip* clip) {
         m_fadeOut->setMaximum(maxFade);
         setSpin(m_fadeIn, ticksToSeconds(clip->fadeIn));
         setSpin(m_fadeOut, ticksToSeconds(clip->fadeOut));
+        m_fadeSection->setModified(clip->fadeIn > 0 || clip->fadeOut > 0);
     }
+
+    // Effects: clips that show a picture from media.
+    const bool effects = video && clip->hasMedia();
+    m_filterSection->setVisible(effects);
+    m_keySection->setVisible(effects);
+    m_fxSection->setVisible(effects);
+    if (effects) {
+        if (m_previewMedia != clip->mediaId && m_thumbnail) {
+            const QImage thumb = m_thumbnail(clip->mediaId);
+            if (!thumb.isNull()) {
+                m_looks->setPreviewImage(thumb);
+                m_previewMedia = clip->mediaId;
+            }
+        }
+        m_autoColor->setEnabled(static_cast<bool>(m_thumbnail));
+        m_looks->setCurrentLook(clip->color.look);
+        m_lookAmount->setValue(clip->color.lookAmount * 100);
+        m_lookAmount->setEnabled(clip->color.hasLook());
+        m_filterSection->setModified(!clip->color.isIdentity());
+        const PictureEffects& e = clip->effects;
+        m_keyOn->setChecked(e.chromaKey.enabled);
+        setButtonColor(m_keyColor, e.chromaKey.color);
+        m_keyTolerance->setValue(e.chromaKey.tolerance * 100);
+        m_keySoftness->setValue(e.chromaKey.softness * 100);
+        m_keySpill->setValue(e.chromaKey.spill * 100);
+        for (SliderRow* s : {m_keyTolerance, m_keySoftness, m_keySpill})
+            s->setEnabled(e.chromaKey.enabled);
+        m_keySection->setModified(e.chromaKey.enabled);
+        m_fxDenoise->setValue(e.denoise * 100);
+        m_fxSharpen->setValue(e.sharpen * 100);
+        m_fxBlur->setValue(e.blur * 100);
+        m_fxVignette->setValue(e.vignette * 100);
+        m_fxGrain->setValue(e.grain * 100);
+        m_fxSection->setModified(e.denoise > 0 || e.sharpen > 0 || e.blur > 0 || e.vignette > 0 || e.grain > 0);
+    }
+
     m_audioSection->setVisible(audio);
-    if (audio)
+    if (audio) {
         setSpin(m_gain, clip->gainDb);
+        m_audioSection->setModified(clip->gainDb != 0.0);
+    }
     m_updating = false;
 }
 
@@ -1029,11 +1615,12 @@ void PropertiesPanel::refreshInfo(const Clip* clip) {
 
     if (clip) {
         html += section(tr("Clip"));
-        html += row(tr("In"), formatTimecode(clip->sourceIn, rate));
-        html += row(tr("Out"), formatTimecode(clip->sourceOut, rate));
+        const auto [mediaIn, mediaOut] = clip->mediaRange();
+        html += row(tr("In"), formatTimecode(mediaIn, rate));
+        html += row(tr("Out"), formatTimecode(mediaOut, rate));
         html += row(tr("Duration"), formatSeconds(clip->duration()));
         html += row(tr("Timeline position"), formatTimecode(clip->timelineStart, m_project->timeline()->frameRate()));
-        if (info.video && media->hasKeyframes()) {
+        if (info.video && media->hasKeyframes() && !clip->hasSpeedChange()) {
             const auto kf = media->keyframesCopy();
             const Ticks fd = frameDuration(rate);
             const Ticks k = previousKeyframe(kf, clip->sourceIn, fd / 2);
@@ -1105,5 +1692,6 @@ void PropertiesPanel::refreshInfo(const Clip* clip) {
     html += QStringLiteral("</table>");
     m_info->setText(html);
 }
+
 
 } // namespace lumora

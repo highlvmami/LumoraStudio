@@ -383,6 +383,7 @@ void PhotoWorkspace::loadCurrent() {
         else
             m_proxy = PhotoProcessor::makeProxy(m_working, 2048);
     }
+    m_color->setPreviewImage(m_proxy.isNull() ? QImage() : m_proxy.scaled(320, 320, Qt::KeepAspectRatio, Qt::SmoothTransformation));
     syncControls();
     scheduleRender();
 }

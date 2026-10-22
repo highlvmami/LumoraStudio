@@ -32,6 +32,12 @@ constexpr TransitionName kTransitionNames[] = {
     {TransitionType::WipeUp, "wipeUp"},      {TransitionType::WipeDown, "wipeDown"},
     {TransitionType::SlideLeft, "slideLeft"}, {TransitionType::SlideRight, "slideRight"},
     {TransitionType::Zoom, "zoom"},          {TransitionType::Blur, "blur"},
+    {TransitionType::PushUp, "pushUp"},      {TransitionType::PushDown, "pushDown"},
+    {TransitionType::Iris, "iris"},          {TransitionType::ClockWipe, "clockWipe"},
+    {TransitionType::BarnDoor, "barnDoor"},  {TransitionType::DiagonalWipe, "diagonalWipe"},
+    {TransitionType::Flash, "flash"},        {TransitionType::Pixelate, "pixelate"},
+    {TransitionType::Spin, "spin"},          {TransitionType::Glitch, "glitch"},
+    {TransitionType::ZoomBlur, "zoomBlur"},
 };
 
 struct AnimationName {
@@ -41,6 +47,26 @@ struct AnimationName {
 constexpr AnimationName kAnimationNames[] = {
     {TitleAnimation::None, "none"}, {TitleAnimation::Fade, "fade"},   {TitleAnimation::SlideUp, "slideUp"},
     {TitleAnimation::Pop, "pop"},   {TitleAnimation::Typewriter, "typewriter"},
+    {TitleAnimation::SlideLeft, "slideLeft"}, {TitleAnimation::Zoom, "zoom"}, {TitleAnimation::Blur, "blur"},
+};
+
+struct DecorationName {
+    TitleDecoration decoration;
+    const char* id;
+};
+constexpr DecorationName kDecorationNames[] = {
+    {TitleDecoration::None, "none"},           {TitleDecoration::Bar, "bar"},   {TitleDecoration::Underline, "underline"},
+    {TitleDecoration::Frame, "frame"},         {TitleDecoration::Band, "band"}, {TitleDecoration::Brackets, "brackets"},
+};
+
+struct RampName {
+    SpeedRampPreset preset;
+    const char* id;
+};
+constexpr RampName kRampNames[] = {
+    {SpeedRampPreset::None, "none"},       {SpeedRampPreset::Montage, "montage"}, {SpeedRampPreset::Hero, "hero"},
+    {SpeedRampPreset::Bullet, "bullet"},   {SpeedRampPreset::FlashIn, "flashIn"}, {SpeedRampPreset::FlashOut, "flashOut"},
+    {SpeedRampPreset::SlowIn, "slowIn"},   {SpeedRampPreset::SlowOut, "slowOut"},
 };
 
 } // namespace
@@ -59,6 +85,27 @@ TransitionType transitionTypeFromId(const QString& id) {
     return TransitionType::None;
 }
 
+std::vector<TransitionType> allTransitionTypes() {
+    std::vector<TransitionType> out;
+    for (const auto& n : kTransitionNames)
+        out.push_back(n.type);
+    return out;
+}
+
+QString titleDecorationId(TitleDecoration d) {
+    for (const auto& n : kDecorationNames)
+        if (n.decoration == d)
+            return QString::fromLatin1(n.id);
+    return QStringLiteral("none");
+}
+
+TitleDecoration titleDecorationFromId(const QString& id) {
+    for (const auto& n : kDecorationNames)
+        if (id == QLatin1String(n.id))
+            return n.decoration;
+    return TitleDecoration::None;
+}
+
 QString titleAnimationId(TitleAnimation a) {
     for (const auto& n : kAnimationNames)
         if (n.anim == a)
@@ -74,7 +121,10 @@ TitleAnimation titleAnimationFromId(const QString& id) {
 }
 
 QJsonObject ClipTransform::toJson() const {
-    return QJsonObject{{"x", x}, {"y", y}, {"scale", scale}, {"rotation", rotation}, {"opacity", opacity}};
+    QJsonObject o{{"x", x}, {"y", y}, {"scale", scale}, {"rotation", rotation}, {"opacity", opacity}};
+    if (hasCrop())
+        o["crop"] = QJsonArray{crop.x(), crop.y(), crop.width(), crop.height()};
+    return o;
 }
 
 ClipTransform ClipTransform::fromJson(const QJsonObject& o) {
@@ -84,6 +134,9 @@ ClipTransform ClipTransform::fromJson(const QJsonObject& o) {
     t.scale = o.value("scale").toDouble(1.0);
     t.rotation = o.value("rotation").toDouble(0.0);
     t.opacity = o.value("opacity").toDouble(1.0);
+    const QJsonArray c = o.value("crop").toArray();
+    if (c.size() == 4)
+        t.crop = QRectF(c[0].toDouble(), c[1].toDouble(), c[2].toDouble(), c[3].toDouble());
     return t;
 }
 
@@ -118,6 +171,14 @@ QJsonObject TitleData::toJson() const {
     o["animationIn"] = titleAnimationId(animationIn);
     o["animationOut"] = titleAnimationId(animationOut);
     o["animationDuration"] = ticksToJson(animationDuration);
+    if (decoration != TitleDecoration::None) {
+        o["decoration"] = titleDecorationId(decoration);
+        o["accentColor"] = colorToJson(accentColor);
+    }
+    if (letterSpacing != 0.0)
+        o["letterSpacing"] = letterSpacing;
+    if (uppercase)
+        o["uppercase"] = true;
     return o;
 }
 
@@ -141,6 +202,10 @@ TitleData TitleData::fromJson(const QJsonObject& o) {
     d.animationOut =
         o.contains("animationOut") ? titleAnimationFromId(o.value("animationOut").toString()) : d.animationOut;
     d.animationDuration = ticksFromJson(o.value("animationDuration"), d.animationDuration);
+    d.decoration = titleDecorationFromId(o.value("decoration").toString());
+    d.accentColor = colorFromJson(o.value("accentColor"), d.accentColor);
+    d.letterSpacing = o.value("letterSpacing").toDouble(0.0);
+    d.uppercase = o.value("uppercase").toBool(false);
     return d;
 }
 
@@ -407,6 +472,227 @@ BackgroundRemoval BackgroundRemoval::fromJson(const QJsonObject& o) {
     b.model = o.value("model").toString(QStringLiteral("fast"));
     b.softness = std::clamp(o.value("softness").toDouble(0.5), 0.0, 1.0);
     return b;
+}
+
+
+// ---------------------------------------------------------------------------
+// Speed
+// ---------------------------------------------------------------------------
+
+namespace {
+
+// Integral of the ramp's relative speed from 0 to u (u in 0 .. 1).
+double rampIntegral(const std::vector<SpeedPoint>& ramp, double u) {
+    if (ramp.empty())
+        return u;
+    double sum = 0.0;
+    double prevPos = 0.0, prevRate = ramp.front().rate;
+    auto segment = [&](double pos, double rate) {
+        // Linear from (prevPos, prevRate) to (pos, rate), integrated up to u.
+        const double end = std::min(pos, u);
+        if (end > prevPos) {
+            const double span = pos - prevPos;
+            const double rEnd = span > 0 ? prevRate + (rate - prevRate) * (end - prevPos) / span : rate;
+            sum += (end - prevPos) * (prevRate + rEnd) / 2;
+        }
+        prevPos = pos;
+        prevRate = rate;
+    };
+    for (const auto& p : ramp)
+        segment(std::clamp(p.pos, 0.0, 1.0), std::max(0.01, p.rate));
+    segment(1.0, prevRate);
+    return sum;
+}
+
+// Inverse of rampIntegral (bisection; the integral grows monotonically).
+double rampInverse(const std::vector<SpeedPoint>& ramp, double value) {
+    if (ramp.empty())
+        return value;
+    double lo = 0.0, hi = 1.0;
+    for (int i = 0; i < 48; ++i) {
+        const double mid = (lo + hi) / 2;
+        (rampIntegral(ramp, mid) < value ? lo : hi) = mid;
+    }
+    return (lo + hi) / 2;
+}
+
+} // namespace
+
+double TimeRemap::rateAt(double pos) const {
+    if (ramp.empty())
+        return 1.0;
+    pos = std::clamp(pos, 0.0, 1.0);
+    if (pos <= ramp.front().pos)
+        return ramp.front().rate;
+    for (size_t i = 1; i < ramp.size(); ++i)
+        if (pos <= ramp[i].pos) {
+            const SpeedPoint& a = ramp[i - 1];
+            const SpeedPoint& b = ramp[i];
+            const double f = b.pos > a.pos ? (pos - a.pos) / (b.pos - a.pos) : 1.0;
+            return a.rate + (b.rate - a.rate) * f;
+        }
+    return ramp.back().rate;
+}
+
+Ticks TimeRemap::map(Ticks v) const {
+    if (length <= 0)
+        return v;
+    const double u = std::clamp(static_cast<double>(v) / length, 0.0, 1.0);
+    const double total = rampIntegral(ramp, 1.0);
+    const double f = total > 0 ? rampIntegral(ramp, u) / total : u;
+    const double span = static_cast<double>(mediaOut - mediaIn);
+    // Backwards, a moment shows the frame just before it in the media: the
+    // range [in, out) then plays from the last frame to the first.
+    return reverse ? std::max(mediaIn, mediaOut - 1 - static_cast<Ticks>(std::llround(f * span)))
+                   : mediaIn + static_cast<Ticks>(std::llround(f * span));
+}
+
+double TimeRemap::mediaRate(Ticks v) const {
+    if (length <= 0)
+        return 1.0;
+    const double total = rampIntegral(ramp, 1.0);
+    const double u = std::clamp(static_cast<double>(v) / length, 0.0, 1.0);
+    const double rate = (total > 0 ? rateAt(u) / total : 1.0) * static_cast<double>(mediaOut - mediaIn) / length;
+    return reverse ? -rate : rate;
+}
+
+Ticks TimeRemap::unmap(Ticks m) const {
+    if (length <= 0 || mediaOut <= mediaIn)
+        return m;
+    double f = static_cast<double>(m - mediaIn) / (mediaOut - mediaIn);
+    if (reverse)
+        f = 1.0 - f;
+    f = std::clamp(f, 0.0, 1.0);
+    const double u = rampInverse(ramp, f * rampIntegral(ramp, 1.0));
+    return static_cast<Ticks>(std::llround(u * length));
+}
+
+double TimeRemap::rampAverage() const { return rampIntegral(ramp, 1.0); }
+
+QJsonObject TimeRemap::toJson() const {
+    QJsonObject o;
+    o["speed"] = speed;
+    if (reverse)
+        o["reverse"] = true;
+    if (!ramp.empty()) {
+        QJsonArray a;
+        for (const auto& p : ramp)
+            a.append(QJsonArray{p.pos, p.rate});
+        o["ramp"] = a;
+    }
+    o["blending"] = blending == FrameBlending::None ? "none" : blending == FrameBlending::Blend ? "blend" : "flow";
+    o["keepPitch"] = keepPitch;
+    o["length"] = ticksToJson(length);
+    o["mediaIn"] = ticksToJson(mediaIn);
+    o["mediaOut"] = ticksToJson(mediaOut);
+    return o;
+}
+
+TimeRemap TimeRemap::fromJson(const QJsonObject& o) {
+    TimeRemap r;
+    r.speed = std::clamp(o.value("speed").toDouble(1.0), 0.01, 100.0);
+    r.reverse = o.value("reverse").toBool(false);
+    for (const auto& v : o.value("ramp").toArray()) {
+        const QJsonArray e = v.toArray();
+        if (e.size() >= 2)
+            r.ramp.push_back({std::clamp(e[0].toDouble(), 0.0, 1.0), std::max(0.01, e[1].toDouble(1.0))});
+    }
+    const QString b = o.value("blending").toString();
+    r.blending = b == QLatin1String("none") ? FrameBlending::None : b == QLatin1String("blend") ? FrameBlending::Blend : FrameBlending::OpticalFlow;
+    r.keepPitch = o.value("keepPitch").toBool(true);
+    r.length = ticksFromJson(o.value("length"), 0);
+    r.mediaIn = ticksFromJson(o.value("mediaIn"), 0);
+    r.mediaOut = ticksFromJson(o.value("mediaOut"), 0);
+    return r;
+}
+
+std::vector<SpeedPoint> speedRampPoints(SpeedRampPreset preset) {
+    switch (preset) {
+    case SpeedRampPreset::None: return {};
+    // Fast, a slow moment in the middle, fast again.
+    case SpeedRampPreset::Montage: return {{0.0, 3.0}, {0.35, 3.0}, {0.45, 0.4}, {0.6, 0.4}, {0.7, 3.0}, {1.0, 3.0}};
+    // Normal, slowing right down for the big moment, back to normal.
+    case SpeedRampPreset::Hero: return {{0.0, 1.0}, {0.3, 1.0}, {0.42, 0.25}, {0.62, 0.25}, {0.75, 1.0}, {1.0, 1.0}};
+    // Very slow in the middle, fast around it.
+    case SpeedRampPreset::Bullet: return {{0.0, 2.0}, {0.38, 2.0}, {0.45, 0.15}, {0.58, 0.15}, {0.65, 2.0}, {1.0, 2.0}};
+    // Starts fast and settles to normal speed.
+    case SpeedRampPreset::FlashIn: return {{0.0, 5.0}, {0.25, 5.0}, {0.4, 1.0}, {1.0, 1.0}};
+    // Normal speed that rushes away at the end.
+    case SpeedRampPreset::FlashOut: return {{0.0, 1.0}, {0.6, 1.0}, {0.75, 5.0}, {1.0, 5.0}};
+    // Starts slow and speeds up.
+    case SpeedRampPreset::SlowIn: return {{0.0, 0.3}, {0.3, 0.3}, {0.6, 1.5}, {1.0, 1.5}};
+    // Slows down towards the end.
+    case SpeedRampPreset::SlowOut: return {{0.0, 1.5}, {0.4, 1.5}, {0.7, 0.3}, {1.0, 0.3}};
+    }
+    return {};
+}
+
+QString speedRampId(SpeedRampPreset preset) {
+    for (const auto& n : kRampNames)
+        if (n.preset == preset)
+            return QString::fromLatin1(n.id);
+    return QStringLiteral("none");
+}
+
+SpeedRampPreset speedRampFromId(const QString& id) {
+    for (const auto& n : kRampNames)
+        if (id == QLatin1String(n.id))
+            return n.preset;
+    return SpeedRampPreset::None;
+}
+
+SpeedRampPreset speedRampPresetOf(const std::vector<SpeedPoint>& ramp) {
+    for (const auto& n : kRampNames)
+        if (speedRampPoints(n.preset) == ramp)
+            return n.preset;
+    return SpeedRampPreset::None;
+}
+
+// ---------------------------------------------------------------------------
+// Picture effects
+// ---------------------------------------------------------------------------
+
+QJsonObject ChromaKey::toJson() const {
+    return QJsonObject{{"enabled", enabled}, {"color", colorToJson(color)}, {"tolerance", tolerance}, {"softness", softness}, {"spill", spill}};
+}
+
+ChromaKey ChromaKey::fromJson(const QJsonObject& o) {
+    ChromaKey k;
+    k.enabled = o.value("enabled").toBool();
+    k.color = colorFromJson(o.value("color"), k.color);
+    k.tolerance = std::clamp(o.value("tolerance").toDouble(k.tolerance), 0.0, 1.0);
+    k.softness = std::clamp(o.value("softness").toDouble(k.softness), 0.0, 1.0);
+    k.spill = std::clamp(o.value("spill").toDouble(k.spill), 0.0, 1.0);
+    return k;
+}
+
+QJsonObject PictureEffects::toJson() const {
+    QJsonObject o;
+    if (chromaKey.enabled)
+        o["chromaKey"] = chromaKey.toJson();
+    auto put = [&](const char* key, double v) {
+        if (v != 0.0)
+            o[QLatin1String(key)] = v;
+    };
+    put("denoise", denoise);
+    put("sharpen", sharpen);
+    put("blur", blur);
+    put("vignette", vignette);
+    put("grain", grain);
+    return o;
+}
+
+PictureEffects PictureEffects::fromJson(const QJsonObject& o) {
+    PictureEffects e;
+    if (o.contains("chromaKey"))
+        e.chromaKey = ChromaKey::fromJson(o.value("chromaKey").toObject());
+    auto get = [&](const char* key) { return std::clamp(o.value(QLatin1String(key)).toDouble(0.0), 0.0, 1.0); };
+    e.denoise = get("denoise");
+    e.sharpen = get("sharpen");
+    e.blur = get("blur");
+    e.vignette = get("vignette");
+    e.grain = get("grain");
+    return e;
 }
 
 } // namespace lumora
