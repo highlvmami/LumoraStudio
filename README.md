@@ -22,6 +22,11 @@ Açık tema ("Gündüz", Görünüm → Tema):
 
 Tam yol haritası: [docs/ozellikler.md](docs/ozellikler.md). Mimari: [docs/mimari.md](docs/mimari.md).
 
+## Sürüm 0.6.8: önizleme sesi hoparlörü takip eder
+
+- Önizleme sesi artık Windows'ta seçili ses çıkışını takip ediyor. Program açıkken kulaklık ya da Bluetooth takılıp çıkarılırsa veya başka bir hoparlör seçilirse ses kaybolmuyor, yeni çıkıştan devam ediyor.
+- Kayan nokta (float) ses kabul etmeyen ses kartlarında 16 bit sese geçiliyor; bu cihazlarda önizleme artık sessiz kalmıyor.
+
 ## Sürüm 0.6.7: kaydırırken ayarlar değişmez
 
 - Bir paneli fare tekerleğiyle kaydırırken imlecin altından geçen kaydırıcılar, sayı kutuları ve açılır listeler artık değişmez; tekerlek paneli kaydırır. Önceden bu yolla bir klibin ses seviyesi fark edilmeden en alta (-40 dB) inebiliyordu. Bir denetimi tekerlekle değiştirmek için önce ona tıklayın.

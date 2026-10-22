@@ -1,6 +1,7 @@
 #pragma once
 
 #include <QAudioFormat>
+#include <QByteArray>
 #include <QImage>
 #include <QObject>
 #include <QPointer>
@@ -15,10 +16,12 @@
 #include "playback/PlaybackSequence.h"
 
 class QAudioSink;
+class QMediaDevices;
 
 namespace lumora {
 
 class AudioRingDevice;
+
 
 // Preview playback. A video thread composites the frame that belongs to the
 // current clock position with FrameRenderer at preview size (dropping frames
@@ -63,6 +66,13 @@ private:
     void post(Command::Type type, Ticks t);
     void startAudio(Ticks from);
     void stopAudio();
+    // (Re)opens the system's current default sound output. Returns true
+    // when it changed.
+    bool openAudioOutput();
+    // Follows the default output when it changes or the current one is
+    // lost (headphones plugged in or out, Bluetooth, another device chosen
+    // in Windows), carrying on from the playhead.
+    void audioOutputChanged();
 
     PlaybackSequence m_sequence; // GUI thread copy
     Ticks m_position = 0;
@@ -83,7 +93,10 @@ private:
     quint64 m_sequenceVersion = 0; // bumped on every setSequence (guarded by m_mutex)
 
     QAudioFormat m_format;
+    QMediaDevices* m_devices = nullptr;
     QAudioSink* m_sink = nullptr;
+    QByteArray m_deviceId;
+    bool m_reopened = false;
     AudioRingDevice* m_ring = nullptr;
     bool m_audioOk = false;
 };

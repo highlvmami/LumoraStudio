@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.21)
 
 project(LumoraStudio
-    VERSION 0.6.7
+    VERSION 0.6.8
     DESCRIPTION "Free video and photo editor that never loses quality unless asked to"
     LANGUAGES CXX)
 

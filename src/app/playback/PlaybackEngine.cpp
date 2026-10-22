@@ -5,7 +5,9 @@
 #include <QIODevice>
 #include <QMediaDevices>
 #include <QTransform>
+#include <algorithm>
 #include <chrono>
+#include <cmath>
 #include <cstring>
 #include <vector>
 
@@ -57,24 +59,31 @@ public:
         return true;
     }
 
+    // Devices that do not take float samples get 16 bit ones.
+    void setInt16(bool on) { m_int16 = on; }
+
 protected:
     qint64 readData(char* out, qint64 maxlen) override {
-        const size_t want = static_cast<size_t>(maxlen) / sizeof(float);
-        auto* dst = reinterpret_cast<float*>(out);
+        const size_t bytes = m_int16 ? sizeof(qint16) : sizeof(float);
+        const size_t want = static_cast<size_t>(maxlen) / bytes;
         size_t n;
         {
             std::lock_guard lock(m_mutex);
             n = std::min(want, m_size);
             for (size_t i = 0; i < n; ++i) {
-                dst[i] = m_buffer[m_read];
+                const float v = m_buffer[m_read];
+                if (m_int16)
+                    reinterpret_cast<qint16*>(out)[i] = static_cast<qint16>(std::lround(std::clamp(v, -1.0f, 1.0f) * 32767.0f));
+                else
+                    reinterpret_cast<float*>(out)[i] = v;
                 m_read = (m_read + 1) % m_buffer.size();
             }
             m_size -= n;
         }
         m_cv.notify_all();
         // Underrun: play silence instead of stalling the device.
-        std::memset(dst + n, 0, (want - n) * sizeof(float));
-        return static_cast<qint64>(want * sizeof(float));
+        std::memset(out + n * bytes, 0, (want - n) * bytes);
+        return static_cast<qint64>(want * bytes);
     }
     qint64 writeData(const char*, qint64) override { return -1; }
     bool isSequential() const override { return true; }
@@ -84,6 +93,7 @@ private:
     std::vector<float> m_buffer;
     size_t m_read = 0, m_write = 0, m_size = 0;
     bool m_abort = false;
+    bool m_int16 = false;
     std::mutex m_mutex;
     std::condition_variable m_cv;
 };
@@ -92,14 +102,11 @@ PlaybackEngine::PlaybackEngine(QObject* parent) : QObject(parent) {
     m_format.setSampleRate(kAudioRate);
     m_format.setChannelCount(kAudioChannels);
     m_format.setSampleFormat(QAudioFormat::Float);
-    const QAudioDevice dev = QMediaDevices::defaultAudioOutput();
-    if (!dev.isNull() && dev.isFormatSupported(m_format)) {
-        m_ring = new AudioRingDevice(kAudioRate / 2);
-        m_ring->open(QIODevice::ReadOnly);
-        m_sink = new QAudioSink(dev, m_format, this);
-        m_sink->setBufferSize(kAudioRate * kAudioChannels * sizeof(float) / 10);
-        m_audioOk = true;
-    }
+    m_ring = new AudioRingDevice(kAudioRate / 2);
+    m_ring->open(QIODevice::ReadOnly);
+    m_devices = new QMediaDevices(this);
+    openAudioOutput();
+    connect(m_devices, &QMediaDevices::audioOutputsChanged, this, &PlaybackEngine::audioOutputChanged);
     m_videoThread = std::thread([this] { videoLoop(); });
 }
 
@@ -152,6 +159,7 @@ void PlaybackEngine::play() {
     if (m_position >= m_sequence.duration - frameDuration(m_sequence.frameRate))
         m_position = 0;
     m_playing = true;
+    m_reopened = false;
     startAudio(m_position);
     post(Command::Play, m_position);
     emit playingChanged(true);
@@ -184,8 +192,49 @@ void PlaybackEngine::stepFrames(int n) {
     seek(snapToFrame(m_position, m_sequence.frameRate) + n * fd);
 }
 
+bool PlaybackEngine::openAudioOutput() {
+    const QAudioDevice dev = QMediaDevices::defaultAudioOutput();
+    if (m_sink && dev.id() == m_deviceId && (m_sink->error() == QAudio::NoError || m_reopened))
+        return false;
+    // A device that keeps failing is reopened once per play.
+    m_reopened = m_sink && dev.id() == m_deviceId;
+    if (m_sink)
+        m_sink->disconnect(this);
+    delete m_sink;
+    m_sink = nullptr;
+    m_audioOk = false;
+    m_deviceId = dev.id();
+    if (dev.isNull())
+        return true;
+    QAudioFormat format = m_format;
+    if (!dev.isFormatSupported(format)) {
+        format.setSampleFormat(QAudioFormat::Int16);
+        if (!dev.isFormatSupported(format))
+            return true;
+    }
+    const bool int16 = format.sampleFormat() == QAudioFormat::Int16;
+    m_ring->setInt16(int16);
+    m_sink = new QAudioSink(dev, format, this);
+    m_sink->setBufferSize(kAudioRate * kAudioChannels * (int16 ? sizeof(qint16) : sizeof(float)) / 10);
+    // A device that goes away while playing stops the sink with an error.
+    connect(m_sink, &QAudioSink::stateChanged, this, [this](QAudio::State st) {
+        if (st == QAudio::StoppedState && m_sink && m_sink->error() != QAudio::NoError && !m_reopened)
+            QMetaObject::invokeMethod(this, &PlaybackEngine::audioOutputChanged, Qt::QueuedConnection);
+    });
+    m_audioOk = true;
+    return true;
+}
+
+void PlaybackEngine::audioOutputChanged() {
+    stopAudio();
+    openAudioOutput();
+    if (m_playing)
+        startAudio(m_position);
+}
+
 void PlaybackEngine::startAudio(Ticks from) {
     stopAudio();
+    openAudioOutput();
     if (!m_audioOk)
         return;
     m_ring->clear();
@@ -215,13 +264,12 @@ void PlaybackEngine::startAudio(Ticks from) {
 }
 
 void PlaybackEngine::stopAudio() {
-    if (!m_audioOk)
-        return;
     m_audioRun = false;
     m_ring->abort();
     if (m_audioThread.joinable())
         m_audioThread.join();
-    m_sink->stop();
+    if (m_sink)
+        m_sink->stop();
 }
 
 void PlaybackEngine::videoLoop() {
