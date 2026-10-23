@@ -74,6 +74,12 @@ struct FrameRenderer::Slot {
     QImage matte;
     Ticks mattePts = kInvalidTicks;
     QString matteModel;
+    // Motion between the two frames of the last in-between frame: the
+    // frames between the same pair share it.
+    fx::MotionField motion;
+    Ticks motionFrom = kInvalidTicks, motionTo = kInvalidTicks;
+    QSize motionSize;
+    bool motionAi = false;
 };
 
 // Opens decoders for clips that are about to come into view and decodes up
@@ -549,9 +555,22 @@ QImage FrameRenderer::clipImage(const Clip& clip, Ticks sourceTime, QSize* fitSi
         return {};
     if (f2) {
         const QImage next = convertFrame(*slot, f2, QSize(tw, th));
-        if (!next.isNull())
-            img = clip.remap.blending == FrameBlending::OpticalFlow ? fx::interpolateFrames(img, next, mix)
-                                                                    : fx::blendFrames(img, next, mix);
+        if (!next.isNull() && clip.remap.blending == FrameBlending::Blend) {
+            img = fx::blendFrames(img, next, mix);
+        } else if (!next.isNull()) {
+            // The AI model takes seconds per frame pair: the export uses it,
+            // the preview the built-in flow.
+            const bool ai = clip.remap.blending == FrameBlending::AiFlow && final;
+            if (slot->motionFrom != pts || slot->motionTo != pts2 || slot->motionSize != img.size() || slot->motionAi != ai ||
+                !slot->motion.isValid()) {
+                slot->motion = fx::measureMotion(img, next, ai);
+                slot->motionFrom = pts;
+                slot->motionTo = pts2;
+                slot->motionSize = img.size();
+                slot->motionAi = ai;
+            }
+            img = fx::interpolateFrames(img, next, mix, &slot->motion);
+        }
     }
     // The subject is found on the picture as shot, before grading, so colour
     // changes do not move the cut-out edge.

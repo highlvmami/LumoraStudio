@@ -30,6 +30,7 @@
 #include <cmath>
 
 #include "Icons.h"
+#include "Tasks.h"
 #include "Theme.h"
 #include "ai/Vision.h"
 #include "color/AutoColor.h"
@@ -460,6 +461,8 @@ PropertiesPanel::PropertiesPanel(Project* project, QUndoStack* undo, QWidget* pa
     m_speedBlend->addItem(tr("Off: repeat frames"), static_cast<int>(FrameBlending::None));
     m_speedBlend->addItem(tr("Mix neighbouring frames"), static_cast<int>(FrameBlending::Blend));
     m_speedBlend->addItem(tr("Make in-between frames (optical flow)"), static_cast<int>(FrameBlending::OpticalFlow));
+    if (ai::visionAvailable())
+        m_speedBlend->addItem(tr("In-between frames with AI (best, slow export)"), static_cast<int>(FrameBlending::AiFlow));
     m_speedBlend->setToolTip(tr("For slow motion: new pictures are drawn between the filmed frames, so it plays smoothly"));
     f->addRow(tr("Smooth slow motion"), m_speedBlend);
     m_speedPitch = new QCheckBox(tr("Keep the voice's pitch"));
@@ -791,6 +794,11 @@ PropertiesPanel::PropertiesPanel(Project* project, QUndoStack* undo, QWidget* pa
     });
     connect(speedReset, &QToolButton::clicked, this, [this] { applySpeed(1.0, false, SpeedRampPreset::None); });
     auto speedOptions = [this] {
+        if (!m_updating && m_speedBlend->currentData().toInt() == static_cast<int>(FrameBlending::AiFlow) &&
+            !ensureVisionModels(this, {QStringLiteral("frame-flow")}, tr("Smooth slow motion"))) {
+            refresh(); // back to the clip's setting
+            return;
+        }
         edit(tr("Slow motion options"), {}, [&](const Clip& c) {
             return m_project->timeline()->setSpeedOptions(c.id, static_cast<FrameBlending>(m_speedBlend->currentData().toInt()),
                                                           m_speedPitch->isChecked());

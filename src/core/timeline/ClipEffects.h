@@ -265,6 +265,7 @@ enum class FrameBlending {
     None,        // each frame is held (steps)
     Blend,       // neighbouring frames are mixed
     OpticalFlow, // in-between frames are drawn from the motion (smooth slow motion)
+    AiFlow,      // the same with the motion measured by an AI model (export; preview uses OpticalFlow)
 };
 
 struct TimeRemap {

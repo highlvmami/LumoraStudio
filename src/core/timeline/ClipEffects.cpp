@@ -580,7 +580,10 @@ QJsonObject TimeRemap::toJson() const {
             a.append(QJsonArray{p.pos, p.rate});
         o["ramp"] = a;
     }
-    o["blending"] = blending == FrameBlending::None ? "none" : blending == FrameBlending::Blend ? "blend" : "flow";
+    o["blending"] = blending == FrameBlending::None    ? "none"
+                    : blending == FrameBlending::Blend ? "blend"
+                    : blending == FrameBlending::AiFlow ? "ai-flow"
+                                                       : "flow";
     o["keepPitch"] = keepPitch;
     o["length"] = ticksToJson(length);
     o["mediaIn"] = ticksToJson(mediaIn);
@@ -598,7 +601,10 @@ TimeRemap TimeRemap::fromJson(const QJsonObject& o) {
             r.ramp.push_back({std::clamp(e[0].toDouble(), 0.0, 1.0), std::max(0.01, e[1].toDouble(1.0))});
     }
     const QString b = o.value("blending").toString();
-    r.blending = b == QLatin1String("none") ? FrameBlending::None : b == QLatin1String("blend") ? FrameBlending::Blend : FrameBlending::OpticalFlow;
+    r.blending = b == QLatin1String("none")      ? FrameBlending::None
+                 : b == QLatin1String("blend")   ? FrameBlending::Blend
+                 : b == QLatin1String("ai-flow") ? FrameBlending::AiFlow
+                                                 : FrameBlending::OpticalFlow;
     r.keepPitch = o.value("keepPitch").toBool(true);
     r.length = ticksFromJson(o.value("length"), 0);
     r.mediaIn = ticksFromJson(o.value("mediaIn"), 0);

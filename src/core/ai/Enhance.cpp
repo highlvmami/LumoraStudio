@@ -331,4 +331,30 @@ QImage inpaint(const QImage& image, const QImage& maskIn, const EnhanceProgress&
     return out;
 }
 
+bool measureFlow(const QImage& a, const QImage& b, std::vector<float>& flowX, std::vector<float>& flowY, QString* error) {
+    if (a.isNull() || b.isNull())
+        return false;
+    auto net = visionNetwork(QStringLiteral("frame-flow"), error);
+    if (!net)
+        return false;
+    // RAFT: RGB 0..255 at its fixed size; outputs the coarse and the full
+    // flow, the full one is used.
+    auto input = [](const QImage& img) {
+        const QImage small = toRgba64(img.scaled(kFlowWidth, kFlowHeight, Qt::IgnoreAspectRatio, Qt::SmoothTransformation));
+        return tensorOf(small, small.rect(), kFlowWidth, kFlowHeight, false, 255.0f, 0.0f);
+    };
+    const auto out = net->run({input(a), input(b)}, -1, error);
+    const size_t plane = static_cast<size_t>(kFlowWidth) * kFlowHeight;
+    for (const Tensor& t : out) {
+        if (t.dim(1) == 2 && t.dim(2) == kFlowHeight && t.dim(3) == kFlowWidth && t.data.size() >= 2 * plane) {
+            flowX.assign(t.data.begin(), t.data.begin() + plane);
+            flowY.assign(t.data.begin() + plane, t.data.begin() + 2 * plane);
+            return true;
+        }
+    }
+    if (error && error->isEmpty())
+        *error = Tr::tr("The in-between frame model gave an unexpected result.");
+    return false;
+}
+
 } // namespace lumora::ai
