@@ -91,6 +91,33 @@ struct Recognition {
     }
 };
 
+// Moves a Whisper start time (10 ms steps) forward to where the sound
+// actually begins: Whisper often starts the first segment or word of a
+// window at the window's start even when the speech begins later.
+class SoundStart {
+public:
+    explicit SoundStart(const std::vector<float>& pcm) : m_level(pcm.size() / 160) {
+        float peak = 0.0f;
+        for (size_t f = 0; f < m_level.size(); ++f) {
+            double sum = 0.0;
+            for (size_t k = f * 160; k < (f + 1) * 160; ++k)
+                sum += double(pcm[k]) * pcm[k];
+            m_level[f] = static_cast<float>(std::sqrt(sum / 160.0));
+            peak = std::max(peak, m_level[f]);
+        }
+        m_quiet = std::max(0.003f, 0.1f * peak);
+    }
+    int64_t operator()(int64_t t0, int64_t t1) const {
+        while (t0 < t1 && t0 >= 0 && t0 < static_cast<int64_t>(m_level.size()) && m_level[t0] < m_quiet)
+            ++t0;
+        return t0 < t1 ? t0 : t1;
+    }
+
+private:
+    std::vector<float> m_level;
+    float m_quiet = 0.0f;
+};
+
 // Runs Whisper on `pcm`. `wordByWord` makes every segment a single word;
 // `prompt` is text the model takes as what came before (its style is
 // copied).
@@ -185,22 +212,8 @@ Result transcribe(const TimelineState& timeline, const MediaPool& pool, Ticks fr
     whisper_context* ctx = rec.ctx;
     // Whisper often starts the first segment of a window at the window's
     // start even when the speech begins later, so each cue start is moved to
-    // where the sound actually begins (10 ms frames, as Whisper's times).
-    std::vector<float> level(pcm.size() / 160);
-    float peak = 0.0f;
-    for (size_t f = 0; f < level.size(); ++f) {
-        double sum = 0.0;
-        for (size_t k = f * 160; k < (f + 1) * 160; ++k)
-            sum += double(pcm[k]) * pcm[k];
-        level[f] = static_cast<float>(std::sqrt(sum / 160.0));
-        peak = std::max(peak, level[f]);
-    }
-    const float quiet = std::max(0.003f, 0.1f * peak);
-    auto soundStart = [&](int64_t t0, int64_t t1) {
-        while (t0 < t1 && t0 >= 0 && t0 < static_cast<int64_t>(level.size()) && level[t0] < quiet)
-            ++t0;
-        return t0 < t1 ? t0 : t1;
-    };
+    // where the sound actually begins.
+    const SoundStart soundStart(pcm);
     const int n = whisper_full_n_segments(ctx);
     for (int i = 0; i < n; ++i) {
         const QString text = QString::fromUtf8(whisper_full_get_segment_text(ctx, i)).simplified();
@@ -251,13 +264,15 @@ WordsResult words(const std::vector<float>& pcm, Ticks from, const Options& opti
     r.error = rec.error;
     if (!r.ok())
         return r;
+    const SoundStart soundStart(pcm);
     const int n = whisper_full_n_segments(rec.ctx);
     for (int i = 0; i < n; ++i) {
         const QString text = QString::fromUtf8(whisper_full_get_segment_text(rec.ctx, i)).trimmed();
         if (text.isEmpty())
             continue;
-        const Ticks s = from + whisper_full_get_segment_t0(rec.ctx, i) * (kTicksPerSecond / 100);
-        const Ticks e = from + whisper_full_get_segment_t1(rec.ctx, i) * (kTicksPerSecond / 100);
+        const int64_t t1 = whisper_full_get_segment_t1(rec.ctx, i);
+        const Ticks s = from + soundStart(whisper_full_get_segment_t0(rec.ctx, i), t1) * (kTicksPerSecond / 100);
+        const Ticks e = from + t1 * (kTicksPerSecond / 100);
         if (e > s)
             r.words.push_back({s, e, text});
     }
