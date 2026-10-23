@@ -51,13 +51,14 @@ QString languageName(const QString& code) {
 
 std::vector<Model> models() {
     // Turkish uses the larger "tc-big" models: the small ones translate it
-    // poorly.
+    // poorly. Their int8 copies must keep the word embeddings in full
+    // precision (the onnx-community ones do), or they only repeat one word.
     const auto small = [](const char* from, const char* to, const char* prefix = "") {
         const QString id = QStringLiteral("%1-%2").arg(QLatin1String(from), QLatin1String(to));
         return Model{id, QStringLiteral("Xenova/opus-mt-") + id, QString::fromLatin1(prefix), 110};
     };
     return {
-        {QStringLiteral("tr-en"), QStringLiteral("Xenova/opus-mt-tc-big-tr-en"), {}, 300},
+        {QStringLiteral("tr-en"), QStringLiteral("onnx-community/opus-mt-tc-big-tr-en"), {}, 535},
         {QStringLiteral("en-tr"), QStringLiteral("onnx-community/opus-mt-tc-big-en-tr"), {}, 535},
         small("de", "en"), small("en", "de"), small("fr", "en"), small("en", "fr"),
         small("es", "en"), small("en", "es"), small("it", "en"), small("en", "it"),

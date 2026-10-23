@@ -238,7 +238,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/translate-models
-          key: translate-models-v1
+          key: translate-models-v2
 
       - name: Prepare translation test
         run: |
@@ -251,7 +251,7 @@ jobs:
                 "https://huggingface.co/$2/resolve/main/$remote"
             done
           }
-          get tr-en Xenova/opus-mt-tc-big-tr-en
+          get tr-en onnx-community/opus-mt-tc-big-tr-en
           get en-tr onnx-community/opus-mt-tc-big-en-tr
           get en-de Xenova/opus-mt-en-de
           echo "LUMORA_TRANSLATE_MODELS=$HOME/translate-models" >> "$GITHUB_ENV"

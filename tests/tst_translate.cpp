@@ -136,18 +136,28 @@ private slots:
             if (!translate::modelReady(QString::fromLatin1(id)))
                 QSKIP("translation models missing");
         QString err;
+        // The small English to German model first: it shows whether a failure
+        // is in the translator or in one model.
+        auto toGerman = translate::Translator::load(QStringLiteral("en-de"), &err);
+        QVERIFY2(toGerman, qPrintable(err));
+        const QString morning = toGerman->translate(QStringLiteral("Good morning, how are you?"), &err);
+        qInfo() << "en-de:" << morning;
+        QVERIFY2(err.isEmpty(), qPrintable(err));
+
         auto toEnglish = translate::Translator::load(QStringLiteral("tr-en"), &err);
         QVERIFY2(toEnglish, qPrintable(err));
         const QString hello = toEnglish->translate(QStringLiteral("Merhaba, nasılsın?"), &err);
-        qInfo() << "tr-en:" << hello;
+        qInfo() << "tr-en:" << hello << toEnglish->tokenize(QStringLiteral("Merhaba, nasılsın?"));
         QVERIFY2(err.isEmpty(), qPrintable(err));
-        QVERIFY(hello.contains(QStringLiteral("how are you"), Qt::CaseInsensitive));
 
         auto toTurkish = translate::Translator::load(QStringLiteral("en-tr"), &err);
         QVERIFY2(toTurkish, qPrintable(err));
         const QString tom = toTurkish->translate(QStringLiteral("I know Tom didn't want to eat that."), &err);
-        qInfo() << "en-tr:" << tom;
+        qInfo() << "en-tr:" << tom << toTurkish->tokenize(QStringLiteral("I know Tom didn't want to eat that."));
         QVERIFY2(err.isEmpty(), qPrintable(err));
+
+        QVERIFY(morning.contains(QStringLiteral("Guten Morgen"), Qt::CaseInsensitive));
+        QVERIFY(hello.contains(QStringLiteral("how are you"), Qt::CaseInsensitive));
         QVERIFY(tom.contains(QStringLiteral("Tom")));
         QVERIFY(tom.contains(QStringLiteral("biliyorum")));
         // Greedy search gives a translation too.
