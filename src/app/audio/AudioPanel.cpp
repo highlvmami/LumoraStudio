@@ -60,10 +60,22 @@ AudioPanel::AudioPanel(Project* project, QUndoStack* undo, QWidget* parent)
     m_lowCut = new SliderRow(tr("Low cut (Hz)"), 0, 300, 1, 0);
     m_lowCut->setToolTip(tr("Removes rumble, wind and handling noise below this frequency; 0 = off. "
                             "80 Hz suits most voices."));
+    m_hum = new QComboBox;
+    m_hum->addItem(tr("Hum removal: off"), 0);
+    m_hum->addItem(tr("Remove 50 Hz hum (Europe, Türkiye)"), 50);
+    m_hum->addItem(tr("Remove 60 Hz hum (Americas)"), 60);
+    m_hum->setToolTip(tr("Takes out the buzz of mains electricity (cables, lights, amplifiers) and its overtones "
+                         "with very narrow filters; the voice around it is not touched."));
+    m_wind = new SliderRow(tr("Wind reduction (%)"), 0, 100, 1, 0);
+    m_wind->setToolTip(tr("Pulls down the rumble and the gusts of wind on the microphone while a clean voice stays "
+                          "as it is."));
     m_denoise = new SliderRow(tr("Noise reduction (%)"), 0, 100, 1, 0);
     m_denoise->setToolTip(tr("Lowers steady background noise (hum, hiss, fans, air conditioning) between and "
                              "under the words. High values can sound watery."));
-    for (auto* s : {m_gain, m_lowCut, m_denoise})
+    cleanL->addWidget(m_gain);
+    cleanL->addWidget(m_lowCut);
+    cleanL->addWidget(m_hum);
+    for (auto* s : {m_wind, m_denoise})
         cleanL->addWidget(s);
     cl->addWidget(clean);
 
@@ -128,6 +140,11 @@ AudioPanel::AudioPanel(Project* project, QUndoStack* undo, QWidget* parent)
     };
     bind(m_gain, tr("Volume"), QStringLiteral("gain"), [](AudioEffects&, double& g, double v) { g = v; });
     bind(m_lowCut, tr("Low cut"), QStringLiteral("lowCut"), [](AudioEffects& f, double&, double v) { f.lowCut = v; });
+    bind(m_wind, tr("Wind reduction"), QStringLiteral("wind"), [](AudioEffects& f, double&, double v) { f.wind = v; });
+    connect(m_hum, &QComboBox::activated, this, [this] {
+        const int hz = m_hum->currentData().toInt();
+        editClip(tr("Hum removal"), {}, [&](AudioEffects& f, double&) { f.humHz = hz; });
+    });
     bind(m_denoise, tr("Noise reduction"), QStringLiteral("denoise"),
          [](AudioEffects& f, double&, double v) { f.denoise = v; });
     bind(m_eqLow, tr("Equaliser"), QStringLiteral("eqLow"), [](AudioEffects& f, double&, double v) { f.eqLow = v; });
@@ -244,7 +261,8 @@ void AudioPanel::refresh() {
         m_header->setText(m_clip.isNull() ? tr("Select a clip with sound in the timeline.")
                                           : tr("This clip has no sound."));
         m_gain->setValue(0);
-        for (auto* s : {m_lowCut, m_denoise, m_eqLow, m_eqMid, m_eqHigh, m_compMakeup, m_duck})
+        m_hum->setCurrentIndex(0);
+        for (auto* s : {m_lowCut, m_wind, m_denoise, m_eqLow, m_eqMid, m_eqHigh, m_compMakeup, m_duck})
             s->setValue(0);
         m_eqMidFreq->setValue(1000);
         m_compThreshold->setValue(-20);
@@ -258,6 +276,8 @@ void AudioPanel::refresh() {
         const AudioEffects& f = c->audio;
         m_gain->setValue(c->gainDb);
         m_lowCut->setValue(f.lowCut);
+        m_hum->setCurrentIndex(std::max(0, m_hum->findData(f.humHz)));
+        m_wind->setValue(f.wind);
         m_denoise->setValue(f.denoise);
         m_eqLow->setValue(f.eqLow);
         m_eqMid->setValue(f.eqMid);

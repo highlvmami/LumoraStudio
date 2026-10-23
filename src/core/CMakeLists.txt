@@ -19,6 +19,7 @@ add_library(lumora_core STATIC
     audio/AudioEffects.h audio/AudioEffects.cpp
     audio/AudioDsp.h audio/AudioDsp.cpp
     audio/Loudness.h audio/Loudness.cpp
+    audio/Beats.h audio/Beats.cpp
     timeline/ClipEffects.h timeline/ClipEffects.cpp
     timeline/Subtitles.h timeline/Subtitles.cpp
     timeline/Timeline.h timeline/Timeline.cpp
@@ -43,6 +44,7 @@ add_library(lumora_core STATIC
     ai/Onnx.h ai/Onnx.cpp
     ai/Vision.h ai/Vision.cpp
     ai/Redaction.h ai/Redaction.cpp
+    ai/SmartCut.h ai/SmartCut.cpp
     motion/Analysis.h motion/Analysis.cpp
     image/PhotoAdjustments.h image/PhotoAdjustments.cpp
     image/PhotoProcessor.h image/PhotoProcessor.cpp
@@ -76,6 +78,8 @@ set(CORE_TRANSLATABLE_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/ai/SpeechToText.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/ai/Vision.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/ai/Redaction.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/ai/SmartCut.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/audio/Beats.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/color/Lut.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/color/Looks.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/render/TitleTemplates.cpp

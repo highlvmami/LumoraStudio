@@ -52,4 +52,28 @@ struct Result {
 Result transcribe(const TimelineState& timeline, const MediaPool& pool, Ticks from, Ticks to, const Options& options,
                   const Progress& progress = {});
 
+// What recognition listens to: the timeline mix between `from` and `to` at
+// kRate, mono, without the master limiter. Empty when cancelled or silent.
+constexpr int kRate = 16000;
+std::vector<float> listen(const TimelineState& timeline, const MediaPool& pool, Ticks from, Ticks to,
+                          const Progress& progress = {}, bool* cancelled = nullptr);
+
+// One recognised word and when it is heard.
+struct Word {
+    Ticks start = 0, end = 0;
+    QString text;
+};
+
+struct WordsResult {
+    std::vector<Word> words;
+    QString error;
+    bool cancelled = false;
+    bool ok() const { return error.isEmpty() && !cancelled; }
+};
+
+// Word by word recognition of `pcm` (kRate mono; sample 0 is heard at
+// `from`). Unlike subtitles, hesitations ("ııı", "eee", "um") are written
+// down too.
+WordsResult words(const std::vector<float>& pcm, Ticks from, const Options& options, const Progress& progress = {});
+
 } // namespace lumora::speech

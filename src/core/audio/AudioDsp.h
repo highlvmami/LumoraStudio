@@ -13,7 +13,7 @@ namespace lumora::dsp {
 // Second order IIR filter (RBJ audio EQ cookbook), one state per channel.
 class Biquad {
 public:
-    enum class Type { HighPass, LowShelf, HighShelf, Peak };
+    enum class Type { HighPass, LowShelf, HighShelf, Peak, Notch };
     void design(Type type, double rate, double freq, double q, double gainDb);
     void setChannels(int channels) { m_z.assign(static_cast<size_t>(channels) * 2, 0.0); }
     void reset() { std::fill(m_z.begin(), m_z.end(), 0.0); }
@@ -25,33 +25,75 @@ private:
     std::vector<double> m_z;
 };
 
-// Short-time spectral noise reduction. The noise floor of every frequency
-// bin is the minimum of its smoothed level over the last ~2 seconds
-// ("minimum statistics": speech and music pause often enough that the
-// minimum is the noise), and bins close to that floor are turned down,
-// never by more than the strength allows. All channels share one gain
-// per bin, which keeps the stereo picture. Output is delayed by latency().
-class SpectralDenoiser {
+// Short-time Fourier processing with 75 % overlap: every hop the last
+// window of input is turned into a spectrum, shape() picks a gain for each
+// frequency bin (one for all channels, which keeps the stereo picture) and
+// the result is added back together. Output is delayed by latency().
+class SpectralProcessor {
 public:
-    SpectralDenoiser(int rate, int channels, double strength); // strength 0..1
+    SpectralProcessor(int rate, int channels);
+    virtual ~SpectralProcessor() = default;
     int latency() const { return m_n; }
     void reset();
     void process(float* data, int frames);
 
+protected:
+    // Gain per bin (n / 2 + 1 of them) for the power spectrum of this window,
+    // averaged over the channels.
+    virtual void shape(const std::vector<float>& power, std::vector<float>& gain) = 0;
+    virtual void resetState() {}
+    double binHz(int k) const { return static_cast<double>(k) * m_rate / m_n; }
+
+    int m_rate, m_n, m_hop, m_channels;
+
 private:
     void runFrame();
 
-    int m_n, m_hop, m_channels;
-    double m_strength;
     std::vector<float> m_window;
     std::vector<std::vector<float>> m_in, m_out; // per channel, m_n each
+    std::vector<std::vector<std::complex<float>>> m_chanSpec;
+    std::vector<float> m_power, m_gain;
+    int m_fill = 0; // new input samples since the last frame
+};
+
+// Short-time spectral noise reduction. The noise floor of every frequency
+// bin is the minimum of its smoothed level over the last ~2 seconds
+// ("minimum statistics": speech and music pause often enough that the
+// minimum is the noise), and bins close to that floor are turned down,
+// never by more than the strength allows.
+class SpectralDenoiser : public SpectralProcessor {
+public:
+    SpectralDenoiser(int rate, int channels, double strength); // strength 0..1
+
+protected:
+    void shape(const std::vector<float>& power, std::vector<float>& gain) override;
+    void resetState() override;
+
+private:
+    double m_strength;
     std::vector<float> m_smooth, m_curMin, m_noise, m_prevGain;
     std::vector<std::vector<float>> m_windowMins; // finished sub-windows
     int m_subLength = 1, m_subFill = 0, m_settle = 0;
-    std::vector<std::complex<float>> m_spec;
-    std::vector<std::vector<std::complex<float>>> m_chanSpec;
-    int m_fill = 0;   // new input samples since the last frame
     int m_frames = 0; // frames processed since reset
+};
+
+// Wind noise reduction. Wind on a microphone is a rumble far below the
+// voice plus gusts that swamp the low frequencies. Below ~60 Hz everything
+// is turned down; the 60 .. 500 Hz band is lowered only while it is much
+// louder than speech or music would make it, judged from the 500 Hz .. 4 kHz
+// band in the same moment, so a gust is pulled down and a clean voice is
+// left alone.
+class WindReducer : public SpectralProcessor {
+public:
+    WindReducer(int rate, int channels, double strength); // strength 0..1
+
+protected:
+    void shape(const std::vector<float>& power, std::vector<float>& gain) override;
+    void resetState() override;
+
+private:
+    double m_strength;
+    std::vector<float> m_prevGain;
 };
 
 // Feed-forward compressor with a soft knee; channels are linked.
@@ -101,10 +143,16 @@ private:
     int m_channels;
     bool m_lowCut = false;
     Biquad m_hp1, m_hp2;
+    std::vector<Biquad> m_hum;
+    std::unique_ptr<WindReducer> m_wind;
     std::unique_ptr<SpectralDenoiser> m_denoise;
     std::vector<Biquad> m_eq;
     std::unique_ptr<Compressor> m_comp;
 };
+
+// In-place radix-2 FFT; the size must be a power of two. The inverse is
+// scaled by 1/n.
+void fft(std::vector<std::complex<float>>& a, bool inverse);
 
 double dbToGain(double db);
 double gainToDb(double g);

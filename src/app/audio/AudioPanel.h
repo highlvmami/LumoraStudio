@@ -52,6 +52,8 @@ private:
     QWidget* m_clipBody;
     SliderRow* m_gain;
     SliderRow* m_lowCut;
+    QComboBox* m_hum;
+    SliderRow* m_wind;
     SliderRow* m_denoise;
     SliderRow* m_eqLow;
     SliderRow* m_eqMid;

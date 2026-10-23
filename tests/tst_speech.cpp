@@ -74,6 +74,20 @@ private slots:
         QVERIFY2(heard >= 3, qPrintable(all));
         QVERIFY(r.cues.front().start >= ticksFromSeconds(1.5));
 
+        // Word by word, with timeline times in order.
+        const auto pcm = speech::listen(tl.state(), pool, 0, tl.duration());
+        QVERIFY(!pcm.empty());
+        const auto w = speech::words(pcm, 0, o);
+        QVERIFY2(w.ok(), qPrintable(w.error));
+        QVERIFY(w.words.size() >= 4);
+        for (size_t i = 0; i < w.words.size(); ++i) {
+            QVERIFY(w.words[i].end > w.words[i].start);
+            QVERIFY(!w.words[i].text.contains(QLatin1Char(' ')));
+            if (i > 0)
+                QVERIFY(w.words[i].start >= w.words[i - 1].start);
+        }
+        QVERIFY(w.words.front().start >= ticksFromSeconds(1.5));
+
         // Cancelling stops early.
         auto c = speech::transcribe(tl.state(), pool, 0, tl.duration(), o, [](double p) { return p < 0.05; });
         QVERIFY(c.cancelled);

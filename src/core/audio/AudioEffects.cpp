@@ -8,6 +8,10 @@ QJsonObject AudioEffects::toJson() const {
     QJsonObject o;
     if (lowCut > 0.0)
         o["lowCut"] = lowCut;
+    if (humHz > 0)
+        o["humHz"] = humHz;
+    if (wind > 0.0)
+        o["wind"] = wind;
     if (denoise > 0.0)
         o["denoise"] = denoise;
     if (hasEq()) {
@@ -30,6 +34,9 @@ QJsonObject AudioEffects::toJson() const {
 AudioEffects AudioEffects::fromJson(const QJsonObject& o) {
     AudioEffects e;
     e.lowCut = std::clamp(o.value("lowCut").toDouble(0.0), 0.0, 1000.0);
+    const int hum = o.value("humHz").toInt(0);
+    e.humHz = hum == 50 || hum == 60 ? hum : 0;
+    e.wind = std::clamp(o.value("wind").toDouble(0.0), 0.0, 100.0);
     e.denoise = std::clamp(o.value("denoise").toDouble(0.0), 0.0, 100.0);
     e.eqLow = std::clamp(o.value("eqLow").toDouble(0.0), -24.0, 24.0);
     e.eqMid = std::clamp(o.value("eqMid").toDouble(0.0), -24.0, 24.0);
