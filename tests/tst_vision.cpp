@@ -5,6 +5,7 @@
 
 #include "TestMedia.h"
 #include "ai/Redaction.h"
+#include "ai/Reframe.h"
 #include "ai/Vision.h"
 #include "image/PhotoAdjustments.h"
 #include "image/PhotoProcessor.h"
@@ -255,6 +256,39 @@ private slots:
         const QRect fr = f.toRect();
         QVERIFY(variance(out.convertToFormat(QImage::Format_RGB32), fr.adjusted(fr.width() / 4, fr.height() / 4, -fr.width() / 4, -fr.height() / 4)) <
                 variance(img, fr.adjusted(fr.width() / 4, fr.height() / 4, -fr.width() / 4, -fr.height() / 4)) / 3);
+    }
+
+    void reframeFindsThePerson() {
+        const QString path = qEnvironmentVariable("LUMORA_FACE_IMAGE");
+        if (!modelsPresent() || path.isEmpty())
+            QSKIP("set LUMORA_VISION_MODELS and LUMORA_FACE_IMAGE to run");
+        const QImage face = QImage(path).convertToFormat(QImage::Format_Grayscale8).scaled(200, 200, Qt::KeepAspectRatio,
+                                                                                         Qt::SmoothTransformation);
+        TestVideoSpec spec;
+        spec.seconds = 2;
+        spec.width = 640;
+        spec.height = 360;
+        spec.audio = false;
+        spec.paint = [face](int) {
+            QImage img(640, 360, QImage::Format_Grayscale8);
+            img.fill(90);
+            QPainter p(&img);
+            p.drawImage(QPointF(400, 80), face); // right of centre
+            return img;
+        };
+        QString err;
+        QVERIFY2(writeTestVideo(m_dir.filePath("person.mp4"), spec, &err), qPrintable(err));
+        Clip clip;
+        clip.sourceIn = 0;
+        clip.sourceOut = ticksFromSeconds(2);
+        const auto r = ai::findSubject(m_dir.filePath("person.mp4"), clip);
+        QVERIFY2(r.ok(), qPrintable(r.error));
+        QCOMPARE(r.faces, 1);
+        QVERIFY(r.samples.size() >= 8);
+        for (const auto& s : r.samples) {
+            QCOMPARE(s.track, 0);
+            QVERIFY2(std::abs(s.centre.x() - 500.0 / 640) < 0.05, qPrintable(QString::number(s.centre.x())));
+        }
     }
 
     void facesAreFollowedInVideo() {

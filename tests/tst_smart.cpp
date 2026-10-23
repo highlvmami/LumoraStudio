@@ -3,6 +3,7 @@
 #include <cmath>
 
 #include "TestMedia.h"
+#include "ai/Reframe.h"
 #include "ai/SmartCut.h"
 #include "audio/Beats.h"
 #include "media/MediaPool.h"
@@ -173,6 +174,54 @@ private slots:
         shortMedia.insertMedia(media, 0, sec(0.6), true, false);
         beats::cutToBeats(shortMedia, beats, 4, [](const QUuid&) { return sec(1.2); });
         QCOMPARE(shortMedia.tracks()[0].clips[0].timelineEnd(), sec(0.96));
+    }
+
+    void reframeSizesAndScale() {
+        // Portrait from Full HD and 4K: 1080 x 1920 both (the 4K cut-out is
+        // only 1215 wide); square from 4K keeps 2160.
+        QCOMPARE(ai::reframeSize(9.0 / 16.0, QSize(1920, 1080)), QSize(1080, 1920));
+        QCOMPARE(ai::reframeSize(9.0 / 16.0, QSize(3840, 2160)), QSize(1080, 1920));
+        QCOMPARE(ai::reframeSize(1.0, QSize(3840, 2160)), QSize(2160, 2160));
+        QCOMPARE(ai::reframeSize(4.0 / 5.0, QSize(1920, 1080)), QSize(1080, 1350));
+        QVERIFY(std::abs(ai::coverScale(16.0 / 9.0, QSize(1080, 1920)) - (16.0 / 9.0) * (16.0 / 9.0)) < 1e-9);
+        QCOMPARE(ai::coverScale(16.0 / 9.0, QSize(1920, 1080)), 1.0);
+    }
+
+    void cameraFollowsLikeAnOperator() {
+        const QSize frame(1080, 1920);
+        const double aspect = 16.0 / 9.0;
+        const double pw = ai::coverScale(aspect, frame); // picture width in frames
+        // Someone standing right of centre, swaying a little: the frame
+        // stays put on them.
+        std::vector<ai::SubjectSample> still;
+        for (int i = 0; i < 25; ++i)
+            still.push_back({sec(i * 0.2), QPointF(0.7 + 0.01 * std::sin(i), 0.4), 0});
+        auto path = ai::cameraPath(still, aspect, frame);
+        QVERIFY(path.points.size() <= 2);
+        QVERIFY(std::abs(path.offsetAt(sec(2)).x() - (-(0.7 - 0.5) * pw)) < 0.02);
+        // Far right is clamped: the picture edge never shows.
+        std::vector<ai::SubjectSample> edge{{0, QPointF(0.99, 0.5), 0}};
+        QVERIFY(std::abs(ai::cameraPath(edge, aspect, frame).offsetAt(0).x() - (-(pw - 1) / 2)) < 1e-9);
+        // Walking from left to right: followed smoothly, ending near them.
+        std::vector<ai::SubjectSample> walk;
+        for (int i = 0; i <= 50; ++i)
+            walk.push_back({sec(i * 0.2), QPointF(0.3 + 0.4 * std::min(1.0, i / 25.0), 0.4), 0});
+        path = ai::cameraPath(walk, aspect, frame);
+        double prev = path.offsetAt(0).x();
+        for (int i = 1; i <= 50; ++i) {
+            const double x = path.offsetAt(sec(i * 0.2)).x();
+            QVERIFY(x <= prev + 1e-9); // only one way
+            QVERIFY(prev - x < 0.25);  // no jumps
+            prev = x;
+        }
+        QVERIFY(std::abs(prev - (-(0.7 - 0.5) * pw)) < 0.12 * 1.5);
+        // Another person takes over: a cut, not a pan.
+        std::vector<ai::SubjectSample> two;
+        for (int i = 0; i < 10; ++i)
+            two.push_back({sec(i * 0.2), QPointF(i < 5 ? 0.3 : 0.75, 0.4), i < 5 ? 0 : 1});
+        path = ai::cameraPath(two, aspect, frame);
+        QVERIFY(std::abs(path.offsetAt(sec(0.8)).x() - (-(0.3 - 0.5) * pw)) < 1e-6);
+        QVERIFY(std::abs(path.offsetAt(sec(1.0)).x() - (-(0.75 - 0.5) * pw)) < 1e-6);
     }
 
     void musicClipIsFound() {
