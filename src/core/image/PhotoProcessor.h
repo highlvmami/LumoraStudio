@@ -3,6 +3,7 @@
 #include <QCoreApplication>
 #include <QImage>
 #include <QString>
+#include <functional>
 
 #include "color/ColorProcessor.h"
 #include "image/PhotoAdjustments.h"
@@ -31,6 +32,15 @@ public:
     // an RGBA64 image. Returns an RGBA64 image.
     static QImage apply(const QImage& rgba64, const PhotoAdjustments& adj, bool applyCrop = true);
 
+    // The photo with the repairs of `retouch` (objects removed, faces
+    // restored) as an RGBA64 image. Slow the first time; the results are
+    // kept, so the same image and repairs come back at once. Null when a
+    // model is missing or fails (`error` set) or `progress` cancels.
+    static QImage retouched(const QImage& image, const PhotoRetouch& retouch, const std::function<bool(double)>& progress = {},
+                            QString* error = nullptr);
+    // True when retouched() would be quick: the slow part is already done.
+    static bool retouchReady(const QImage& image, const PhotoRetouch& retouch);
+
     // Downscaled copy for interactive preview (never used for export).
     static QImage makeProxy(const QImage& rgba64, int maxSide = 2048);
     // Pixel size of the picture an Image layer shows (empty when it cannot
@@ -46,6 +56,7 @@ struct PhotoExportSettings {
     // changed (so no banding is introduced). 8 or 16 forces a depth.
     int bitDepth = 0;
     int quality = 95; // JPEG / lossy WebP only
+    int enlarge = 1;  // 2 or 4: made bigger with the enlargement model
 };
 
 class PhotoExporter {
@@ -56,7 +67,8 @@ public:
     // tone changes and the depth is unchanged, the source pixels are written
     // untouched (only cropped), so a lossless save is bit exact.
     static bool save(const QString& path, const QImage& original, const QImage& working,
-                     const PhotoAdjustments& adj, const PhotoExportSettings& settings, QString* error = nullptr);
+                     const PhotoAdjustments& adj, const PhotoExportSettings& settings, QString* error = nullptr,
+                     const std::function<bool(double)>& progress = {});
 
     static bool isLossless(const PhotoExportSettings& s) { return s.format == PhotoFormat::Png || s.format == PhotoFormat::Tiff; }
     static bool formatAvailable(PhotoFormat f);

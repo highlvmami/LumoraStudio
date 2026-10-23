@@ -3,15 +3,19 @@
 #include <QColorSpace>
 #include <QPainter>
 #include <QImageReader>
+#include <QJsonArray>
+#include <QJsonDocument>
 #include <QImageWriter>
 #include <QtConcurrent/QtConcurrentMap>
 #include <algorithm>
+#include <list>
 #include <map>
 #include <mutex>
 #include <cmath>
 #include <numeric>
 #include <vector>
 
+#include "ai/Enhance.h"
 #include "ai/Redaction.h"
 #include "media/MediaInfo.h"
 #include "media/VideoDecoder.h"
@@ -188,7 +192,142 @@ QImage cachedMatte(const QImage& image, const QString& model) {
     return m;
 }
 
+// The last few repaired images by what they were made from.
+class RetouchCache {
+public:
+    QImage find(const QString& key) {
+        std::lock_guard lock(m_mutex);
+        for (auto it = m_items.begin(); it != m_items.end(); ++it)
+            if (it->first == key) {
+                auto item = *it;
+                m_items.erase(it);
+                m_items.push_front(item);
+                return item.second;
+            }
+        return {};
+    }
+    void insert(const QString& key, const QImage& image) {
+        std::lock_guard lock(m_mutex);
+        m_items.push_front({key, image});
+        // A few, and not more memory than a handful of big photos take.
+        qint64 bytes = 0;
+        size_t keep = 0;
+        for (const auto& item : m_items) {
+            bytes += item.second.sizeInBytes();
+            if (keep >= 3 && (keep >= 8 || bytes > 1024LL * 1024 * 1024))
+                break;
+            ++keep;
+        }
+        m_items.resize(keep);
+    }
+
+private:
+    std::mutex m_mutex;
+    std::list<std::pair<QString, QImage>> m_items;
+};
+
+RetouchCache& retouchCache() {
+    static RetouchCache cache;
+    return cache;
+}
+
+// a + (b - a) * amount, for RGBA64 images of the same size.
+QImage mix(const QImage& a, const QImage& b, double amount) {
+    if (amount >= 1.0)
+        return b;
+    QImage out = a.convertToFormat(QImage::Format_RGBA64);
+    const QImage other = b.convertToFormat(QImage::Format_RGBA64);
+    const int k = static_cast<int>(std::lround(std::clamp(amount, 0.0, 1.0) * 65536));
+    for (int y = 0; y < out.height(); ++y) {
+        auto* d = reinterpret_cast<quint16*>(out.scanLine(y));
+        const auto* s = reinterpret_cast<const quint16*>(other.constScanLine(y));
+        for (int x = 0; x < out.width() * 4; ++x)
+            d[x] = static_cast<quint16>(d[x] + ((static_cast<qint64>(s[x]) - d[x]) * k + 32768) / 65536);
+    }
+    return out;
+}
+
+QString strokesKey(const std::vector<BrushStroke>& strokes) {
+    QJsonArray arr;
+    for (const auto& s : strokes)
+        arr.append(s.toJson());
+    return QString::fromUtf8(QJsonDocument(arr).toJson(QJsonDocument::Compact));
+}
+
 } // namespace
+
+bool PhotoProcessor::retouchReady(const QImage& image, const PhotoRetouch& retouch) {
+    QImage out = image;
+    if (!retouch.erase.empty()) {
+        out = retouchCache().find(QStringLiteral("erase %1 %2").arg(image.cacheKey()).arg(strokesKey(retouch.erase)));
+        if (out.isNull())
+            return false;
+    }
+    if (retouch.faces > 0.0 && retouchCache().find(QStringLiteral("faces %1").arg(out.cacheKey())).isNull())
+        return false;
+    return true;
+}
+
+QImage PhotoProcessor::retouched(const QImage& image, const PhotoRetouch& retouch, const std::function<bool(double)>& progress,
+                                 QString* error) {
+    if (image.isNull())
+        return {};
+    QImage out = image;
+    const bool erase = !retouch.erase.empty(), faces = retouch.faces > 0.0;
+    // Each step is kept on its own, so moving the face slider does not
+    // fill in the removed objects again.
+    if (erase) {
+        const QString key = QStringLiteral("erase %1 %2").arg(image.cacheKey()).arg(strokesKey(retouch.erase));
+        QImage done = retouchCache().find(key);
+        if (done.isNull()) {
+            LayerMask m;
+            m.shape = MaskShape::Brush;
+            m.strokes = retouch.erase;
+            const std::vector<float> v = m.render(image.width(), image.height());
+            QImage mask(image.size(), QImage::Format_Grayscale8);
+            for (int y = 0; y < mask.height(); ++y) {
+                uchar* line = mask.scanLine(y);
+                for (int x = 0; x < mask.width(); ++x)
+                    line[x] = static_cast<uchar>(std::lround(std::clamp(v[static_cast<size_t>(y) * mask.width() + x], 0.0f, 1.0f) * 255.0f));
+            }
+            done = ai::inpaint(image, mask, [&](double p) { return !progress || progress(faces ? p / 2 : p); }, error);
+            if (done.isNull())
+                return {};
+            // Same format as the photo (a photo without transparency gets
+            // none), and the same image each time for the caches after.
+            if (!image.hasAlphaChannel())
+                done = done.convertToFormat(QImage::Format_RGBX64);
+            done.setColorSpace(image.colorSpace());
+            retouchCache().insert(key, done);
+        }
+        out = done;
+    }
+    if (faces) {
+        // Restored fully once; the strength only mixes the restored faces
+        // with the photo, so changing it is instant.
+        const QString full = QStringLiteral("faces %1").arg(out.cacheKey());
+        const QString key = full + QStringLiteral(" %1").arg(retouch.faces);
+        QImage done = retouchCache().find(key);
+        if (done.isNull()) {
+            QImage restored = retouchCache().find(full);
+            if (restored.isNull()) {
+                restored = ai::restoreFaces(out, 1.0, [&](double p) { return !progress || progress(erase ? 0.5 + p / 2 : p); }, error);
+                if (restored.isNull())
+                    return {};
+                retouchCache().insert(full, restored);
+            }
+            done = mix(out, restored, retouch.faces);
+            if (!image.hasAlphaChannel())
+                done = done.convertToFormat(QImage::Format_RGBX64);
+            done.setColorSpace(image.colorSpace());
+            retouchCache().insert(key, done);
+        }
+        out = done;
+    }
+    if (progress)
+        progress(1.0);
+    return out;
+}
 
 QImage PhotoProcessor::apply(const QImage& src, const PhotoAdjustments& adj, bool applyCrop) {
     if (src.isNull())
@@ -207,6 +346,12 @@ QImage PhotoProcessor::apply(const QImage& src, const PhotoAdjustments& adj, boo
     // only the kept part is processed.
     const bool layers = adj.hasLayerChanges();
     const bool whole = layers || adj.hasAiChanges();
+    if (adj.retouch.isActive()) {
+        // A missing model leaves the photo as it is.
+        const QImage repaired = retouched(input, adj.retouch);
+        if (!repaired.isNull())
+            input = repaired;
+    }
     // The subject is found on the photo as shot, so tone changes do not move
     // the cut-out edge (and the matte is reused while sliders move).
     const QImage matte = adj.background.enabled ? cachedMatte(input, adj.background.model) : QImage();
@@ -275,7 +420,8 @@ bool PhotoExporter::formatAvailable(PhotoFormat f) {
 }
 
 bool PhotoExporter::save(const QString& path, const QImage& original, const QImage& working,
-                         const PhotoAdjustments& adj, const PhotoExportSettings& s, QString* error) {
+                         const PhotoAdjustments& adj, const PhotoExportSettings& s, QString* error,
+                         const std::function<bool(double)>& progress) {
     const int srcDepth = sourceBitDepth(original);
     int depth = s.bitDepth;
     if (depth == 0)
@@ -283,12 +429,41 @@ bool PhotoExporter::save(const QString& path, const QImage& original, const QIma
     if (s.format == PhotoFormat::Jpeg || s.format == PhotoFormat::WebP)
         depth = 8; // these formats are 8-bit only
 
+    const bool enlarge = s.enlarge > 1;
+    if (enlarge && s.bitDepth == 0 && s.format != PhotoFormat::Jpeg && s.format != PhotoFormat::WebP)
+        depth = 16; // the enlarged detail is new: keep all of it
     QImage out;
-    if (!adj.hasToneChanges() && depth == srcDepth) {
+    if (!adj.hasToneChanges() && !enlarge && depth == srcDepth) {
         // Bit-exact path: crop the decoded source pixels without conversion.
         out = original.copy(adj.cropRect(original.size()));
     } else {
+        // Repairs are slow at full size: they are made first, with progress.
+        if (adj.retouch.isActive()) {
+            QString why;
+            const QImage repaired = PhotoProcessor::retouched(working, adj.retouch, [&](double p) {
+                return !progress || progress(enlarge ? p * 0.3 : p);
+            }, &why);
+            if (repaired.isNull()) {
+                if (error)
+                    *error = why.isEmpty() ? tr("Cancelled.") : why;
+                return false;
+            }
+        }
         out = PhotoProcessor::apply(working, adj, true);
+        if (enlarge) {
+            QString why;
+            const bool alpha = out.hasAlphaChannel();
+            out = ai::upscale(out, s.enlarge, [&](double p) {
+                return !progress || progress(adj.retouch.isActive() ? 0.3 + p * 0.7 : p);
+            }, &why);
+            if (out.isNull()) {
+                if (error)
+                    *error = why.isEmpty() ? tr("Cancelled.") : why;
+                return false;
+            }
+            if (!alpha)
+                out = out.convertToFormat(QImage::Format_RGBX64);
+        }
         if (depth == 8)
             out = out.convertToFormat(out.hasAlphaChannel() ? QImage::Format_RGBA8888 : QImage::Format_RGB888);
     }

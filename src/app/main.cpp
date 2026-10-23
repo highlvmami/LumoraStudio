@@ -201,7 +201,7 @@ int main(int argc, char* argv[]) {
         const bool fullScreen = parser.isSet(fullScreenOpt);
         const QString grabScroll = parser.value(grabScrollOpt);
         const QString tool = parser.value(toolOpt);
-        QTimer::singleShot(2500, &w, [&w, out, exportDlg, exportCustom, autoSubs, track, fullScreen, grabScroll, tool] {
+        auto shoot = [&w, out, exportDlg, exportCustom, autoSubs, track, fullScreen, grabScroll, tool] {
             if (!grabScroll.isEmpty()) {
                 for (QWidget* c : w.findChildren<QWidget*>())
                     if (c->isVisible() && c->inherits(grabScroll.toLatin1().constData()))
@@ -284,7 +284,18 @@ int main(int argc, char* argv[]) {
             }
             saveShot(&w, out);
             QCoreApplication::exit(0);
-        });
+        };
+        // Work behind a progress dialog (photo repairs) finishes first.
+        auto waitIdle = std::make_shared<std::function<void()>>();
+        *waitIdle = [&w, shoot, waitIdle] {
+            for (QWidget* top : QApplication::topLevelWidgets())
+                if (top->isVisible() && top->inherits("QProgressDialog")) {
+                    QTimer::singleShot(500, &w, *waitIdle);
+                    return;
+                }
+            shoot();
+        };
+        QTimer::singleShot(2500, &w, *waitIdle);
     }
     return app.exec();
 }

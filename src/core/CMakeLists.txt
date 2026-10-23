@@ -46,6 +46,7 @@ add_library(lumora_core STATIC
     ai/Redaction.h ai/Redaction.cpp
     ai/SmartCut.h ai/SmartCut.cpp
     ai/Reframe.h ai/Reframe.cpp
+    ai/Enhance.h ai/Enhance.cpp
     motion/Analysis.h motion/Analysis.cpp
     image/PhotoAdjustments.h image/PhotoAdjustments.cpp
     image/PhotoProcessor.h image/PhotoProcessor.cpp
@@ -81,6 +82,7 @@ set(CORE_TRANSLATABLE_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/ai/Redaction.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/ai/SmartCut.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/ai/Reframe.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/ai/Enhance.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/audio/Beats.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/color/Lut.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/color/Looks.cpp

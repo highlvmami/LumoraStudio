@@ -346,6 +346,8 @@ QJsonObject PhotoAdjustments::toJson() const {
         o["redaction"] = redaction.toJson();
     if (background.enabled)
         o["background"] = background.toJson();
+    if (retouch.isActive())
+        o["retouch"] = retouch.toJson();
     return o;
 }
 
@@ -359,7 +361,30 @@ PhotoAdjustments PhotoAdjustments::fromJson(const QJsonObject& o) {
         a.redaction = Redaction::fromJson(o.value("redaction").toObject());
     if (o.contains("background"))
         a.background = BackgroundRemoval::fromJson(o.value("background").toObject());
+    if (o.contains("retouch"))
+        a.retouch = PhotoRetouch::fromJson(o.value("retouch").toObject());
     return a;
+}
+
+QJsonObject PhotoRetouch::toJson() const {
+    QJsonObject o;
+    if (faces > 0.0)
+        o["faces"] = faces;
+    if (!erase.empty()) {
+        QJsonArray arr;
+        for (const auto& s : erase)
+            arr.append(s.toJson());
+        o["erase"] = arr;
+    }
+    return o;
+}
+
+PhotoRetouch PhotoRetouch::fromJson(const QJsonObject& o) {
+    PhotoRetouch r;
+    r.faces = std::clamp(o.value("faces").toDouble(0.0), 0.0, 1.0);
+    for (const auto& v : o.value("erase").toArray())
+        r.erase.push_back(BrushStroke::fromJson(v.toObject()));
+    return r;
 }
 
 } // namespace lumora

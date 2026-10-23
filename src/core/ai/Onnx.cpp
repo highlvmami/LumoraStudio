@@ -104,18 +104,31 @@ std::vector<int64_t> Network::inputShape() const {
 }
 
 std::vector<Tensor> Network::run(const Tensor& input, int outputs, QString* error) const {
+    return run(std::vector<Tensor>{input}, outputs, error);
+}
+
+std::vector<Tensor> Network::run(const std::vector<Tensor>& inputs, int outputs, QString* error) const {
     std::vector<Tensor> out;
 #ifdef LUMORA_HAVE_ONNXRUNTIME
+    if (inputs.size() != d->inputNames.size()) {
+        if (error)
+            *error = QStringLiteral("the model takes %1 inputs, not %2").arg(d->inputNames.size()).arg(inputs.size());
+        return out;
+    }
     try {
         const Ort::MemoryInfo mem = Ort::MemoryInfo::CreateCpu(OrtArenaAllocator, OrtMemTypeDefault);
-        Ort::Value in = Ort::Value::CreateTensor<float>(mem, const_cast<float*>(input.data.data()), input.data.size(),
-                                                        input.shape.data(), input.shape.size());
-        const char* inName = d->inputNames.front().c_str();
+        std::vector<Ort::Value> in;
+        std::vector<const char*> inNames;
+        for (size_t i = 0; i < inputs.size(); ++i) {
+            in.push_back(Ort::Value::CreateTensor<float>(mem, const_cast<float*>(inputs[i].data.data()), inputs[i].data.size(),
+                                                         inputs[i].shape.data(), inputs[i].shape.size()));
+            inNames.push_back(d->inputNames[i].c_str());
+        }
         const size_t count = outputs < 0 ? d->outputNames.size() : std::min<size_t>(outputs, d->outputNames.size());
         std::vector<const char*> names;
         for (size_t i = 0; i < count; ++i)
             names.push_back(d->outputNames[i].c_str());
-        auto values = d->session->Run(Ort::RunOptions{nullptr}, &inName, &in, 1, names.data(), names.size());
+        auto values = d->session->Run(Ort::RunOptions{nullptr}, inNames.data(), in.data(), in.size(), names.data(), names.size());
         for (auto& v : values) {
             Tensor t;
             const auto info = v.GetTensorTypeAndShapeInfo();
@@ -131,7 +144,7 @@ std::vector<Tensor> Network::run(const Tensor& input, int outputs, QString* erro
         out.clear();
     }
 #else
-    (void)input, (void)outputs;
+    (void)inputs, (void)outputs;
     if (error)
         *error = QStringLiteral("built without ONNX Runtime");
 #endif

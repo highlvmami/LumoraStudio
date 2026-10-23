@@ -26,10 +26,20 @@ QString fileName(const QString& id) {
         return QStringLiteral("u2netp.onnx");
     if (id == QLatin1String("background-quality"))
         return QStringLiteral("isnet-general-use.onnx");
+    if (id == QLatin1String("upscale-x2"))
+        return QStringLiteral("real_esrgan_x2.onnx");
+    if (id == QLatin1String("upscale-x4"))
+        return QStringLiteral("real_esrgan_x4.onnx");
+    if (id == QLatin1String("face-restore"))
+        return QStringLiteral("gfpgan_1.4.onnx");
+    if (id == QLatin1String("inpaint"))
+        return QStringLiteral("inpainting_lama_2025jan.onnx");
     return {};
 }
 
-std::shared_ptr<Network> network(const QString& id, QString* error) {
+} // namespace
+
+std::shared_ptr<Network> visionNetwork(const QString& id, QString* error) {
     if (!onnxAvailable()) {
         if (error)
             *error = Tr::tr("This build of LumoraStudio has no AI tools.");
@@ -47,6 +57,8 @@ std::shared_ptr<Network> network(const QString& id, QString* error) {
         *error = Tr::tr("The %1 model cannot be read (%2). Download it again.").arg(visionModel(id).label, why);
     return net;
 }
+
+namespace {
 
 QImage toRgb888(const QImage& image) {
     return image.format() == QImage::Format_RGB888 ? image : image.convertToFormat(QImage::Format_RGB888);
@@ -129,6 +141,8 @@ std::vector<Detection> detectTiled(const QImage& rgb, F detect) {
                 const QRect r = QRect(tx * tw - ox, ty * th - oy, tw + 2 * ox, th + 2 * oy).intersected(rgb.rect());
                 for (Detection d : detect(rgb.copy(r))) {
                     d.rect.translate(r.topLeft());
+                    for (QPointF& p : d.landmarks)
+                        p += r.topLeft();
                     all.push_back(d);
                 }
             }
@@ -153,6 +167,15 @@ std::vector<VisionModel> visionModels() {
          QUrl(releases + QStringLiteral("danielgatis/rembg/releases/download/v0.0.0/u2netp.onnx"))},
         {QStringLiteral("background-quality"), Tr::tr("detailed background removal"), 179,
          QUrl(releases + QStringLiteral("danielgatis/rembg/releases/download/v0.0.0/isnet-general-use.onnx"))},
+        {QStringLiteral("upscale-x2"), Tr::tr("2x enlargement"), 64,
+         QUrl(releases + QStringLiteral("facefusion/facefusion-assets/releases/download/models-3.0.0/real_esrgan_x2.onnx"))},
+        {QStringLiteral("upscale-x4"), Tr::tr("4x enlargement"), 64,
+         QUrl(releases + QStringLiteral("facefusion/facefusion-assets/releases/download/models-3.0.0/real_esrgan_x4.onnx"))},
+        {QStringLiteral("face-restore"), Tr::tr("face restoration"), 325,
+         QUrl(releases + QStringLiteral("facefusion/facefusion-assets/releases/download/models-3.0.0/gfpgan_1.4.onnx"))},
+        {QStringLiteral("inpaint"), Tr::tr("object removal"), 88,
+         QUrl(QStringLiteral("https://media.githubusercontent.com/media/opencv/opencv_zoo/main/models/inpainting_lama/"
+                             "inpainting_lama_2025jan.onnx"))},
     };
 }
 
@@ -182,7 +205,7 @@ QString backgroundModelId(const QString& name) {
 std::vector<Detection> detectFaces(const QImage& image, float threshold, QString* error) {
     if (image.isNull())
         return {};
-    auto net = network(QStringLiteral("face"), error);
+    auto net = visionNetwork(QStringLiteral("face"), error);
     if (!net)
         return {};
     // YuNet: BGR 0..255, picture in the top left corner of a 640 x 640 input.
@@ -200,6 +223,7 @@ std::vector<Detection> detectFaces(const QImage& image, float threshold, QString
             const Tensor& cls = outputs[s];
             const Tensor& obj = outputs[3 + s];
             const Tensor& box = outputs[6 + s];
+            const Tensor& kps = outputs[9 + s];
             const int cols = kSize / strides[s];
             const int rows = kSize / strides[s];
             if (static_cast<int>(cls.data.size()) < rows * cols || static_cast<int>(box.data.size()) < rows * cols * 4)
@@ -215,8 +239,14 @@ std::vector<Detection> detectFaces(const QImage& image, float threshold, QString
                     const double w = std::exp(b[2]) * strides[s], h = std::exp(b[3]) * strides[s];
                     QRectF rect((cx - w / 2 - lb.dx) / lb.scale, (cy - h / 2 - lb.dy) / lb.scale, w / lb.scale, h / lb.scale);
                     rect = rect.intersected(QRectF(rgb.rect()));
-                    if (!rect.isEmpty())
-                        out.push_back({rect, score});
+                    if (rect.isEmpty())
+                        continue;
+                    Detection d{rect, score, {}};
+                    if (static_cast<int>(kps.data.size()) >= (i + 1) * 10)
+                        for (int k = 0; k < 5; ++k)
+                            d.landmarks[k] = QPointF(((c + kps.data[i * 10 + 2 * k]) * strides[s] - lb.dx) / lb.scale,
+                                                     ((r + kps.data[i * 10 + 2 * k + 1]) * strides[s] - lb.dy) / lb.scale);
+                    out.push_back(d);
                 }
             }
         }
@@ -228,7 +258,7 @@ std::vector<Detection> detectFaces(const QImage& image, float threshold, QString
 std::vector<Detection> detectPlates(const QImage& image, float threshold, QString* error) {
     if (image.isNull())
         return {};
-    auto net = network(QStringLiteral("plate"), error);
+    auto net = visionNetwork(QStringLiteral("plate"), error);
     if (!net)
         return {};
     // YOLOv9 end to end (with NMS): RGB 0..1, letterboxed with grey; each
@@ -263,7 +293,7 @@ QImage subjectMatte(const QImage& image, const QString& modelName, QString* erro
     if (image.isNull())
         return {};
     const QString id = backgroundModelId(modelName);
-    auto net = network(id, error);
+    auto net = visionNetwork(id, error);
     if (!net)
         return {};
     const auto shape = net->inputShape();

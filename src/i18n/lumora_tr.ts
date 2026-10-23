@@ -2478,6 +2478,10 @@
         <source>Turns a landscape video portrait or square and keeps the speaker in the frame</source>
         <translation>Yatay videoyu dikey ya da kare yapar, konuşan kişiyi kadrajda tutar</translation>
     </message>
+    <message>
+        <source>Paint over objects to remove them from the photo</source>
+        <translation>Fotoğraftan silmek için nesnelerin üzerini boyayın</translation>
+    </message>
 </context>
 <context>
     <name>lumora::MediaBinPanel</name>
@@ -2675,6 +2679,34 @@
         <source>Could not save: %1</source>
         <translation>Kaydedilemedi: %1</translation>
     </message>
+    <message>
+        <source>2× larger with AI (%1 × %2 px)</source>
+        <translation>Yapay zekâyla 2 kat büyük (%1 × %2 px)</translation>
+    </message>
+    <message>
+        <source>4× larger with AI (%1 × %2 px)</source>
+        <translation>Yapay zekâyla 4 kat büyük (%1 × %2 px)</translation>
+    </message>
+    <message>
+        <source>Enlarged %1 times by the AI model: new detail is drawn in, so faces and fine textures can look a little different from the original.</source>
+        <translation>Yapay zekâ modeliyle %1 kat büyütülür: yeni ayrıntılar çizilir, bu yüzden yüzler ve ince dokular orijinalden biraz farklı görünebilir.</translation>
+    </message>
+    <message>
+        <source>Enlarges small or old photos and draws in fine detail instead of stretching the pixels. Runs on this computer and takes a while.</source>
+        <translation>Küçük ya da eski fotoğrafları büyütür; pikselleri germek yerine ince ayrıntıları çizer. Bu bilgisayarda çalışır ve biraz sürer.</translation>
+    </message>
+    <message>
+        <source>Original (%1 × %2 px)</source>
+        <translation>Orijinal (%1 × %2 px)</translation>
+    </message>
+    <message>
+        <source>Saving the photo…</source>
+        <translation>Fotoğraf kaydediliyor…</translation>
+    </message>
+    <message>
+        <source>Size:</source>
+        <translation>Boyut:</translation>
+    </message>
 </context>
 <context>
     <name>lumora::PhotoView</name>
@@ -2840,6 +2872,38 @@ The original file is never changed: edits are stored in the project and applied 
         <translation>&quot;Fotoğraf aç…&quot; ile bir fotoğraf (JPEG, PNG, HEIC, TIFF, WebP) açın ya da buraya sürükleyin.
 
 Orijinal dosya asla değişmez: düzenlemeler projede saklanır ve dışa aktarırken uygulanır.</translation>
+    </message>
+    <message>
+        <source>Bring part back</source>
+        <translation>Bir kısmı geri getir</translation>
+    </message>
+    <message>
+        <source>Original faces</source>
+        <translation>Orijinal yüzler</translation>
+    </message>
+    <message>
+        <source>Remove object</source>
+        <translation>Nesneyi sil</translation>
+    </message>
+    <message>
+        <source>Remove objects</source>
+        <translation>Nesne sil</translation>
+    </message>
+    <message>
+        <source>Repair</source>
+        <translation>Onarma</translation>
+    </message>
+    <message>
+        <source>Repairing the photo…</source>
+        <translation>Fotoğraf onarılıyor…</translation>
+    </message>
+    <message>
+        <source>Restore faces</source>
+        <translation>Yüzleri onar</translation>
+    </message>
+    <message>
+        <source>The photo is shown without its repairs. Undo (Ctrl+Z) takes the last one back.</source>
+        <translation>Fotoğraf onarımları olmadan gösteriliyor. Geri al (Ctrl+Z) sonuncusunu kaldırır.</translation>
     </message>
 </context>
 <context>
@@ -4288,6 +4352,58 @@ Orijinal dosya asla değişmez: düzenlemeler projede saklanır ve dışa aktar�
         <source>Face %1</source>
         <translation>Yüz %1</translation>
     </message>
+    <message>
+        <source>Bring all back</source>
+        <translation>Hepsini geri getir</translation>
+    </message>
+    <message>
+        <source>Bring removed objects back</source>
+        <translation>Silinen nesneleri geri getir</translation>
+    </message>
+    <message>
+        <source>Brush size</source>
+        <translation>Fırça boyu</translation>
+    </message>
+    <message>
+        <source>Change face restoration</source>
+        <translation>Yüz onarmayı değiştir</translation>
+    </message>
+    <message>
+        <source>Original faces</source>
+        <translation>Orijinal yüzler</translation>
+    </message>
+    <message>
+        <source>Paint over people, wires, spots or text that should go; the gap is filled in from the surroundings (E)</source>
+        <translation>Gitmesi gereken insanların, tellerin, lekelerin ya da yazıların üzerini boyayın; boşluk çevresinden doldurulur (E)</translation>
+    </message>
+    <message>
+        <source>Paint over what should go. Hold Alt to paint it back.</source>
+        <translation>Gitmesi gerekenin üzerini boyayın. Geri getirmek için Alt&apos;a basılı tutun.</translation>
+    </message>
+    <message>
+        <source>Remove objects</source>
+        <translation>Nesne sil</translation>
+    </message>
+    <message>
+        <source>Removes what you paint over and fills in what was behind it.</source>
+        <translation>Üzerini boyadığınızı siler ve arkasında olanı doldurur.</translation>
+    </message>
+    <message>
+        <source>Repair</source>
+        <translation>Onarma</translation>
+    </message>
+    <message>
+        <source>Restore faces</source>
+        <translation>Yüzleri onar</translation>
+    </message>
+    <message>
+        <source>Sharpens faces in old, small or blurry photos</source>
+        <translation>Eski, küçük ya da bulanık fotoğraflardaki yüzleri netleştirir</translation>
+    </message>
+    <message>
+        <source>Size of the brush, as a part of the photo&apos;s height</source>
+        <translation>Fırçanın boyu, fotoğraf yüksekliğinin bir parçası olarak</translation>
+    </message>
 </context>
 <context>
     <name>lumora::Tasks</name>
@@ -4610,6 +4726,34 @@ Orijinal dosya asla değişmez: düzenlemeler projede saklanır ve dışa aktar�
     <message>
         <source>The video cannot be read.</source>
         <translation>Video okunamıyor.</translation>
+    </message>
+    <message>
+        <source>2x enlargement</source>
+        <translation>2 kat büyütme</translation>
+    </message>
+    <message>
+        <source>4x enlargement</source>
+        <translation>4 kat büyütme</translation>
+    </message>
+    <message>
+        <source>The enlargement model gave an unexpected result.</source>
+        <translation>Büyütme modeli beklenmeyen bir sonuç verdi.</translation>
+    </message>
+    <message>
+        <source>The face restoration model gave an unexpected result.</source>
+        <translation>Yüz onarma modeli beklenmeyen bir sonuç verdi.</translation>
+    </message>
+    <message>
+        <source>The object removal model gave an unexpected result.</source>
+        <translation>Nesne silme modeli beklenmeyen bir sonuç verdi.</translation>
+    </message>
+    <message>
+        <source>face restoration</source>
+        <translation>yüz onarma</translation>
+    </message>
+    <message>
+        <source>object removal</source>
+        <translation>nesne silme</translation>
     </message>
 </context>
 <context>
@@ -5955,6 +6099,13 @@ Unvan</translation>
     <message>
         <source>The clips on the main track have no sound.</source>
         <translation>Ana izdeki kliplerin sesi yok.</translation>
+    </message>
+</context>
+<context>
+    <name>PhotoExporter</name>
+    <message>
+        <source>Cancelled.</source>
+        <translation>İptal edildi.</translation>
     </message>
 </context>
 </TS>

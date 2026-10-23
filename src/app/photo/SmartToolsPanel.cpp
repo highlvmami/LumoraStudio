@@ -8,8 +8,12 @@
 #include <QLabel>
 #include <QListWidget>
 #include <QPushButton>
+#include <QSettings>
+#include <QSlider>
 #include <QSpinBox>
 #include <QVBoxLayout>
+
+#include "Icons.h"
 
 namespace lumora {
 
@@ -34,6 +38,35 @@ QSpinBox* percent() {
 SmartToolsPanel::SmartToolsPanel(QWidget* parent) : QWidget(parent) {
     auto* layout = new QVBoxLayout(this);
     layout->setContentsMargins(0, 6, 0, 0);
+
+    auto* repairBox = new QGroupBox(tr("Repair"));
+    auto* pf = new QFormLayout(repairBox);
+    m_erase = new QPushButton(Icons::eraser(), tr("Remove objects"));
+    m_erase->setCheckable(true);
+    m_erase->setToolTip(tr("Paint over people, wires, spots or text that should go; the gap is filled in from the "
+                           "surroundings (E)"));
+    m_eraseUndo = new QPushButton(tr("Bring all back"));
+    auto* eraseRow = new QHBoxLayout;
+    eraseRow->addWidget(m_erase, 1);
+    eraseRow->addWidget(m_eraseUndo);
+    pf->addRow(eraseRow);
+    m_eraseSize = new QSlider(Qt::Horizontal);
+    m_eraseSize->setRange(1, 25);
+    m_eraseSize->setValue(QSettings().value(QStringLiteral("photo/eraseSize"), 4).toInt());
+    m_eraseSize->setToolTip(tr("Size of the brush, as a part of the photo's height"));
+    pf->addRow(tr("Brush size"), m_eraseSize);
+    m_eraseInfo = note();
+    pf->addRow(m_eraseInfo);
+    m_facesOn = new QCheckBox(tr("Restore faces"));
+    m_facesOn->setIcon(Icons::face());
+    m_facesOn->setToolTip(tr("Sharpens faces in old, small or blurry photos"));
+    m_facesStrength = percent();
+    m_facesStrength->setRange(10, 100);
+    auto* facesRow = new QHBoxLayout;
+    facesRow->addWidget(m_facesOn, 1);
+    facesRow->addWidget(m_facesStrength);
+    pf->addRow(facesRow);
+    layout->addWidget(repairBox);
 
     auto* redactBox = new QGroupBox(tr("Hide faces and plates"));
     auto* rf = new QFormLayout(redactBox);
@@ -81,6 +114,34 @@ SmartToolsPanel::SmartToolsPanel(QWidget* parent) : QWidget(parent) {
     layout->addWidget(bgBox);
     layout->addStretch();
 
+    connect(m_erase, &QPushButton::toggled, this, [this](bool on) {
+        m_eraseInfo->setText(on ? tr("Paint over what should go. Hold Alt to paint it back.")
+                                : tr("Removes what you paint over and fills in what was behind it."));
+        emit eraseModeChanged(on);
+    });
+    connect(m_eraseSize, &QSlider::valueChanged, this, [this](int v) {
+        QSettings().setValue(QStringLiteral("photo/eraseSize"), v);
+        emit eraseBrushChanged();
+    });
+    connect(m_eraseUndo, &QPushButton::clicked, this, [this] {
+        PhotoRetouch r = m_retouch;
+        r.erase.clear();
+        emit retouchEdited(r, tr("Bring removed objects back"), {});
+    });
+    connect(m_facesOn, &QCheckBox::toggled, this, [this](bool on) {
+        if (m_syncing)
+            return;
+        PhotoRetouch r = m_retouch;
+        r.faces = on ? m_facesStrength->value() / 100.0 : 0.0;
+        emit retouchEdited(r, on ? tr("Restore faces") : tr("Original faces"), {});
+    });
+    connect(m_facesStrength, &QSpinBox::valueChanged, this, [this](int v) {
+        if (m_syncing || !m_facesOn->isChecked())
+            return;
+        PhotoRetouch r = m_retouch;
+        r.faces = v / 100.0;
+        emit retouchEdited(r, tr("Change face restoration"), QStringLiteral("faces-strength"));
+    });
     connect(m_find, &QPushButton::clicked, this, &SmartToolsPanel::findRequested);
     connect(m_clear, &QPushButton::clicked, this, [this] {
         Redaction r;
@@ -143,11 +204,36 @@ SmartToolsPanel::SmartToolsPanel(QWidget* parent) : QWidget(parent) {
         b.softness = v / 100.0;
         emit backgroundEdited(b, tr("Change edge softness"), QStringLiteral("bg-softness"));
     });
-    setState({}, {}, false);
+    m_facesStrength->setValue(80);
+    m_eraseInfo->setText(tr("Removes what you paint over and fills in what was behind it."));
+    setState({}, {}, {}, false);
 }
 
-void SmartToolsPanel::setState(const Redaction& r, const BackgroundRemoval& b, bool editable) {
+bool SmartToolsPanel::eraseMode() const { return m_erase->isChecked() && m_erase->isEnabled(); }
+
+void SmartToolsPanel::setEraseMode(bool on) { m_erase->setChecked(on); }
+
+BrushStroke SmartToolsPanel::eraseBrush() const {
+    BrushStroke b;
+    b.radius = m_eraseSize->value() / 200.0;
+    b.hardness = 0.8;
+    b.flow = 1.0;
+    return b;
+}
+
+void SmartToolsPanel::setState(const PhotoRetouch& retouch, const Redaction& r, const BackgroundRemoval& b, bool editable) {
     m_syncing = true;
+    m_retouch = retouch;
+    m_erase->setEnabled(editable);
+    if (!editable)
+        m_erase->setChecked(false);
+    m_eraseUndo->setEnabled(editable && !retouch.erase.empty());
+    m_eraseSize->setEnabled(editable);
+    m_facesOn->setEnabled(editable);
+    m_facesOn->setChecked(retouch.faces > 0.0);
+    if (retouch.faces > 0.0)
+        m_facesStrength->setValue(qRound(retouch.faces * 100));
+    m_facesStrength->setEnabled(editable && retouch.faces > 0.0);
     m_redaction = r;
     m_background = b;
     const bool found = !r.tracks.empty();

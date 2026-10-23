@@ -57,6 +57,8 @@ QIcon batch();      // stacked photos
 QIcon silenceCut(); // waveform with a gap cut out
 QIcon beat();       // musical note on beat marks
 QIcon portrait();   // upright phone frame
+QIcon eraser();     // eraser rubbing out a spot
+QIcon face();       // face with sparkle: restore faces
 QIcon chevron(bool open);
 
 } // namespace lumora::Icons
