@@ -72,6 +72,10 @@ signals:
     // Opens a workspace with more tools (colour, sound).
     void colorWorkspaceRequested();
     void soundWorkspaceRequested();
+    // Smart editing tools for the whole timeline.
+    void cutSilencesRequested();
+    void beatCutRequested();
+    void reframeRequested();
 
 protected:
     void resizeEvent(QResizeEvent* e) override;
@@ -162,6 +166,8 @@ private:
     QComboBox* m_bgModel;
     QSpinBox* m_bgSoftness;
     QLabel* m_bgInfo;
+
+    CollapsibleSection* m_reframeSection;
 
     CollapsibleSection* m_trackSection;
     QPushButton* m_trackStart;

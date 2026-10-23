@@ -133,6 +133,23 @@ private slots:
         QCOMPARE(q.timeline()->clip(f)->freezeTime, ticksFromSeconds(2));
     }
 
+    void soundCleanupSurvivesSaving() {
+        Project p;
+        Timeline* tl = p.timeline();
+        tl->insertMedia(QUuid::createUuid(), 0, ticksFromSeconds(4), true, true);
+        const QUuid audio = tl->tracks()[1].clips[0].id;
+        AudioEffects fx;
+        fx.humHz = 50;
+        fx.wind = 40;
+        QVERIFY(tl->setAudioEffects(audio, fx));
+        const QByteArray json = p.toJson();
+        QVERIFY(json.contains("\"version\": 9"));
+        Project q;
+        QString err;
+        QVERIFY2(q.fromJson(json, {}, &err), qPrintable(err));
+        QCOMPARE(q.timeline()->clip(audio)->audio, fx);
+    }
+
     void stickersSurviveSaving() {
         QTemporaryDir dir;
         QImage png(40, 20, QImage::Format_ARGB32);

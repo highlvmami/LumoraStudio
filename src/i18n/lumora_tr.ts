@@ -467,6 +467,38 @@
         <source>Normalising to %1 LUFS changes it by %2 dB.</source>
         <translation>%1 LUFS&apos;a eşitlemek onu %2 dB değiştirir.</translation>
     </message>
+    <message>
+        <source>Hum removal: off</source>
+        <translation>Uğultu temizleme: kapalı</translation>
+    </message>
+    <message>
+        <source>Remove 50 Hz hum (Europe, Türkiye)</source>
+        <translation>50 Hz uğultuyu sil (Avrupa, Türkiye)</translation>
+    </message>
+    <message>
+        <source>Remove 60 Hz hum (Americas)</source>
+        <translation>60 Hz uğultuyu sil (Amerika)</translation>
+    </message>
+    <message>
+        <source>Takes out the buzz of mains electricity (cables, lights, amplifiers) and its overtones with very narrow filters; the voice around it is not touched.</source>
+        <translation>Elektrik şebekesinin vızıltısını (kablolar, lambalar, amfiler) ve harmoniklerini çok dar filtrelerle siler; çevresindeki sese dokunulmaz.</translation>
+    </message>
+    <message>
+        <source>Wind reduction (%)</source>
+        <translation>Rüzgâr azaltma (%)</translation>
+    </message>
+    <message>
+        <source>Pulls down the rumble and the gusts of wind on the microphone while a clean voice stays as it is.</source>
+        <translation>Mikrofondaki rüzgâr uğultusunu ve esintilerini bastırır; temiz ses olduğu gibi kalır.</translation>
+    </message>
+    <message>
+        <source>Wind reduction</source>
+        <translation>Rüzgâr azaltma</translation>
+    </message>
+    <message>
+        <source>Hum removal</source>
+        <translation>Uğultu temizleme</translation>
+    </message>
 </context>
 <context>
     <name>lumora::ClipColorPanel</name>
@@ -2422,6 +2454,30 @@
 
 %1</translation>
     </message>
+    <message>
+        <source>Cut &amp;silences and hesitations…</source>
+        <translation>&amp;Sessizlikleri ve ııı&apos;ları kes…</translation>
+    </message>
+    <message>
+        <source>Removes the pauses and the &quot;ııı&quot;, &quot;eee&quot; of a talk on the main track</source>
+        <translation>Ana izdeki konuşmanın duraklamalarını ve &quot;ııı&quot;, &quot;eee&quot;lerini siler</translation>
+    </message>
+    <message>
+        <source>Cut to the &amp;beat…</source>
+        <translation>Müziğin &amp;ritmine göre kes…</translation>
+    </message>
+    <message>
+        <source>Moves the cuts between the clips onto the beat of the music</source>
+        <translation>Klipler arasındaki kesimleri müziğin vuruşlarına taşır</translation>
+    </message>
+    <message>
+        <source>&amp;Vertical video (Reels, TikTok)…</source>
+        <translation>&amp;Dikey video (Reels, TikTok)…</translation>
+    </message>
+    <message>
+        <source>Turns a landscape video portrait or square and keeps the speaker in the frame</source>
+        <translation>Yatay videoyu dikey ya da kare yapar, konuşan kişiyi kadrajda tutar</translation>
+    </message>
 </context>
 <context>
     <name>lumora::MediaBinPanel</name>
@@ -3925,6 +3981,38 @@ Orijinal dosya asla değişmez: düzenlemeler projede saklanır ve dışa aktar�
         <source>Playing backwards can make the preview slower.</source>
         <translation>Tersten oynatma önizlemeyi yavaşlatabilir.</translation>
     </message>
+    <message>
+        <source>Vertical video</source>
+        <translation>Dikey video</translation>
+    </message>
+    <message>
+        <source>Turns the whole video portrait (Reels, TikTok, Shorts) or square; the picture follows the person speaking.</source>
+        <translation>Tüm videoyu dikey (Reels, TikTok, Shorts) ya da kare yapar; görüntü konuşan kişiyi takip eder.</translation>
+    </message>
+    <message>
+        <source>Make it vertical…</source>
+        <translation>Dikey yap…</translation>
+    </message>
+    <message>
+        <source>Opens the Sound workspace: hum, wind and noise removal, equaliser, compressor, ducking</source>
+        <translation>Ses çalışma alanını açar: uğultu, rüzgâr ve gürültü temizleme, ekolayzer, kompresör, otomatik kısma</translation>
+    </message>
+    <message>
+        <source>Cut silences and hesitations…</source>
+        <translation>Sessizlikleri ve ııı&apos;ları kes…</translation>
+    </message>
+    <message>
+        <source>Removes the pauses and the &quot;ııı&quot;, &quot;eee&quot; of a talk on the main track</source>
+        <translation>Ana izdeki konuşmanın duraklamalarını ve &quot;ııı&quot;, &quot;eee&quot;lerini siler</translation>
+    </message>
+    <message>
+        <source>Cut to the beat…</source>
+        <translation>Müziğin ritmine göre kes…</translation>
+    </message>
+    <message>
+        <source>Moves the cuts between the clips onto the beat of the music</source>
+        <translation>Klipler arasındaki kesimleri müziğin vuruşlarına taşır</translation>
+    </message>
 </context>
 <context>
     <name>lumora::ScopesWidget</name>
@@ -4214,6 +4302,58 @@ Orijinal dosya asla değişmez: düzenlemeler projede saklanır ve dışa aktar�
     <message>
         <source>The %1 model could not be downloaded: %2</source>
         <translation>%1 modeli indirilemedi: %2</translation>
+    </message>
+    <message>
+        <source>Turkish</source>
+        <translation>Türkçe</translation>
+    </message>
+    <message>
+        <source>English</source>
+        <translation>İngilizce</translation>
+    </message>
+    <message>
+        <source>German</source>
+        <translation>Almanca</translation>
+    </message>
+    <message>
+        <source>French</source>
+        <translation>Fransızca</translation>
+    </message>
+    <message>
+        <source>Spanish</source>
+        <translation>İspanyolca</translation>
+    </message>
+    <message>
+        <source>Arabic</source>
+        <translation>Arapça</translation>
+    </message>
+    <message>
+        <source>Russian</source>
+        <translation>Rusça</translation>
+    </message>
+    <message>
+        <source>Detect automatically</source>
+        <translation>Kendisi bulsun</translation>
+    </message>
+    <message>
+        <source>%1 · downloaded</source>
+        <translation>%1 · indirildi</translation>
+    </message>
+    <message>
+        <source>%1 · %2 MB download</source>
+        <translation>%1 · %2 MB indirilecek</translation>
+    </message>
+    <message>
+        <source>This build of LumoraStudio has no speech recognition.</source>
+        <translation>LumoraStudio'nun bu sürümünde konuşma tanıma yok.</translation>
+    </message>
+    <message>
+        <source>Downloading the speech recognition model…</source>
+        <translation>Konuşma tanıma modeli indiriliyor…</translation>
+    </message>
+    <message>
+        <source>The model could not be downloaded: %1</source>
+        <translation>Model indirilemedi: %1</translation>
     </message>
 </context>
 <context>
@@ -5622,6 +5762,199 @@ Unvan</translation>
     <message>
         <source>Thanks for watching</source>
         <translation>İzlediğiniz için teşekkürler</translation>
+    </message>
+</context>
+<context>
+    <name>lumora::SmartEdit</name>
+    <message>
+        <source>%1 s</source>
+        <translation>%1 sn</translation>
+    </message>
+    <message>
+        <source>%1 min %2 s</source>
+        <translation>%1 dk %2 sn</translation>
+    </message>
+    <message>
+        <source>Cut silences and hesitations</source>
+        <translation>Sessizlikleri ve ııı&apos;ları kes</translation>
+    </message>
+    <message>
+        <source>The timeline is empty. Add a video first.</source>
+        <translation>Zaman çizelgesi boş. Önce bir video ekleyin.</translation>
+    </message>
+    <message>
+        <source>Cut</source>
+        <translation>Kes</translation>
+    </message>
+    <message>
+        <source>LumoraStudio listens to the main track and removes the pauses and the hesitations. Music on other tracks stays where it is. Undo brings everything back.</source>
+        <translation>LumoraStudio ana izi dinler, duraklamaları ve &quot;ııı&quot;, &quot;eee&quot; gibi duraksamaları siler. Diğer izlerdeki müzik yerinde kalır. Geri al her şeyi geri getirir.</translation>
+    </message>
+    <message>
+        <source>Remove pauses</source>
+        <translation>Duraklamaları sil</translation>
+    </message>
+    <message>
+        <source>Shorter pauses belong to speaking and stay</source>
+        <translation>Daha kısa duraklamalar konuşmanın parçasıdır ve kalır</translation>
+    </message>
+    <message>
+        <source>Shortest pause</source>
+        <translation>En kısa duraklama</translation>
+    </message>
+    <message>
+        <source>A little of each pause stays before and after the words, so they do not run into each other</source>
+        <translation>Her duraklamanın biraz kısmı sözcüklerin önünde ve arkasında kalır, böylece sözler birbirine girmez</translation>
+    </message>
+    <message>
+        <source>Breathing room</source>
+        <translation>Nefes payı</translation>
+    </message>
+    <message>
+        <source>Remove hesitations (ııı, eee, hmm, um)</source>
+        <translation>Duraksamaları sil (ııı, eee, hmm)</translation>
+    </message>
+    <message>
+        <source>Uses speech recognition on this computer; the model is downloaded once</source>
+        <translation>Bu bilgisayarda konuşma tanıma kullanır; model bir kez indirilir</translation>
+    </message>
+    <message>
+        <source>Spoken language</source>
+        <translation>Konuşulan dil</translation>
+    </message>
+    <message>
+        <source>Model</source>
+        <translation>Model</translation>
+    </message>
+    <message>
+        <source>Listening for pauses and hesitations…</source>
+        <translation>Duraklamalar ve duraksamalar dinleniyor…</translation>
+    </message>
+    <message>
+        <source>No pauses or hesitations were found.</source>
+        <translation>Duraklama ya da duraksama bulunamadı.</translation>
+    </message>
+    <message>
+        <source>Removed %1 pause(s) and %2 hesitation(s): the video is %3 shorter. Undo (Ctrl+Z) brings them back.</source>
+        <translation>%1 duraklama ve %2 duraksama silindi: video %3 kısaldı. Geri al (Ctrl+Z) hepsini geri getirir.</translation>
+    </message>
+    <message>
+        <source>Cut to the beat</source>
+        <translation>Ritme göre kes</translation>
+    </message>
+    <message>
+        <source>Put the clips on the main track and the music on an audio track below them first. Then LumoraStudio moves the cuts onto the beat.</source>
+        <translation>Önce klipleri ana ize, müziği de altındaki bir ses izine koyun. Sonra LumoraStudio kesimleri vuruşlara taşır.</translation>
+    </message>
+    <message>
+        <source>LumoraStudio finds the beat of &lt;b&gt;%1&lt;/b&gt; and moves the cuts between the clips on the main track onto it. Clips get only as long as their video allows.</source>
+        <translation>LumoraStudio &lt;b&gt;%1&lt;/b&gt; müziğinin ritmini bulur ve ana izdeki klipler arasındaki kesimleri vuruşlara taşır. Klipler en fazla videolarının yettiği kadar uzar.</translation>
+    </message>
+    <message>
+        <source>Move each cut to the nearest beat</source>
+        <translation>Her kesimi en yakın vuruşa taşı</translation>
+    </message>
+    <message>
+        <source>Every clip lasts 1 beat (fast)</source>
+        <translation>Her klip 1 vuruş sürsün (hızlı)</translation>
+    </message>
+    <message>
+        <source>Every clip lasts 2 beats</source>
+        <translation>Her klip 2 vuruş sürsün</translation>
+    </message>
+    <message>
+        <source>Every clip lasts 4 beats (one bar)</source>
+        <translation>Her klip 4 vuruş sürsün (bir ölçü)</translation>
+    </message>
+    <message>
+        <source>Every clip lasts 8 beats (slow)</source>
+        <translation>Her klip 8 vuruş sürsün (yavaş)</translation>
+    </message>
+    <message>
+        <source>Cuts</source>
+        <translation>Kesimler</translation>
+    </message>
+    <message>
+        <source>Listening for the beat…</source>
+        <translation>Ritim dinleniyor…</translation>
+    </message>
+    <message>
+        <source>The cuts are already on the beat (%1 BPM).</source>
+        <translation>Kesimler zaten ritimde (%1 BPM).</translation>
+    </message>
+    <message>
+        <source>%1 clip(s) cut to the beat of the music (%2 BPM).</source>
+        <translation>%1 klip müziğin ritmine göre kesildi (%2 BPM).</translation>
+    </message>
+    <message>
+        <source>Vertical video</source>
+        <translation>Dikey video</translation>
+    </message>
+    <message>
+        <source>The main track has no video. Add a video first.</source>
+        <translation>Ana izde video yok. Önce bir video ekleyin.</translation>
+    </message>
+    <message>
+        <source>Make it vertical</source>
+        <translation>Dikey yap</translation>
+    </message>
+    <message>
+        <source>The picture fills the new frame edge to edge (nothing is stretched) and moves with the person speaking, so they stay in view. Faces are found on this computer.</source>
+        <translation>Görüntü yeni kareyi kenardan kenara doldurur (hiçbir şey esnetilmez) ve konuşan kişiyle birlikte kayar, böylece kişi hep görünür kalır. Yüzler bu bilgisayarda bulunur.</translation>
+    </message>
+    <message>
+        <source>Portrait 9:16 (Reels, TikTok, Shorts)</source>
+        <translation>Dikey 9:16 (Reels, TikTok, Shorts)</translation>
+    </message>
+    <message>
+        <source>Portrait 4:5 (Instagram posts)</source>
+        <translation>Dikey 4:5 (Instagram gönderisi)</translation>
+    </message>
+    <message>
+        <source>Square 1:1</source>
+        <translation>Kare 1:1</translation>
+    </message>
+    <message>
+        <source>Format</source>
+        <translation>Biçim</translation>
+    </message>
+    <message>
+        <source>Keep the speaker in the frame</source>
+        <translation>Konuşanı kadrajda tut</translation>
+    </message>
+    <message>
+        <source>Finding the speaker…</source>
+        <translation>Konuşan kişi bulunuyor…</translation>
+    </message>
+    <message>
+        <source>The video is now %1 × %2. %3 clip(s) follow the speaker; move a clip by hand in the viewer if you want it elsewhere.</source>
+        <translation>Video artık %1 × %2. %3 klip konuşan kişiyi takip ediyor; başka bir yerde olsun isterseniz klibi önizlemede elle kaydırın.</translation>
+    </message>
+</context>
+<context>
+    <name>lumora::beats</name>
+    <message>
+        <source>There is no music clip.</source>
+        <translation>Müzik klibi yok.</translation>
+    </message>
+    <message>
+        <source>The clip has no sound.</source>
+        <translation>Klibin sesi yok.</translation>
+    </message>
+    <message>
+        <source>No steady beat was found in the music.</source>
+        <translation>Müzikte düzenli bir ritim bulunamadı.</translation>
+    </message>
+</context>
+<context>
+    <name>lumora::smartcut</name>
+    <message>
+        <source>The timeline is empty.</source>
+        <translation>Zaman çizelgesi boş.</translation>
+    </message>
+    <message>
+        <source>The clips on the main track have no sound.</source>
+        <translation>Ana izdeki kliplerin sesi yok.</translation>
     </message>
 </context>
 </TS>

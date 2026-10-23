@@ -79,6 +79,7 @@
 #include "tools/CollageDialog.h"
 #include "tools/GifDialog.h"
 #include "tools/Recorders.h"
+#include "tools/SmartEdit.h"
 
 namespace lumora {
 
@@ -131,6 +132,9 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
     connect(m_properties, &PropertiesPanel::keyColorPickRequested, this, &MainWindow::pickKeyColor);
     connect(m_properties, &PropertiesPanel::colorWorkspaceRequested, this, [this] { setWorkspace(Workspace::Color); });
     connect(m_properties, &PropertiesPanel::soundWorkspaceRequested, this, [this] { setWorkspace(Workspace::Audio); });
+    connect(m_properties, &PropertiesPanel::cutSilencesRequested, this, &MainWindow::cutSilences);
+    connect(m_properties, &PropertiesPanel::beatCutRequested, this, &MainWindow::cutToBeat);
+    connect(m_properties, &PropertiesPanel::reframeRequested, this, &MainWindow::reframeVertical);
     m_properties->setThumbnailProvider([this](const QUuid& id) { return m_cache->thumbnail(id); });
     m_clipColor = new ClipColorPanel(m_project, m_videoUndo);
     m_clipColor->setThumbnailProvider([this](const QUuid& id) { return m_cache->thumbnail(id); });
@@ -477,6 +481,12 @@ void MainWindow::createActions() {
     m_actRecordScreen->setEnabled(ScreenRecordDialog::available());
     m_actVoiceover = make(tr("Record &voice-over…"), {}, &MainWindow::recordVoiceover, Icons::microphone());
     m_actVoiceover->setToolTip(tr("Speak over the video while it plays; the recording goes on a sound track"));
+    m_actCutSilences = make(tr("Cut &silences and hesitations…"), {}, &MainWindow::cutSilences, Icons::silenceCut());
+    m_actCutSilences->setToolTip(tr("Removes the pauses and the \"ııı\", \"eee\" of a talk on the main track"));
+    m_actBeatCut = make(tr("Cut to the &beat…"), {}, &MainWindow::cutToBeat, Icons::beat());
+    m_actBeatCut->setToolTip(tr("Moves the cuts between the clips onto the beat of the music"));
+    m_actReframe = make(tr("&Vertical video (Reels, TikTok)…"), {}, &MainWindow::reframeVertical, Icons::portrait());
+    m_actReframe->setToolTip(tr("Turns a landscape video portrait or square and keeps the speaker in the frame"));
 
     auto* tb = m_timelinePanel->toolBar();
     tb->addAction(m_actSplit);
@@ -593,6 +603,10 @@ void MainWindow::createMenus() {
     view->addAction(m_actResetLayout);
 
     QMenu* tools = menuBar()->addMenu(tr("&Tools"));
+    tools->addAction(m_actCutSilences);
+    tools->addAction(m_actBeatCut);
+    tools->addAction(m_actReframe);
+    tools->addSeparator();
     tools->addAction(m_actRecordScreen);
     tools->addAction(m_actVoiceover);
     tools->addSeparator();
@@ -1441,22 +1455,9 @@ void MainWindow::autoSubtitles() {
     intro->setWordWrap(true);
     layout->addWidget(intro);
     auto* form = new QFormLayout;
-    auto* language = new QComboBox;
-    const std::pair<QString, QString> languages[] = {
-        {QStringLiteral("tr"), tr("Turkish")}, {QStringLiteral("en"), tr("English")},  {QStringLiteral("de"), tr("German")},
-        {QStringLiteral("fr"), tr("French")},  {QStringLiteral("es"), tr("Spanish")},  {QStringLiteral("ar"), tr("Arabic")},
-        {QStringLiteral("ru"), tr("Russian")}, {QStringLiteral("auto"), tr("Detect automatically")}};
-    for (const auto& [code, name] : languages)
-        language->addItem(name, code);
-    QSettings settings;
-    language->setCurrentIndex(std::max(0, language->findData(settings.value(QStringLiteral("speech/language"), QStringLiteral("tr")))));
+    auto* language = speechLanguageBox();
     form->addRow(tr("Spoken language"), language);
-    auto* model = new QComboBox;
-    for (const auto& m : speech::models()) {
-        const bool have = QFileInfo::exists(speech::modelPath(m.id));
-        model->addItem(have ? tr("%1 · downloaded").arg(m.label) : tr("%1 · %2 MB download").arg(m.label).arg(m.sizeMB), m.id);
-    }
-    model->setCurrentIndex(std::max(0, model->findData(settings.value(QStringLiteral("speech/model"), speech::defaultModel()))));
+    auto* model = speechModelBox();
     form->addRow(tr("Model"), model);
     layout->addLayout(form);
     auto* buttons = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel);
@@ -1468,19 +1469,9 @@ void MainWindow::autoSubtitles() {
     if (dlg.exec() != QDialog::Accepted)
         return;
     const QString lang = language->currentData().toString();
-    const QString modelId = model->currentData().toString();
-    settings.setValue(QStringLiteral("speech/language"), lang);
-    settings.setValue(QStringLiteral("speech/model"), modelId);
-
-    const QString path = speech::modelPath(modelId);
-    if (!QFileInfo::exists(path)) {
-        QString error;
-        if (!downloadFile(this, speech::modelUrl(modelId), path, tr("Downloading the speech recognition model…"), &error)) {
-            if (!error.isEmpty())
-                QMessageBox::warning(this, tr("Automatic subtitles"), tr("The model could not be downloaded: %1").arg(error));
-            return;
-        }
-    }
+    const QString path = ensureSpeechModel(this, language, model, tr("Automatic subtitles"));
+    if (path.isEmpty())
+        return;
     speech::Options options;
     options.modelPath = path;
     options.language = lang;
@@ -1711,7 +1702,10 @@ void MainWindow::runTool(const QString& name) {
                                                       {"collage", m_actCollage},
                                                       {"batch", m_actBatchPhotos},
                                                       {"screen", m_actRecordScreen},
-                                                      {"voiceover", m_actVoiceover}};
+                                                      {"voiceover", m_actVoiceover},
+                                                      {"silences", m_actCutSilences},
+                                                      {"beat", m_actBeatCut},
+                                                      {"reframe", m_actReframe}};
     for (const auto& [id, action] : tools)
         if (name == QLatin1String(id))
             action->trigger();
@@ -1733,6 +1727,27 @@ void MainWindow::exportGif() {
     GifDialog dlg(m_project, from == kInvalidTicks ? 0 : from, to == kInvalidTicks ? 0 : to, this);
     if (dlg.exec() == QDialog::Accepted)
         statusBar()->showMessage(tr("GIF saved to %1").arg(QDir::toNativeSeparators(dlg.savedPath())), 6000);
+}
+
+void MainWindow::cutSilences() {
+    m_engine->pause();
+    const QString message = smartedit::cutSilences(this, m_project, m_videoUndo);
+    if (!message.isEmpty())
+        statusBar()->showMessage(message, 10000);
+}
+
+void MainWindow::cutToBeat() {
+    m_engine->pause();
+    const QString message = smartedit::cutToBeat(this, m_project, m_videoUndo, m_timelineView->selection());
+    if (!message.isEmpty())
+        statusBar()->showMessage(message, 10000);
+}
+
+void MainWindow::reframeVertical() {
+    m_engine->pause();
+    const QString message = smartedit::reframe(this, m_project, m_videoUndo);
+    if (!message.isEmpty())
+        statusBar()->showMessage(message, 12000);
 }
 
 void MainWindow::makeCollage() {

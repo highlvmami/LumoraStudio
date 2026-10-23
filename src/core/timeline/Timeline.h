@@ -283,6 +283,10 @@ public:
     bool removeClips(const std::vector<QUuid>& ids);
     // Removes the range [from, to) from all unlocked tracks (ripple delete).
     bool removeRange(Ticks from, Ticks to);
+    // Removes several ranges at once (one change). With `storylineOnly` only
+    // the storyline (V1, A1) and the subtitles are cut; other tracks (music,
+    // overlays) keep their place, apart from clips connected to the storyline.
+    bool removeRanges(std::vector<std::pair<Ticks, Ticks>> ranges, bool storylineOnly);
     // Moves the edge of a clip. newSourceTime is clamped to the media bounds
     // [0, mediaDuration] and to at least one frame.
     bool trimIn(const QUuid& clipId, Ticks newSourceIn);

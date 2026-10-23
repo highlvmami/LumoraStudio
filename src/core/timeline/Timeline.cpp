@@ -1226,6 +1226,31 @@ bool Timeline::removeRange(Ticks from, Ticks to) {
     return true;
 }
 
+bool Timeline::removeRanges(std::vector<std::pair<Ticks, Ticks>> ranges, bool storylineOnly) {
+    const TimelineState backup = m_state;
+    {
+        const QSignalBlocker block(this);
+        std::vector<bool> wasLocked;
+        for (size_t i = 0; i < m_state.tracks.size(); ++i) {
+            Track& t = m_state.tracks[i];
+            wasLocked.push_back(t.locked);
+            if (storylineOnly && i != static_cast<size_t>(primaryVideoTrack()) && i != static_cast<size_t>(primaryAudioTrack()) &&
+                !t.isSubtitle())
+                t.locked = true;
+        }
+        // Back to front, so the earlier ranges keep their times.
+        std::sort(ranges.begin(), ranges.end(), [](const auto& a, const auto& b) { return a.first > b.first; });
+        for (const auto& [from, to] : ranges)
+            removeRange(from, to);
+        for (size_t i = 0; i < m_state.tracks.size() && i < wasLocked.size(); ++i)
+            m_state.tracks[i].locked = wasLocked[i];
+    }
+    if (m_state == backup)
+        return false;
+    emit changed();
+    return true;
+}
+
 bool Timeline::trimIn(const QUuid& clipId, Ticks newSourceIn) {
     const Clip* c = clip(clipId);
     if (!c)

@@ -81,7 +81,9 @@ QByteArray Project::toJson() const {
         return c.remap.isActive() || !c.effects.isIdentity() || c.transform.hasCrop() ||
                (c.kind == ClipKind::Title && (c.title.decoration != TitleDecoration::None || c.title.letterSpacing != 0.0 || c.title.uppercase));
     });
-    root["version"] = tools ? 8 : stickers ? 7 : ai ? 6 : motion ? 5 : freezes ? 4 : subtitles ? 3 : 2;
+    // 0.8 sound clean-up: hum and wind removal.
+    const bool cleanup = anyClip([](const Clip& c) { return c.audio.humHz > 0 || c.audio.wind > 0.0; });
+    root["version"] = cleanup ? 9 : tools ? 8 : stickers ? 7 : ai ? 6 : motion ? 5 : freezes ? 4 : subtitles ? 3 : 2;
     root["application"] = QCoreApplication::applicationVersion();
 
     QJsonArray media;

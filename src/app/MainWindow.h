@@ -116,6 +116,9 @@ private:
     void exportGif();
     void makeCollage();
     void batchPhotos();
+    void cutSilences();
+    void cutToBeat();
+    void reframeVertical();
     void recordScreen();
     void recordVoiceover();
     void refreshProgram();
@@ -209,6 +212,9 @@ private:
     QAction* m_actBatchPhotos;
     QAction* m_actRecordScreen;
     QAction* m_actVoiceover;
+    QAction* m_actCutSilences;
+    QAction* m_actBeatCut;
+    QAction* m_actReframe;
     class Updater* m_updater = nullptr;
 };
 

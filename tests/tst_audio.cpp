@@ -122,6 +122,73 @@ private slots:
         QVERIFY2(after < before * 0.3, qPrintable(QString("%1 -> %2").arg(before).arg(after)));
     }
 
+    void humRemovalTakesOutMainsBuzzOnly() {
+        // 50 Hz hum with harmonics under a 1 kHz tone: the hum goes, the tone stays.
+        AudioEffects fx;
+        fx.humHz = 50;
+        dsp::ClipChain chain(fx, 48000, 1);
+        auto hum = sine(48000 * 2, 1, 50.0, 0.1);
+        auto h3 = sine(48000 * 2, 1, 150.0, 0.05);
+        auto tone = sine(48000 * 2, 1, 1110.0, 0.1);
+        for (size_t i = 0; i < hum.size(); ++i)
+            hum[i] += h3[i];
+        auto mixed = hum;
+        for (size_t i = 0; i < mixed.size(); ++i)
+            mixed[i] += tone[i];
+        chain.process(hum.data(), 48000 * 2);
+        QVERIFY2(rms(hum, 48000, hum.size()) < 0.005, qPrintable(QString::number(rms(hum, 48000, hum.size()))));
+        dsp::ClipChain chain2(fx, 48000, 1);
+        chain2.process(mixed.data(), 48000 * 2);
+        const double toneRms = 0.1 / std::sqrt(2.0);
+        QVERIFY(std::abs(rms(mixed, 48000, mixed.size()) / toneRms - 1.0) < 0.05);
+        // 60 Hz notches leave 50 Hz alone.
+        fx.humHz = 60;
+        dsp::ClipChain chain3(fx, 48000, 1);
+        auto fifty = sine(48000 * 2, 1, 50.0, 0.1);
+        chain3.process(fifty.data(), 48000 * 2);
+        QVERIFY(rms(fifty, 48000, fifty.size()) > 0.06);
+        QVERIFY(AudioEffects::fromJson(AudioEffects{.humHz = 60}.toJson()).humHz == 60);
+    }
+
+    void windReducerPullsDownGustsKeepsVoice() {
+        // Wind: loud noise below 300 Hz. Voice: a 1 kHz tone with a 200 Hz
+        // part at a natural level.
+        const int n = 48000 * 2;
+        std::vector<float> wind(n);
+        quint32 seed = 3;
+        double lp1 = 0.0, lp2 = 0.0;
+        for (float& v : wind) {
+            seed = seed * 1664525u + 1013904223u;
+            const double w = (static_cast<double>(seed >> 8) / 16777216.0 - 0.5);
+            lp1 += 0.02 * (w - lp1); // low-pass: rumble under ~150 Hz
+            lp2 += 0.02 * (lp1 - lp2);
+            v = static_cast<float>(lp2 * 20.0);
+        }
+        auto voice = sine(n, 1, 1000.0, 0.1);
+        auto low = sine(n, 1, 200.0, 0.1);
+        for (int i = 0; i < n; ++i)
+            voice[i] += low[i];
+        auto mixed = voice;
+        for (int i = 0; i < n; ++i)
+            mixed[i] += wind[i];
+        const double windBefore = rms(wind, n / 2, n);
+        dsp::WindReducer r(48000, 1, 1.0);
+        r.process(wind.data(), n);
+        QVERIFY2(rms(wind, n / 2, n) < windBefore * 0.3,
+                 qPrintable(QString("%1 -> %2").arg(windBefore).arg(rms(wind, n / 2, n))));
+        // The voice alone passes (only delayed).
+        dsp::WindReducer r2(48000, 1, 1.0);
+        auto v = voice;
+        r2.process(v.data(), n);
+        const int L = r2.latency();
+        double err = 0, ref = 0;
+        for (int i = n / 2; i < n; ++i) {
+            err += std::pow(v[i] - voice[i - L], 2);
+            ref += std::pow(voice[i - L], 2);
+        }
+        QVERIFY2(err / ref < 0.01, qPrintable(QString::number(err / ref)));
+    }
+
     void equaliserBoostsItsBand() {
         dsp::Biquad b;
         b.design(dsp::Biquad::Type::Peak, 48000, 1000, 0.9, 6.0);

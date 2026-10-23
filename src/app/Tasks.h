@@ -15,6 +15,7 @@
 #include <optional>
 
 class QWidget;
+class QComboBox;
 
 namespace lumora {
 
@@ -59,5 +60,13 @@ bool downloadFile(QWidget* parent, const QUrl& url, const QString& dest, const Q
 // computer, downloading the missing ones. False (after telling the user why)
 // when one is still missing.
 bool ensureVisionModels(QWidget* parent, const QStringList& ids, const QString& title);
+
+// Choices for speech recognition (automatic subtitles, hesitation cutting):
+// the spoken language and the Whisper model, with the last choice selected.
+QComboBox* speechLanguageBox();
+QComboBox* speechModelBox();
+// Remembers the choice and downloads the model when it is missing. Returns
+// the model file, or an empty string (after telling the user why).
+QString ensureSpeechModel(QWidget* parent, QComboBox* language, QComboBox* model, const QString& title);
 
 } // namespace lumora

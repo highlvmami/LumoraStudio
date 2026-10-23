@@ -54,6 +54,9 @@ QIcon record(const QColor& color = {}); // filled circle
 QIcon microphone();
 QIcon screen();     // monitor
 QIcon batch();      // stacked photos
+QIcon silenceCut(); // waveform with a gap cut out
+QIcon beat();       // musical note on beat marks
+QIcon portrait();   // upright phone frame
 QIcon chevron(bool open);
 
 } // namespace lumora::Icons

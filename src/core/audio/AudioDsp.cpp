@@ -22,6 +22,10 @@ void Biquad::design(Type type, double rate, double freq, double q, double gainDb
         b0 = (1 + cw) / 2, b1 = -(1 + cw), b2 = (1 + cw) / 2;
         a0 = 1 + alpha, a1 = -2 * cw, a2 = 1 - alpha;
         break;
+    case Type::Notch:
+        b0 = 1, b1 = -2 * cw, b2 = 1;
+        a0 = 1 + alpha, a1 = -2 * cw, a2 = 1 - alpha;
+        break;
     case Type::Peak:
         b0 = 1 + alpha * A, b1 = -2 * cw, b2 = 1 - alpha * A;
         a0 = 1 + alpha / A, a1 = -2 * cw, a2 = 1 - alpha / A;
@@ -72,8 +76,6 @@ void Biquad::process(float* data, int frames, int channels) {
 
 // ------------------------------------------------------------- FFT helper
 
-namespace {
-
 void fft(std::vector<std::complex<float>>& a, bool inverse) {
     const size_t n = a.size();
     for (size_t i = 1, j = 0; i < n; ++i) {
@@ -102,41 +104,32 @@ void fft(std::vector<std::complex<float>>& a, bool inverse) {
             x /= static_cast<float>(n);
 }
 
-} // namespace
+// ------------------------------------------------------- SpectralProcessor
 
-// -------------------------------------------------------- SpectralDenoiser
-
-SpectralDenoiser::SpectralDenoiser(int rate, int channels, double strength)
-    : m_n(rate > 50000 ? 2048 : 1024), m_hop(m_n / 4), m_channels(std::max(1, channels)),
-      m_strength(std::clamp(strength, 0.0, 1.0)) {
+SpectralProcessor::SpectralProcessor(int rate, int channels)
+    : m_rate(rate), m_n(rate > 50000 ? 2048 : 1024), m_hop(m_n / 4), m_channels(std::max(1, channels)) {
     // sqrt-Hann on both sides: the product is a Hann window, which sums to 2
     // at 75 % overlap; the 0.5 is folded into the synthesis side.
     m_window.resize(m_n);
     for (int i = 0; i < m_n; ++i)
         m_window[i] = static_cast<float>(std::sqrt(0.5 - 0.5 * std::cos(2 * M_PI * i / m_n)));
-    // Six sub-windows of a third of a second: the floor follows a change
-    // of noise within about two seconds.
-    m_subLength = std::max(1, static_cast<int>(rate / 3.0 / m_hop));
-    reset();
-}
-
-void SpectralDenoiser::reset() {
     m_in.assign(m_channels, std::vector<float>(m_n, 0.0f));
     m_out.assign(m_channels, std::vector<float>(m_n, 0.0f));
-    m_smooth.assign(m_n / 2 + 1, 0.0f);
-    m_curMin.assign(m_n / 2 + 1, 0.0f);
-    m_noise.assign(m_n / 2 + 1, 0.0f);
-    m_windowMins.clear();
-    m_subFill = 0;
-    m_settle = 0;
-    m_prevGain.assign(m_n / 2 + 1, 1.0f);
-    m_spec.assign(m_n, {});
     m_chanSpec.assign(m_channels, std::vector<std::complex<float>>(m_n));
-    m_fill = 0;
-    m_frames = 0;
+    m_power.assign(m_n / 2 + 1, 0.0f);
+    m_gain.assign(m_n / 2 + 1, 1.0f);
 }
 
-void SpectralDenoiser::process(float* data, int frames) {
+void SpectralProcessor::reset() {
+    for (auto& v : m_in)
+        std::fill(v.begin(), v.end(), 0.0f);
+    for (auto& v : m_out)
+        std::fill(v.begin(), v.end(), 0.0f);
+    m_fill = 0;
+    resetState();
+}
+
+void SpectralProcessor::process(float* data, int frames) {
     for (int i = 0; i < frames; ++i) {
         const int pos = m_n - m_hop + m_fill; // write position in the input window
         for (int ch = 0; ch < m_channels; ++ch) {
@@ -161,20 +154,57 @@ void SpectralDenoiser::process(float* data, int frames) {
     }
 }
 
-void SpectralDenoiser::runFrame() {
+void SpectralProcessor::runFrame() {
     const int bins = m_n / 2 + 1;
-    std::vector<float> power(bins, 0.0f);
+    std::fill(m_power.begin(), m_power.end(), 0.0f);
     for (int ch = 0; ch < m_channels; ++ch) {
         auto& spec = m_chanSpec[ch];
         for (int i = 0; i < m_n; ++i)
             spec[i] = {m_in[ch][i] * m_window[i], 0.0f};
         fft(spec, false);
         for (int k = 0; k < bins; ++k)
-            power[k] += std::norm(spec[k]);
+            m_power[k] += std::norm(spec[k]);
     }
-    for (float& p : power)
+    for (float& p : m_power)
         p /= static_cast<float>(m_channels);
+    shape(m_power, m_gain);
+    for (int ch = 0; ch < m_channels; ++ch) {
+        auto& spec = m_chanSpec[ch];
+        for (int k = 0; k < bins; ++k) {
+            spec[k] *= m_gain[k];
+            if (k > 0 && k < m_n / 2)
+                spec[m_n - k] = std::conj(spec[k]);
+        }
+        fft(spec, true);
+        auto& o = m_out[ch];
+        for (int i = 0; i < m_n; ++i)
+            o[i] += spec[i].real() * m_window[i] * 0.5f;
+    }
+}
 
+// -------------------------------------------------------- SpectralDenoiser
+
+SpectralDenoiser::SpectralDenoiser(int rate, int channels, double strength)
+    : SpectralProcessor(rate, channels), m_strength(std::clamp(strength, 0.0, 1.0)) {
+    // Six sub-windows of a third of a second: the floor follows a change
+    // of noise within about two seconds.
+    m_subLength = std::max(1, static_cast<int>(rate / 3.0 / m_hop));
+    resetState();
+}
+
+void SpectralDenoiser::resetState() {
+    m_smooth.assign(m_n / 2 + 1, 0.0f);
+    m_curMin.assign(m_n / 2 + 1, 0.0f);
+    m_noise.assign(m_n / 2 + 1, 0.0f);
+    m_windowMins.clear();
+    m_subFill = 0;
+    m_settle = 0;
+    m_prevGain.assign(m_n / 2 + 1, 1.0f);
+    m_frames = 0;
+}
+
+void SpectralDenoiser::shape(const std::vector<float>& power, std::vector<float>& smooth) {
+    const int bins = m_n / 2 + 1;
     // Noise floor: minimum of the smoothed level over the recent
     // sub-windows, corrected for the bias of taking a minimum.
     constexpr float bias = 2.5f;
@@ -222,7 +252,6 @@ void SpectralDenoiser::runFrame() {
         const float p = std::max(0.3f * power[k] + 0.7f * sm, 1e-20f);
         gain[k] = std::max(floor, std::sqrt(std::max(0.0f, 1.0f - over * m_noise[k] / p)));
     }
-    std::vector<float> smooth(bins);
     for (int k = 0; k < bins; ++k) {
         const float a = gain[std::max(0, k - 1)], b = gain[k], c = gain[std::min(bins - 1, k + 1)];
         float g = 0.15f * a + 0.7f * b + 0.15f * c;
@@ -231,18 +260,52 @@ void SpectralDenoiser::runFrame() {
         smooth[k] = g;
         m_prevGain[k] = g;
     }
+}
 
-    for (int ch = 0; ch < m_channels; ++ch) {
-        auto& spec = m_chanSpec[ch];
-        for (int k = 0; k < bins; ++k) {
-            spec[k] *= smooth[k];
-            if (k > 0 && k < m_n / 2)
-                spec[m_n - k] = std::conj(spec[k]);
+// ------------------------------------------------------------ WindReducer
+
+WindReducer::WindReducer(int rate, int channels, double strength)
+    : SpectralProcessor(rate, channels), m_strength(std::clamp(strength, 0.0, 1.0)) {
+    resetState();
+}
+
+void WindReducer::resetState() { m_prevGain.assign(m_n / 2 + 1, 1.0f); }
+
+void WindReducer::shape(const std::vector<float>& power, std::vector<float>& gain) {
+    const int bins = m_n / 2 + 1;
+    // Energy of the wind band (60 .. 500 Hz) against the 500 Hz .. 4 kHz
+    // band, where voices and instruments are strong and wind is weak.
+    double low = 0.0, ref = 0.0;
+    for (int k = 0; k < bins; ++k) {
+        const double f = binHz(k);
+        if (f >= 60.0 && f < 500.0)
+            low += power[k];
+        else if (f >= 500.0 && f < 4000.0)
+            ref += power[k];
+    }
+    // Speech and music put up to about 4x (6 dB) more energy below 500 Hz
+    // than above; more than that is wind, and the band is lowered to that
+    // level (fully at strength 1, half as many dB at 0.5).
+    const double allowed = 4.0 * ref + 1e-12;
+    double bandDb = 0.0;
+    if (low > allowed)
+        bandDb = 10.0 * std::log10(allowed / low) * m_strength;
+    const float floor = static_cast<float>(std::pow(10.0, -30.0 * m_strength / 20.0));
+    // Gusts come fast: the gain drops at once and comes back over ~60 ms.
+    const float release = static_cast<float>(std::exp(-static_cast<double>(m_hop) / (0.06 * m_rate)));
+    for (int k = 0; k < bins; ++k) {
+        const double f = binHz(k);
+        float g = 1.0f;
+        if (f < 60.0) {
+            g = floor; // rumble only, nothing to keep
+        } else if (f < 500.0 && bandDb < 0.0) {
+            const double fade = f < 350.0 ? 1.0 : (500.0 - f) / 150.0; // towards 500 Hz
+            g = std::max(floor, static_cast<float>(std::pow(10.0, bandDb * fade / 20.0)));
         }
-        fft(spec, true);
-        auto& o = m_out[ch];
-        for (int i = 0; i < m_n; ++i)
-            o[i] += spec[i].real() * m_window[i] * 0.5f;
+        if (g > m_prevGain[k])
+            g = m_prevGain[k] + (g - m_prevGain[k]) * (1.0f - release);
+        m_prevGain[k] = g;
+        gain[k] = g;
     }
 }
 
@@ -336,6 +399,19 @@ ClipChain::ClipChain(const AudioEffects& fx, int rate, int channels) : m_channel
         m_hp1.setChannels(channels);
         m_hp2.setChannels(channels);
     }
+    if (fx.humHz > 0) {
+        // Narrow notches (3 Hz wide) on the mains frequency and its
+        // harmonics up to 1 kHz: the buzz goes, the voice around it stays.
+        for (int k = 1; k * fx.humHz <= 1000 && k * fx.humHz < rate * 0.45; ++k) {
+            Biquad b;
+            const double f = static_cast<double>(k) * fx.humHz;
+            b.design(Biquad::Type::Notch, rate, f, f / 3.0, 0.0);
+            b.setChannels(channels);
+            m_hum.push_back(b);
+        }
+    }
+    if (fx.wind > 0.0)
+        m_wind = std::make_unique<WindReducer>(rate, channels, fx.wind / 100.0);
     if (fx.denoise > 0.0)
         m_denoise = std::make_unique<SpectralDenoiser>(rate, channels, fx.denoise / 100.0);
     auto band = [&](Biquad::Type t, double f, double q, double g) {
@@ -355,11 +431,15 @@ ClipChain::ClipChain(const AudioEffects& fx, int rate, int channels) : m_channel
 
 ClipChain::~ClipChain() = default;
 
-int ClipChain::latency() const { return m_denoise ? m_denoise->latency() : 0; }
+int ClipChain::latency() const { return (m_wind ? m_wind->latency() : 0) + (m_denoise ? m_denoise->latency() : 0); }
 
 void ClipChain::reset() {
     m_hp1.reset();
     m_hp2.reset();
+    for (auto& b : m_hum)
+        b.reset();
+    if (m_wind)
+        m_wind->reset();
     if (m_denoise)
         m_denoise->reset();
     for (auto& b : m_eq)
@@ -373,6 +453,10 @@ void ClipChain::process(float* data, int frames) {
         m_hp1.process(data, frames, m_channels);
         m_hp2.process(data, frames, m_channels);
     }
+    for (auto& b : m_hum)
+        b.process(data, frames, m_channels);
+    if (m_wind)
+        m_wind->process(data, frames);
     if (m_denoise)
         m_denoise->process(data, frames);
     for (auto& b : m_eq)
