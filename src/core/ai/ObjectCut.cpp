@@ -116,7 +116,6 @@ QImage objectMatte(const QImage& image, const QRectF& box, bool precise, QString
 
 ObjectTrackResult trackObject(const QString& path, const Clip& clip, const QRectF& box, const std::function<bool(double)>& progress) {
     ObjectTrackResult r;
-    r.track.kind = RedactionKind::Manual;
     VideoDecoder dec;
     QString err;
     auto [from, to] = clip.mediaRange();

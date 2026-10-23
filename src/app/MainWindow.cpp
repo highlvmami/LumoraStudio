@@ -69,6 +69,7 @@
 #include "project/Project.h"
 #include "ai/Redaction.h"
 #include "ai/SpeechToText.h"
+#include "ai/ObjectCut.h"
 #include "ai/Vision.h"
 #include "motion/Analysis.h"
 #include "render/FrameRenderer.h"
@@ -1459,6 +1460,11 @@ void MainWindow::autoSubtitles() {
     form->addRow(tr("Spoken language"), language);
     auto* model = speechModelBox();
     form->addRow(tr("Model"), model);
+    auto* written = new QComboBox;
+    written->addItem(tr("As spoken"), false);
+    written->addItem(tr("Translated into English"), true);
+    written->setToolTip(tr("Translation is done by the same model on this computer; the larger models translate better"));
+    form->addRow(tr("Subtitles"), written);
     layout->addLayout(form);
     auto* buttons = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel);
     buttons->button(QDialogButtonBox::Ok)->setText(tr("Write subtitles"));
@@ -1475,6 +1481,7 @@ void MainWindow::autoSubtitles() {
     speech::Options options;
     options.modelPath = path;
     options.language = lang;
+    options.translate = written->currentData().toBool();
     const TimelineState state = tl->state();
     const MediaPool* pool = m_project->media();
     const Ticks end = tl->duration();
@@ -1492,7 +1499,9 @@ void MainWindow::autoSubtitles() {
         QMessageBox::information(this, tr("Automatic subtitles"), tr("No speech was heard on the timeline."));
         return;
     }
-    const QString iso = lang == QLatin1String("auto") ? QString() : subtitles::isoLanguage(lang);
+    const QString iso = options.translate ? subtitles::isoLanguage(QStringLiteral("en"))
+                        : lang == QLatin1String("auto") ? QString()
+                                                        : subtitles::isoLanguage(lang);
     runTimelineEdit(m_videoUndo, tl, tr("Automatic subtitles"), [&] { return tl->addSubtitleTrack(result->cues, iso) >= 0; });
     statusBar()->showMessage(tr("%n subtitle(s) written. Check them: select a cue to correct its text in Properties.", nullptr,
                                 static_cast<int>(result->cues.size())),
@@ -1566,6 +1575,10 @@ void MainWindow::redactClip(const QUuid& clipId) {
 }
 
 void MainWindow::removeBackground(const QUuid& clipId, const QString& model) {
+    if (model == QLatin1String("object")) {
+        cutOutObject(clipId);
+        return;
+    }
     // The preview always uses the fast model, so the detailed one brings it along.
     QStringList ids{ai::backgroundModelId(QStringLiteral("fast"))};
     if (model != QLatin1String("fast"))
@@ -1580,6 +1593,70 @@ void MainWindow::removeBackground(const QUuid& clipId, const QString& model) {
     b.enabled = true;
     b.model = model;
     runTimelineEdit(m_videoUndo, tl, tr("Remove the background"), [&] { return tl->setBackgroundRemoval(clipId, b); });
+}
+
+void MainWindow::cutOutObject(const QUuid& clipId) {
+    const QString title = tr("Cut out an object");
+    if (!ensureVisionModels(this, {QStringLiteral("segment"), ai::backgroundModelId(QStringLiteral("fast"))}, title))
+        return;
+    const Clip* c = m_project->timeline()->clip(clipId);
+    if (!c || !c->hasMedia())
+        return;
+    // The object is chosen on the clip's first frame, as the program shows it.
+    if (m_monitor->mode() != MonitorPanel::Mode::Program)
+        m_monitor->showProgram(PlaybackSequence::fromTimeline(m_project->timeline()->state(), *m_project->media(),
+                                                              m_project->timeline()->frameRate()),
+                               true);
+    m_engine->pause();
+    m_engine->seek(c->timelineStart);
+    VideoView* view = m_monitor->view();
+    auto picked = std::make_shared<QMetaObject::Connection>();
+    auto cancelled = std::make_shared<QMetaObject::Connection>();
+    *picked = connect(view, &VideoView::regionPicked, this, [this, clipId, picked, cancelled, title](const QRectF& region) {
+        disconnect(*picked);
+        disconnect(*cancelled);
+        Timeline* tl = m_project->timeline();
+        const Clip* c = tl->clip(clipId);
+        const auto media = c ? m_project->media()->find(c->mediaId) : nullptr;
+        if (!c || !media)
+            return;
+        // From the frame to the clip's picture: it fills the frame as fitted,
+        // then scaled and moved by the clip's transform.
+        const QSize canvas = FrameRenderer::defaultCanvasSize(tl->state(), *m_project->media());
+        const double frameAspect = static_cast<double>(canvas.width()) / std::max(1, canvas.height());
+        const double pictureAspect = motion::pictureAspect(*m_project->media(), *c);
+        QSizeF fit = pictureAspect > frameAspect ? QSizeF(1.0, frameAspect / pictureAspect) : QSizeF(pictureAspect / frameAspect, 1.0);
+        fit *= std::max(0.01, c->transform.scale);
+        const QPointF centre(0.5 + c->transform.x, 0.5 + c->transform.y);
+        const QRectF picture(centre.x() - fit.width() / 2, centre.y() - fit.height() / 2, fit.width(), fit.height());
+        const QRectF box = QRectF((region.x() - picture.x()) / picture.width(), (region.y() - picture.y()) / picture.height(),
+                                  region.width() / picture.width(), region.height() / picture.height())
+                               .intersected(QRectF(0, 0, 1, 1));
+        if (box.isEmpty())
+            return;
+        const Clip clip = *c;
+        const QString path = media->path;
+        const auto result = withProgress<ai::ObjectTrackResult>(this, tr("Following the object…"), [path, clip, box](const TaskProgress& p) {
+            return ai::trackObject(path, clip, box, p);
+        });
+        if (!result || result->cancelled)
+            return;
+        if (!result->ok()) {
+            QMessageBox::warning(this, title, result->error);
+            return;
+        }
+        BackgroundRemoval b = clip.background;
+        b.enabled = true;
+        b.model = QStringLiteral("object");
+        b.object = result->track;
+        runTimelineEdit(m_videoUndo, tl, title, [&] { return tl->setBackgroundRemoval(clipId, b); });
+        statusBar()->showMessage(tr("Only the chosen object stays. The export outlines it precisely; play it back to check."), 6000);
+    });
+    *cancelled = connect(view, &VideoView::regionPickCancelled, this, [picked, cancelled] {
+        disconnect(*picked);
+        disconnect(*cancelled);
+    });
+    view->startRegionPick(tr("Draw a box around the object to keep (Esc cancels)"));
 }
 
 void MainWindow::trackClip(const QUuid& id) {

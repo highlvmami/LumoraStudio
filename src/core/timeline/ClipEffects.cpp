@@ -478,7 +478,6 @@ BackgroundRemoval BackgroundRemoval::fromJson(const QJsonObject& o) {
     b.enabled = o.value("enabled").toBool();
     b.model = o.value("model").toString(QStringLiteral("fast"));
     b.softness = std::clamp(o.value("softness").toDouble(0.5), 0.0, 1.0);
-    b.object.kind = RedactionKind::Manual;
     for (const auto& v : o.value("object").toArray()) {
         const QJsonArray a = v.toArray();
         if (a.size() >= 5)

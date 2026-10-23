@@ -662,8 +662,12 @@ PropertiesPanel::PropertiesPanel(Project* project, QUndoStack* undo, QWidget* pa
     m_bgModel = new QComboBox;
     m_bgModel->addItem(tr("Fast"), QStringLiteral("fast"));
     m_bgModel->addItem(tr("Detailed (slow)"), QStringLiteral("quality"));
-    m_bgModel->setToolTip(tr("The detailed model finds hair and fine edges better; the preview uses the fast one"));
+    m_bgModel->addItem(tr("Chosen object (draw a box)"), QStringLiteral("object"));
+    m_bgModel->setToolTip(tr("The detailed model finds hair and fine edges better; the preview uses the fast one. "
+                             "With a chosen object only that object stays, followed through the clip."));
     f->addRow(tr("Model"), m_bgModel);
+    m_bgPick = new QPushButton(tr("Choose the object again…"));
+    f->addRow(m_bgPick);
     m_bgSoftness = percent();
     f->addRow(tr("Edge softness"), m_bgSoftness);
     m_bgInfo = hint();
@@ -961,8 +965,10 @@ PropertiesPanel::PropertiesPanel(Project* project, QUndoStack* undo, QWidget* pa
         if (m_updating || m_clip.isNull())
             return;
         const QString model = m_bgModel->currentData().toString();
-        if (on && !ai::visionModelReady(ai::backgroundModelId(model))) {
-            emit backgroundRequested(m_clip, model); // downloads the model first
+        const Clip* clip = m_project->timeline()->clip(m_clip);
+        const bool needsObject = model == QLatin1String("object") && clip && clip->background.object.boxes.empty();
+        if (on && (needsObject || (model != QLatin1String("object") && !ai::visionModelReady(ai::backgroundModelId(model))))) {
+            emit backgroundRequested(m_clip, model); // downloads the model (and picks the object) first
             refresh();
             return;
         }
@@ -978,7 +984,9 @@ PropertiesPanel::PropertiesPanel(Project* project, QUndoStack* undo, QWidget* pa
             return;
         const QString model = m_bgModel->currentData().toString();
         const Clip* c = m_project->timeline()->clip(m_clip);
-        if (c && c->background.enabled && !ai::visionModelReady(ai::backgroundModelId(model))) {
+        const bool object = model == QLatin1String("object");
+        if (c && c->background.enabled &&
+            ((object && c->background.object.boxes.empty()) || (!object && !ai::visionModelReady(ai::backgroundModelId(model))))) {
             emit backgroundRequested(m_clip, model);
             refresh();
             return;
@@ -988,6 +996,10 @@ PropertiesPanel::PropertiesPanel(Project* project, QUndoStack* undo, QWidget* pa
             b.model = model;
             return m_project->timeline()->setBackgroundRemoval(c.id, b);
         });
+    });
+    connect(m_bgPick, &QPushButton::clicked, this, [this] {
+        if (!m_clip.isNull())
+            emit backgroundRequested(m_clip, QStringLiteral("object"));
     });
     connect(m_bgSoftness, &QSpinBox::valueChanged, this, [this](int v) {
         edit(tr("Change edge softness"), QStringLiteral("bg-softness"), [&](const Clip& c) {
@@ -1440,8 +1452,16 @@ void PropertiesPanel::refreshEditors(const Clip* clip) {
         m_bgSoftness->setValue(qRound(b.softness * 100));
         m_bgModel->setEnabled(b.enabled);
         m_bgSoftness->setEnabled(b.enabled);
+        m_bgPick->setVisible(b.enabled && b.isObject());
         QString bgInfo;
-        if (b.enabled && !ai::visionModelReady(ai::backgroundModelId(b.model)))
+        if (b.enabled && b.isObject() && !ai::visionModelReady(QStringLiteral("segment")))
+            bgInfo = tr("The model is not on this computer yet: turn this off and on again to download it.");
+        else if (b.enabled && b.isObject() && track == 0)
+            bgInfo = tr("Only the chosen object stays; the rest turns black on the main track. The preview outlines it "
+                        "roughly, the export precisely.");
+        else if (b.enabled && b.isObject())
+            bgInfo = tr("Only the chosen object stays. The preview outlines it roughly, the export precisely.");
+        else if (b.enabled && !ai::visionModelReady(ai::backgroundModelId(b.model)))
             bgInfo = tr("The model is not on this computer yet: turn this off and on again to download it.");
         else if (b.enabled && track == 0)
             bgInfo = tr("On the main track the background turns black. Put the clip on a track above another clip to show that clip behind it.");

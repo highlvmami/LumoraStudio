@@ -54,6 +54,8 @@ public:
     // voiceover); used for the screenshots of the booklet.
     void runTool(const QString& name);
     // Starts following an object with the selected clip.
+    // Keeps only an object the user draws a box around, followed through the clip.
+    void cutOutObject(const QUuid& clipId);
     void trackClip(const QUuid& clipId = {});
     void showFullScreenPreview();
     void showHelpSection(const QString& id);
