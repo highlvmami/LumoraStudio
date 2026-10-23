@@ -32,6 +32,8 @@ public:
     // Runs the network on one input and returns its first `outputs` outputs
     // (all of them when negative). Empty on failure, with `error` set.
     std::vector<Tensor> run(const Tensor& input, int outputs = -1, QString* error = nullptr) const;
+    // The same for a network with several inputs, in the model's order.
+    std::vector<Tensor> run(const std::vector<Tensor>& inputs, int outputs = -1, QString* error = nullptr) const;
 
     std::vector<int64_t> inputShape() const;
 
