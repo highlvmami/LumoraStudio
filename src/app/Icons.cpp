@@ -582,6 +582,49 @@ QIcon batch() {
     });
 }
 
+QIcon silenceCut() {
+    return draw([](QPainter& p, QColor c) {
+        p.setPen(pen(c, 1.6));
+        // Speech on both sides, a flat pause in the middle that is cut away.
+        const double left[] = {9, 5, 12, 7}, right[] = {7, 12, 5, 9};
+        for (int i = 0; i < 4; ++i) {
+            p.drawLine(QPointF(2.5 + i * 1.8, 12 - left[i] / 2), QPointF(2.5 + i * 1.8, 12 + left[i] / 2));
+            p.drawLine(QPointF(16 + i * 1.8, 12 - right[i] / 2), QPointF(16 + i * 1.8, 12 + right[i] / 2));
+        }
+        p.setPen(pen(themeColors().accent, 1.6));
+        p.drawLine(QPointF(9.5, 4), QPointF(9.5, 20));
+        p.drawLine(QPointF(14.5, 4), QPointF(14.5, 20));
+        p.setPen(QPen(c, 1.2, Qt::DotLine));
+        p.drawLine(QPointF(10.5, 12), QPointF(13.5, 12));
+    });
+}
+
+QIcon beat() {
+    return draw([](QPainter& p, QColor c) {
+        p.setPen(pen(c));
+        p.setBrush(c);
+        p.drawEllipse(QRectF(5, 13, 5, 4));
+        p.drawEllipse(QRectF(13, 11, 5, 4));
+        p.setBrush(Qt::NoBrush);
+        p.drawLine(QPointF(10, 15), QPointF(10, 5));
+        p.drawLine(QPointF(18, 13), QPointF(18, 3.5));
+        p.drawLine(QPointF(10, 5), QPointF(18, 3.5));
+        p.setPen(pen(themeColors().accent, 1.6));
+        for (int i = 0; i < 4; ++i)
+            p.drawLine(QPointF(4 + i * 5, 20), QPointF(4 + i * 5, 22));
+    });
+}
+
+QIcon portrait() {
+    return draw([](QPainter& p, QColor c) {
+        p.setPen(pen(c, 1.2));
+        p.setBrush(Qt::NoBrush);
+        p.drawRoundedRect(QRectF(2, 7, 20, 11), 1.5, 1.5); // the wide picture
+        p.setPen(pen(themeColors().accent, 1.8));
+        p.drawRoundedRect(QRectF(8, 2.5, 8, 19), 1.5, 1.5); // the upright frame
+    });
+}
+
 QIcon chevron(bool open) {
     return draw([open](QPainter& p, QColor c) {
         p.setPen(pen(c, 2.0));

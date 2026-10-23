@@ -41,6 +41,7 @@ set(APP_SOURCES
     tools/CollageDialog.h tools/CollageDialog.cpp
     tools/BatchPhotoDialog.h tools/BatchPhotoDialog.cpp
     tools/Recorders.h tools/Recorders.cpp
+    tools/SmartEdit.h tools/SmartEdit.cpp
 )
 
 # Windows: the logo as the .exe icon and the version in the file properties.

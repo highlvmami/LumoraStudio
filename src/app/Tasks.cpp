@@ -1,11 +1,14 @@
 #include "Tasks.h"
 
+#include <QComboBox>
 #include <QFileInfo>
+#include <QSettings>
 #include <QMessageBox>
 #include <QNetworkAccessManager>
 #include <QNetworkReply>
 #include <QSaveFile>
 
+#include "ai/SpeechToText.h"
 #include "ai/Vision.h"
 
 namespace lumora {
@@ -76,6 +79,52 @@ bool ensureVisionModels(QWidget* parent, const QStringList& ids, const QString& 
         }
     }
     return true;
+}
+
+QComboBox* speechLanguageBox() {
+    auto* language = new QComboBox;
+    const std::pair<QString, QString> languages[] = {
+        {QStringLiteral("tr"), Tasks::tr("Turkish")}, {QStringLiteral("en"), Tasks::tr("English")},
+        {QStringLiteral("de"), Tasks::tr("German")},  {QStringLiteral("fr"), Tasks::tr("French")},
+        {QStringLiteral("es"), Tasks::tr("Spanish")}, {QStringLiteral("ar"), Tasks::tr("Arabic")},
+        {QStringLiteral("ru"), Tasks::tr("Russian")}, {QStringLiteral("auto"), Tasks::tr("Detect automatically")}};
+    for (const auto& [code, name] : languages)
+        language->addItem(name, code);
+    language->setCurrentIndex(
+        std::max(0, language->findData(QSettings().value(QStringLiteral("speech/language"), QStringLiteral("tr")))));
+    return language;
+}
+
+QComboBox* speechModelBox() {
+    auto* model = new QComboBox;
+    for (const auto& m : speech::models()) {
+        const bool have = QFileInfo::exists(speech::modelPath(m.id));
+        model->addItem(have ? Tasks::tr("%1 · downloaded").arg(m.label) : Tasks::tr("%1 · %2 MB download").arg(m.label).arg(m.sizeMB),
+                       m.id);
+    }
+    model->setCurrentIndex(std::max(0, model->findData(QSettings().value(QStringLiteral("speech/model"), speech::defaultModel()))));
+    return model;
+}
+
+QString ensureSpeechModel(QWidget* parent, QComboBox* language, QComboBox* model, const QString& title) {
+    if (!speech::available()) {
+        QMessageBox::information(parent, title, Tasks::tr("This build of LumoraStudio has no speech recognition."));
+        return {};
+    }
+    const QString modelId = model->currentData().toString();
+    QSettings settings;
+    settings.setValue(QStringLiteral("speech/language"), language->currentData().toString());
+    settings.setValue(QStringLiteral("speech/model"), modelId);
+    const QString path = speech::modelPath(modelId);
+    if (!QFileInfo::exists(path)) {
+        QString error;
+        if (!downloadFile(parent, speech::modelUrl(modelId), path, Tasks::tr("Downloading the speech recognition model…"), &error)) {
+            if (!error.isEmpty())
+                QMessageBox::warning(parent, title, Tasks::tr("The model could not be downloaded: %1").arg(error));
+            return {};
+        }
+    }
+    return path;
 }
 
 } // namespace lumora

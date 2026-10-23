@@ -666,15 +666,32 @@ PropertiesPanel::PropertiesPanel(Project* project, QUndoStack* undo, QWidget* pa
     m_bgInfo = hint();
     f->addRow(m_bgInfo);
 
+    m_reframeSection = makeSection(SmartPage, QStringLiteral("reframe"), tr("Vertical video"), &f);
+    auto* reframeInfo = hint();
+    reframeInfo->setText(tr("Turns the whole video portrait (Reels, TikTok, Shorts) or square; the picture follows the person "
+                            "speaking."));
+    f->addRow(reframeInfo);
+    auto* reframe = new QPushButton(Icons::portrait(), tr("Make it vertical…"));
+    f->addRow(reframe);
+    connect(reframe, &QPushButton::clicked, this, &PropertiesPanel::reframeRequested);
+
     // ===== Sound =====
 
     m_audioSection = makeSection(SoundPage, QStringLiteral("volume"), tr("Sound"), &f);
     m_gain = dspin(-60, 24, 0.5, 1, QStringLiteral(" dB"));
     f->addRow(tr("Volume"), m_gain);
     auto* moreSound = new QPushButton(tr("Sound tools…"));
-    moreSound->setToolTip(tr("Opens the Sound workspace: noise reduction, equaliser, compressor, ducking"));
+    moreSound->setToolTip(tr("Opens the Sound workspace: hum, wind and noise removal, equaliser, compressor, ducking"));
     f->addRow(moreSound);
     connect(moreSound, &QPushButton::clicked, this, &PropertiesPanel::soundWorkspaceRequested);
+    auto* cutSilences = new QPushButton(Icons::silenceCut(), tr("Cut silences and hesitations…"));
+    cutSilences->setToolTip(tr("Removes the pauses and the \"ııı\", \"eee\" of a talk on the main track"));
+    f->addRow(cutSilences);
+    connect(cutSilences, &QPushButton::clicked, this, &PropertiesPanel::cutSilencesRequested);
+    auto* beatCut = new QPushButton(Icons::beat(), tr("Cut to the beat…"));
+    beatCut->setToolTip(tr("Moves the cuts between the clips onto the beat of the music"));
+    f->addRow(beatCut);
+    connect(beatCut, &QPushButton::clicked, this, &PropertiesPanel::beatCutRequested);
 
     // ===== Info =====
 
@@ -1363,6 +1380,7 @@ void PropertiesPanel::refreshEditors(const Clip* clip) {
     // Faces are searched in video frames; a picture can still lose its background.
     m_redactSection->setVisible(ai && !isStill);
     m_bgSection->setVisible(ai);
+    m_reframeSection->setVisible(ai);
     if (ai) {
         const Redaction& r = clip->redaction;
         const int faces = r.count(RedactionKind::Face), plates = r.count(RedactionKind::Plate);
