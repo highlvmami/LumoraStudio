@@ -114,7 +114,11 @@ std::vector<Cut> findSilences(const std::vector<float>& levels, const Options& o
 
 bool isFiller(const QString& word) {
     static const QRegularExpression strip(QStringLiteral("[\\p{P}\\p{S}\\s]"));
-    QString w = QLocale(QLocale::Turkish).toLower(word);
+    // Turkish dotless I by hand: QLocale lowers it to "i" where Qt is built
+    // without ICU (Windows).
+    QString w = word;
+    w.replace(QChar(u'I'), QChar(u'ı')).replace(QChar(u'İ'), QChar(u'i'));
+    w = w.toLower();
     w.remove(strip);
     if (w.isEmpty())
         return false;
