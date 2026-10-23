@@ -89,6 +89,7 @@ Hedef: kullanıcı istemedikçe hiçbir aşamada kalite düşmez.
 - Şekiller, oklar, vurgular
 - ✅ Altyazı: SRT/VTT içe-dışa aktarma, videoya gömme, görüntüye yakma veya ayrı .srt
 - ✅ Otomatik altyazı (yerel konuşma tanıma, Whisper), Türkçe destekli
+- ✅ Altyazı çevirisi (yerel, Opus-MT): 9 dil arasında, yeni altyazı izine
 
 ### 2.8 Ses
 
@@ -207,5 +208,5 @@ Hedef: kullanıcı istemedikçe hiçbir aşamada kalite düşmez.
 8. ✅ **Sürüm 0.8.0 (akıllı kurgu ve ses):** Sesteki elektrik uğultusunu (50/60 Hz) ve rüzgârı temizleme; sessiz yerleri ve "ııı", "eee" duraksamalarını tek tıkla kesme (konuşma tanıma bilgisayarda); müziğin ritmini bulup kesimleri vuruşlara taşıma; konuşanı kadrajda tutarak dikey 9:16, 4:5 ya da kare formata çevirme.
 9. ✅ **Sürüm 0.8.1 (akıllı görüntü):** Fotoğrafta nesne silme fırçası (LaMa), eski/bulanık fotoğraflarda yüz onarma (GFPGAN), dışa aktarırken yapay zekâyla 2 ya da 4 kat büyütme (Real-ESRGAN). Hepsi yerel, ilk kullanımda bir kez indirilir.
 10. ✅ **Sürüm 0.8.2 (akıllı hareket):** Videoda seçilen bir nesneyi kutuyla işaretleyip klip boyunca takip ederek kesme (EfficientSAM), yapay zekâyla ara kare (RAFT) ile daha akıcı ağır çekim, konuşmadan altyazıyı doğrudan İngilizce yazma (Whisper çevirisi). Hepsi yerel, ilk kullanımda bir kez indirilir.
-11. **Sürüm 0.8.3 (plan):** Yazılı altyazıyı her dil çiftinde çevirme (Opus-MT, yerel).
+11. ✅ **Sürüm 0.8.3 (altyazı çevirisi):** Yazılı bir altyazı izini başka bir dile çevirip aynı zamanlarla yeni bir ize yazma (Opus-MT, yerel). Türkçe, İngilizce, Almanca, Fransızca, İspanyolca, İtalyanca, Felemenkçe, Rusça ve Arapça arasında her yöne; doğrudan model yoksa İngilizce üzerinden. Her dil çiftinin modeli ilk kullanımda bir kez indirilir.
 12. **Sonrası:** Çoklu kamera (ses ile eşitleme), OpenFX eklentileri, HDR10/HLG ve ton eşleme, OpenColorIO/ACES.

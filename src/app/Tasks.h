@@ -61,6 +61,11 @@ bool downloadFile(QWidget* parent, const QUrl& url, const QString& dest, const Q
 // when one is still missing.
 bool ensureVisionModels(QWidget* parent, const QStringList& ids, const QString& title);
 
+// Makes sure the translation models `ids` (translate::models) are on this
+// computer, downloading the missing files. False (after telling the user
+// why) when one is still missing.
+bool ensureTranslationModels(QWidget* parent, const QStringList& ids, const QString& title);
+
 // Choices for speech recognition (automatic subtitles, hesitation cutting):
 // the spoken language and the Whisper model, with the last choice selected.
 QComboBox* speechLanguageBox();
