@@ -34,6 +34,10 @@ QString fileName(const QString& id) {
         return QStringLiteral("gfpgan_1.4.onnx");
     if (id == QLatin1String("inpaint"))
         return QStringLiteral("inpainting_lama_2025jan.onnx");
+    if (id == QLatin1String("frame-flow"))
+        return QStringLiteral("optical_flow_estimation_raft_2023aug.onnx");
+    if (id == QLatin1String("segment"))
+        return QStringLiteral("image_segmentation_efficientsam_ti_2025april.onnx");
     return {};
 }
 
@@ -176,6 +180,12 @@ std::vector<VisionModel> visionModels() {
         {QStringLiteral("inpaint"), Tr::tr("object removal"), 88,
          QUrl(QStringLiteral("https://media.githubusercontent.com/media/opencv/opencv_zoo/main/models/inpainting_lama/"
                              "inpainting_lama_2025jan.onnx"))},
+        {QStringLiteral("frame-flow"), Tr::tr("in-between frames"), 62,
+         QUrl(QStringLiteral("https://media.githubusercontent.com/media/opencv/opencv_zoo/main/models/optical_flow_estimation_raft/"
+                             "optical_flow_estimation_raft_2023aug.onnx"))},
+        {QStringLiteral("segment"), Tr::tr("object outlining"), 47,
+         QUrl(QStringLiteral("https://media.githubusercontent.com/media/opencv/opencv_zoo/main/models/image_segmentation_efficientsam/"
+                             "image_segmentation_efficientsam_ti_2025april.onnx"))},
     };
 }
 

@@ -165,6 +165,7 @@ private:
     QCheckBox* m_bgOn;
     QComboBox* m_bgModel;
     QSpinBox* m_bgSoftness;
+    QPushButton* m_bgPick;
     QLabel* m_bgInfo;
 
     CollapsibleSection* m_reframeSection;

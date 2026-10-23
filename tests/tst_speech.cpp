@@ -88,6 +88,13 @@ private slots:
         }
         QVERIFY(w.words.front().start >= ticksFromSeconds(1.5));
 
+        // Written in English whatever is spoken (here it already is).
+        speech::Options en = o;
+        en.translate = true;
+        const auto t = speech::transcribe(tl.state(), pool, 0, tl.duration(), en);
+        QVERIFY2(t.ok(), qPrintable(t.error));
+        QVERIFY(!t.cues.empty());
+
         // Cancelling stops early.
         auto c = speech::transcribe(tl.state(), pool, 0, tl.duration(), o, [](double p) { return p < 0.05; });
         QVERIFY(c.cancelled);

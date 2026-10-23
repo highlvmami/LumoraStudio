@@ -2482,6 +2482,30 @@
         <source>Paint over objects to remove them from the photo</source>
         <translation>Fotoğraftan silmek için nesnelerin üzerini boyayın</translation>
     </message>
+    <message>
+        <source>As spoken</source>
+        <translation>Konuşulduğu gibi</translation>
+    </message>
+    <message>
+        <source>Cut out an object</source>
+        <translation>Bir nesneyi kes</translation>
+    </message>
+    <message>
+        <source>Draw a box around the object to keep (Esc cancels)</source>
+        <translation>Kalacak nesnenin çevresine bir kutu çizin (Esc iptal eder)</translation>
+    </message>
+    <message>
+        <source>Only the chosen object stays. The export outlines it precisely; play it back to check.</source>
+        <translation>Yalnızca seçilen nesne kalır. Dışa aktarma onu hassasça çizer; kontrol etmek için oynatın.</translation>
+    </message>
+    <message>
+        <source>Translated into English</source>
+        <translation>İngilizceye çevrilmiş</translation>
+    </message>
+    <message>
+        <source>Translation is done by the same model on this computer; the larger models translate better</source>
+        <translation>Çeviriyi bu bilgisayarda aynı model yapar; büyük modeller daha iyi çevirir</translation>
+    </message>
 </context>
 <context>
     <name>lumora::MediaBinPanel</name>
@@ -4077,6 +4101,30 @@ Orijinal dosya asla değişmez: düzenlemeler projede saklanır ve dışa aktar�
         <source>Moves the cuts between the clips onto the beat of the music</source>
         <translation>Klipler arasındaki kesimleri müziğin vuruşlarına taşır</translation>
     </message>
+    <message>
+        <source>Choose the object again…</source>
+        <translation>Nesneyi yeniden seç…</translation>
+    </message>
+    <message>
+        <source>Chosen object (draw a box)</source>
+        <translation>Seçilen nesne (kutu çizin)</translation>
+    </message>
+    <message>
+        <source>In-between frames with AI (best, slow export)</source>
+        <translation>Yapay zekâyla ara kareler (en iyisi, dışa aktarma yavaş)</translation>
+    </message>
+    <message>
+        <source>Only the chosen object stays. The preview outlines it roughly, the export precisely.</source>
+        <translation>Yalnızca seçilen nesne kalır. Önizleme onu kabaca, dışa aktarma hassasça çizer.</translation>
+    </message>
+    <message>
+        <source>Only the chosen object stays; the rest turns black on the main track. The preview outlines it roughly, the export precisely.</source>
+        <translation>Yalnızca seçilen nesne kalır; ana izde gerisi siyah olur. Önizleme onu kabaca, dışa aktarma hassasça çizer.</translation>
+    </message>
+    <message>
+        <source>The detailed model finds hair and fine edges better; the preview uses the fast one. With a chosen object only that object stays, followed through the clip.</source>
+        <translation>Ayrıntılı model saçı ve ince kenarları daha iyi bulur; önizleme hızlı olanı kullanır. Seçilen nesnede yalnızca o nesne kalır ve klip boyunca takip edilir.</translation>
+    </message>
 </context>
 <context>
     <name>lumora::ScopesWidget</name>
@@ -4754,6 +4802,22 @@ Orijinal dosya asla değişmez: düzenlemeler projede saklanır ve dışa aktar�
     <message>
         <source>object removal</source>
         <translation>nesne silme</translation>
+    </message>
+    <message>
+        <source>The in-between frame model gave an unexpected result.</source>
+        <translation>Ara kare modeli beklenmeyen bir sonuç verdi.</translation>
+    </message>
+    <message>
+        <source>The object outlining model gave an unexpected result.</source>
+        <translation>Nesne çizme modeli beklenmeyen bir sonuç verdi.</translation>
+    </message>
+    <message>
+        <source>in-between frames</source>
+        <translation>ara kareler</translation>
+    </message>
+    <message>
+        <source>object outlining</source>
+        <translation>nesne çizme</translation>
     </message>
 </context>
 <context>

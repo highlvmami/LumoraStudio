@@ -213,7 +213,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/vision-models
-          key: vision-models-v2
+          key: vision-models-v3
 
       - name: Prepare vision tests
         run: |
@@ -225,6 +225,8 @@ jobs:
           get u2netp.onnx https://github.com/danielgatis/rembg/releases/download/v0.0.0/u2netp.onnx
           get real_esrgan_x2.onnx https://github.com/facefusion/facefusion-assets/releases/download/models-3.0.0/real_esrgan_x2.onnx
           get inpainting_lama_2025jan.onnx https://media.githubusercontent.com/media/opencv/opencv_zoo/main/models/inpainting_lama/inpainting_lama_2025jan.onnx
+          get optical_flow_estimation_raft_2023aug.onnx https://media.githubusercontent.com/media/opencv/opencv_zoo/main/models/optical_flow_estimation_raft/optical_flow_estimation_raft_2023aug.onnx
+          get image_segmentation_efficientsam_ti_2025april.onnx https://media.githubusercontent.com/media/opencv/opencv_zoo/main/models/image_segmentation_efficientsam/image_segmentation_efficientsam_ti_2025april.onnx
           get face.jpg https://raw.githubusercontent.com/opencv/opencv/4.x/samples/data/lena.jpg
           echo "LUMORA_VISION_MODELS=$HOME/vision-models" >> "$GITHUB_ENV"
           echo "LUMORA_FACE_IMAGE=$HOME/vision-models/face.jpg" >> "$GITHUB_ENV"

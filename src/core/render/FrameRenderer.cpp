@@ -11,6 +11,7 @@
 #include <thread>
 
 #include "ai/Redaction.h"
+#include "ai/ObjectCut.h"
 #include "ai/Vision.h"
 #include "color/ColorProcessor.h"
 #include "ffmpeg/FFmpeg.h"
@@ -74,6 +75,12 @@ struct FrameRenderer::Slot {
     QImage matte;
     Ticks mattePts = kInvalidTicks;
     QString matteModel;
+    // Motion between the two frames of the last in-between frame: the
+    // frames between the same pair share it.
+    fx::MotionField motion;
+    Ticks motionFrom = kInvalidTicks, motionTo = kInvalidTicks;
+    QSize motionSize;
+    bool motionAi = false;
 };
 
 // Opens decoders for clips that are about to come into view and decodes up
@@ -549,9 +556,22 @@ QImage FrameRenderer::clipImage(const Clip& clip, Ticks sourceTime, QSize* fitSi
         return {};
     if (f2) {
         const QImage next = convertFrame(*slot, f2, QSize(tw, th));
-        if (!next.isNull())
-            img = clip.remap.blending == FrameBlending::OpticalFlow ? fx::interpolateFrames(img, next, mix)
-                                                                    : fx::blendFrames(img, next, mix);
+        if (!next.isNull() && clip.remap.blending == FrameBlending::Blend) {
+            img = fx::blendFrames(img, next, mix);
+        } else if (!next.isNull()) {
+            // The AI model takes seconds per frame pair: the export uses it,
+            // the preview the built-in flow.
+            const bool ai = clip.remap.blending == FrameBlending::AiFlow && final;
+            if (slot->motionFrom != pts || slot->motionTo != pts2 || slot->motionSize != img.size() || slot->motionAi != ai ||
+                !slot->motion.isValid()) {
+                slot->motion = fx::measureMotion(img, next, ai);
+                slot->motionFrom = pts;
+                slot->motionTo = pts2;
+                slot->motionSize = img.size();
+                slot->motionAi = ai;
+            }
+            img = fx::interpolateFrames(img, next, mix, &slot->motion);
+        }
     }
     // The subject is found on the picture as shot, before grading, so colour
     // changes do not move the cut-out edge.
@@ -560,10 +580,24 @@ QImage FrameRenderer::clipImage(const Clip& clip, Ticks sourceTime, QSize* fitSi
         // The detailed model takes seconds per frame; the preview uses the
         // fast one when it is there.
         QString model = clip.background.model;
-        if (!final && model != QLatin1String("fast") && ai::visionModelReady(ai::backgroundModelId(QStringLiteral("fast"))))
+        if (!final && model != QLatin1String("fast") && !clip.background.isObject() &&
+            ai::visionModelReady(ai::backgroundModelId(QStringLiteral("fast"))))
             model = QStringLiteral("fast");
+        if (clip.background.isObject())
+            model += final ? QStringLiteral(" precise") : QStringLiteral(" quick");
         if (slot->mattePts != pts || slot->matteModel != model || slot->matte.isNull()) {
-            slot->matte = ai::subjectMatte(img, model);
+            if (clip.background.isObject()) {
+                // The chosen object: outlined inside its box; nothing when
+                // the box is not known at this moment.
+                const QRectF box = clip.background.object.rectAt(pts, kTicksPerSecond / 2);
+                slot->matte = box.isEmpty() ? QImage() : ai::objectMatte(img, box, final);
+                if (slot->matte.isNull()) {
+                    slot->matte = QImage(img.size(), QImage::Format_Grayscale8);
+                    slot->matte.fill(box.isEmpty() ? 0 : 255);
+                }
+            } else {
+                slot->matte = ai::subjectMatte(img, model);
+            }
             slot->mattePts = pts;
             slot->matteModel = model;
         }

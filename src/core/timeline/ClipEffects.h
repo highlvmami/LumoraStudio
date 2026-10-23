@@ -240,8 +240,12 @@ struct Redaction {
 // becomes transparent so the tracks below show through.
 struct BackgroundRemoval {
     bool enabled = false;
-    QString model = QStringLiteral("fast"); // ai::vision background model id
+    QString model = QStringLiteral("fast"); // ai::vision background model id, or "object"
     double softness = 0.5;                  // 0 = hard edge .. 1 = soft edge
+    // "object": the chosen object's box through the clip (media time,
+    // fraction of the upright picture); only it stays.
+    RedactionTrack object;
+    bool isObject() const { return model == QLatin1String("object"); }
     bool operator==(const BackgroundRemoval&) const = default;
     QJsonObject toJson() const;
     static BackgroundRemoval fromJson(const QJsonObject& o);
@@ -265,6 +269,7 @@ enum class FrameBlending {
     None,        // each frame is held (steps)
     Blend,       // neighbouring frames are mixed
     OpticalFlow, // in-between frames are drawn from the motion (smooth slow motion)
+    AiFlow,      // the same with the motion measured by an AI model (export; preview uses OpticalFlow)
 };
 
 struct TimeRemap {

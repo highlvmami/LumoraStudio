@@ -38,6 +38,7 @@ struct Options {
     QString language = QStringLiteral("tr"); // ISO 639-1, or "auto"
     int maxLineLength = 42;                   // characters per cue
     int threads = 0;                          // 0 = all but one core
+    bool translate = false;                   // write the subtitles in English, whatever is spoken
 };
 
 struct Result {

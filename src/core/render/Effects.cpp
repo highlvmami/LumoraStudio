@@ -1,5 +1,7 @@
 #include "Effects.h"
 
+#include "ai/Enhance.h"
+
 #include <QtConcurrent/QtConcurrentMap>
 #include <algorithm>
 #include <cmath>
@@ -450,39 +452,59 @@ void opticalFlow(const std::vector<float>& a, const std::vector<float>& b, int w
     flowY = std::move(fy);
 }
 
-QImage interpolateFrames(const QImage& a, const QImage& b, double w) {
+MotionField measureMotion(const QImage& a, const QImage& b, bool ai) {
+    MotionField m;
+    if (a.isNull() || b.isNull())
+        return m;
+    if (ai && ai::visionModelReady(QStringLiteral("frame-flow")) &&
+        ai::measureFlow(a, b, m.forwardX, m.forwardY) && ai::measureFlow(b, a, m.backwardX, m.backwardY)) {
+        m.width = ai::kFlowWidth;
+        m.height = ai::kFlowHeight;
+        return m;
+    }
+    // Motion measured on small grey pictures (fast), applied at full size.
+    int sw = 0, sh = 0;
+    const std::vector<float> ga = greySmall(a, 360, sw, sh);
+    const std::vector<float> gb = greySmall(b, 360, sw, sh);
+    opticalFlow(ga, gb, sw, sh, m.forwardX, m.forwardY);
+    opticalFlow(gb, ga, sw, sh, m.backwardX, m.backwardY);
+    m.width = sw;
+    m.height = sh;
+    return m;
+}
+
+QImage interpolateFrames(const QImage& a, const QImage& b, double w, const MotionField* motion) {
     if (a.isNull() || b.isNull() || a.size() != b.size())
         return a;
     if (w <= 0.0)
         return a;
     if (w >= 1.0)
         return b.convertToFormat(a.format());
-    // Motion measured on small grey pictures (fast), applied at full size.
-    int sw = 0, sh = 0;
-    const std::vector<float> ga = greySmall(a, 360, sw, sh);
-    const std::vector<float> gb = greySmall(b, 360, sw, sh);
-    std::vector<float> fx, fy, bx, by;
-    opticalFlow(ga, gb, sw, sh, fx, fy); // a -> b
-    opticalFlow(gb, ga, sw, sh, bx, by); // b -> a
+    MotionField measured;
+    if (!motion || !motion->isValid()) {
+        measured = measureMotion(a, b);
+        motion = &measured;
+    }
+    const int sw = motion->width, sh = motion->height;
     const FloatImage fa = toFloat(a), fb = toFloat(b);
     FloatImage out;
     out.width = fa.width;
     out.height = fa.height;
     out.px.resize(fa.px.size());
-    const float scale = static_cast<float>(fa.width) / sw;
+    const float scaleX = static_cast<float>(fa.width) / sw, scaleY = static_cast<float>(fa.height) / sh;
     const float fw = static_cast<float>(w);
     parallelRows(out.height, [&](int y0, int y1) {
         float pa[4], pb[4];
         for (int y = y0; y < y1; ++y) {
             float* d = out.row(y);
             for (int x = 0; x < out.width; ++x, d += 4) {
-                const float sx = std::min((x + 0.5f) / scale - 0.5f, sw - 1.0f);
-                const float sy = std::min((y + 0.5f) / scale - 0.5f, sh - 1.0f);
+                const float sx = std::min((x + 0.5f) / scaleX - 0.5f, sw - 1.0f);
+                const float sy = std::min((y + 0.5f) / scaleY - 0.5f, sh - 1.0f);
                 // Where this point was in a and will be in b.
-                const float ax = x - fw * sample1(fx, sw, sh, sx, sy) * scale;
-                const float ay = y - fw * sample1(fy, sw, sh, sx, sy) * scale;
-                const float bxp = x - (1 - fw) * sample1(bx, sw, sh, sx, sy) * scale;
-                const float byp = y - (1 - fw) * sample1(by, sw, sh, sx, sy) * scale;
+                const float ax = x - fw * sample1(motion->forwardX, sw, sh, sx, sy) * scaleX;
+                const float ay = y - fw * sample1(motion->forwardY, sw, sh, sx, sy) * scaleY;
+                const float bxp = x - (1 - fw) * sample1(motion->backwardX, sw, sh, sx, sy) * scaleX;
+                const float byp = y - (1 - fw) * sample1(motion->backwardY, sw, sh, sx, sy) * scaleY;
                 sample4(fa, ax, ay, pa);
                 sample4(fb, bxp, byp, pb);
                 for (int k = 0; k < 4; ++k)

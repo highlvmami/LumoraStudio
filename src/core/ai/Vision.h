@@ -23,6 +23,8 @@ class Network;
 //   upscale-x2/x4       Real-ESRGAN (BSD 3-clause)
 //   face-restore        GFPGAN 1.4 (Apache 2.0)
 //   inpaint             LaMa (Apache 2.0)
+//   frame-flow          RAFT optical flow (BSD 3-clause)
+//   segment             EfficientSAM-Ti (Apache 2.0)
 struct VisionModel {
     QString id;
     QString label; // shown to the user

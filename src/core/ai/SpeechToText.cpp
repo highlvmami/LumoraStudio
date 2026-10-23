@@ -145,7 +145,7 @@ void recognise(Recognition& r, const std::vector<float>& pcm, const Options& opt
     const QByteArray lang = options.language.toLatin1();
     p.language = lang.constData();
     p.detect_language = false;
-    p.translate = false;
+    p.translate = options.translate && !wordByWord;
     p.n_threads = options.threads > 0 ? options.threads : std::max(1, static_cast<int>(std::thread::hardware_concurrency()) - 1);
     p.print_progress = false;
     p.print_realtime = false;

@@ -42,9 +42,23 @@ void grain(FloatImage& img, double amount, std::uint32_t seed);
 // to `b` (0 .. 1). Both must have the same size and format; the result has
 // that format too.
 QImage blendFrames(const QImage& a, const QImage& b, double w);
+// The motion between two frames, both ways, on a small grid (in grid
+// pixels). Measuring it is the slow part of an in-between frame, so frames
+// between the same two source frames share it.
+struct MotionField {
+    int width = 0, height = 0;
+    std::vector<float> forwardX, forwardY;   // a -> b
+    std::vector<float> backwardX, backwardY; // b -> a
+    bool isValid() const { return width > 0 && height > 0; }
+};
+// `ai` measures with the RAFT model when it is downloaded (sharper edges,
+// fast motion), otherwise with the built-in optical flow.
+MotionField measureMotion(const QImage& a, const QImage& b, bool ai = false);
+
 // Like blendFrames, but things move to where they are at that moment (dense
 // optical flow measured between the frames), which makes slow motion smooth.
-QImage interpolateFrames(const QImage& a, const QImage& b, double w);
+// `motion` from measureMotion(a, b) saves measuring it again.
+QImage interpolateFrames(const QImage& a, const QImage& b, double w, const MotionField* motion = nullptr);
 
 // Dense optical flow from `a` to `b` on grey pictures of the same size (one
 // float per pixel): for each pixel of `a` how far it moved, in pixels.

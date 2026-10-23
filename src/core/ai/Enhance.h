@@ -4,6 +4,7 @@
 #include <QString>
 #include <QTransform>
 #include <functional>
+#include <vector>
 
 #include "ai/Vision.h"
 
@@ -37,5 +38,12 @@ QImage inpaint(const QImage& image, const QImage& mask, const EnhanceProgress& p
 // the face's five landmarks onto the 512 x 512 face template GFPGAN was
 // trained on.
 QTransform faceAlignment(const Detection& face);
+
+// Motion from `a` to `b` measured by RAFT on 480 x 360 copies of the
+// pictures: per point of that grid, how far it moved (in grid pixels).
+// False when the model is missing or fails.
+constexpr int kFlowWidth = 480, kFlowHeight = 360;
+bool measureFlow(const QImage& a, const QImage& b, std::vector<float>& flowX, std::vector<float>& flowY,
+                 QString* error = nullptr);
 
 } // namespace lumora::ai

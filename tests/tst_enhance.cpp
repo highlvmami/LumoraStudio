@@ -8,6 +8,8 @@
 #include "ai/Vision.h"
 #include "image/PhotoAdjustments.h"
 #include "image/PhotoProcessor.h"
+#include "render/Effects.h"
+#include "timeline/ClipEffects.h"
 
 using namespace lumora;
 
@@ -239,6 +241,37 @@ private slots:
         QVERIFY(!PhotoExporter::save(dir.filePath(QStringLiteral("no.png")), img, working, PhotoAdjustments(), es, &err,
                                      [](double) { return false; }));
         QVERIFY(!QFileInfo::exists(dir.filePath(QStringLiteral("no.png"))));
+    }
+
+    void aiInBetweenFrames() {
+        TimeRemap r;
+        r.blending = FrameBlending::AiFlow;
+        QCOMPARE(TimeRemap::fromJson(r.toJson()).blending, FrameBlending::AiFlow);
+        const QString path = qEnvironmentVariable("LUMORA_FACE_IMAGE");
+        if (!modelReady("frame-flow") || path.isEmpty())
+            QSKIP("set LUMORA_VISION_MODELS (with the RAFT model) and LUMORA_FACE_IMAGE to run");
+        // The picture moves 24 px left and 12 px down between the frames.
+        const QImage big = QImage(path).scaled(1040, 800).convertToFormat(QImage::Format_RGB32);
+        const QImage a = big.copy(40, 40, 960, 720), b = big.copy(64, 28, 960, 720);
+        std::vector<float> fx, fy;
+        QString err;
+        QVERIFY2(ai::measureFlow(a, b, fx, fy, &err), qPrintable(err));
+        QCOMPARE(fx.size(), size_t(ai::kFlowWidth * ai::kFlowHeight));
+        const size_t mid = fx.size() / 2 + ai::kFlowWidth / 2;
+        QVERIFY(std::abs(fx[mid] - (-24.0f / 2)) < 1.0f); // 960 -> 480: half
+        QVERIFY(std::abs(fy[mid] - (12.0f / 2)) < 1.0f);  // 720 -> 360: half
+        const fx::MotionField m = fx::measureMotion(a, b, true);
+        QCOMPARE(m.width, ai::kFlowWidth);
+        // Half way: the picture has moved half the distance.
+        const QImage half = fx::interpolateFrames(a, b, 0.5, &m);
+        const QImage expected = big.copy(52, 34, 960, 720);
+        double diff = 0;
+        const QImage h = half.convertToFormat(QImage::Format_RGB32);
+        for (int y = 100; y < 620; y += 4)
+            for (int x = 100; x < 860; x += 4)
+                diff += std::abs(qGray(h.pixel(x, y)) - qGray(expected.pixel(x, y)));
+        diff /= (520 / 4) * (760 / 4);
+        QVERIFY2(diff < 6, qPrintable(QString::number(diff)));
     }
 };
 

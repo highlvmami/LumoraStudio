@@ -463,6 +463,13 @@ QJsonObject BackgroundRemoval::toJson() const {
     o["enabled"] = enabled;
     o["model"] = model;
     o["softness"] = softness;
+    if (!object.boxes.empty()) {
+        QJsonArray ba;
+        for (const auto& b : object.boxes)
+            ba.append(QJsonArray{ticksToJson(b.time), round4(b.rect.x()), round4(b.rect.y()), round4(b.rect.width()),
+                                 round4(b.rect.height())});
+        o["object"] = ba;
+    }
     return o;
 }
 
@@ -471,6 +478,11 @@ BackgroundRemoval BackgroundRemoval::fromJson(const QJsonObject& o) {
     b.enabled = o.value("enabled").toBool();
     b.model = o.value("model").toString(QStringLiteral("fast"));
     b.softness = std::clamp(o.value("softness").toDouble(0.5), 0.0, 1.0);
+    for (const auto& v : o.value("object").toArray()) {
+        const QJsonArray a = v.toArray();
+        if (a.size() >= 5)
+            b.object.boxes.push_back({ticksFromJson(a[0], 0), QRectF(a[1].toDouble(), a[2].toDouble(), a[3].toDouble(), a[4].toDouble())});
+    }
     return b;
 }
 
@@ -580,7 +592,10 @@ QJsonObject TimeRemap::toJson() const {
             a.append(QJsonArray{p.pos, p.rate});
         o["ramp"] = a;
     }
-    o["blending"] = blending == FrameBlending::None ? "none" : blending == FrameBlending::Blend ? "blend" : "flow";
+    o["blending"] = blending == FrameBlending::None    ? "none"
+                    : blending == FrameBlending::Blend ? "blend"
+                    : blending == FrameBlending::AiFlow ? "ai-flow"
+                                                       : "flow";
     o["keepPitch"] = keepPitch;
     o["length"] = ticksToJson(length);
     o["mediaIn"] = ticksToJson(mediaIn);
@@ -598,7 +613,10 @@ TimeRemap TimeRemap::fromJson(const QJsonObject& o) {
             r.ramp.push_back({std::clamp(e[0].toDouble(), 0.0, 1.0), std::max(0.01, e[1].toDouble(1.0))});
     }
     const QString b = o.value("blending").toString();
-    r.blending = b == QLatin1String("none") ? FrameBlending::None : b == QLatin1String("blend") ? FrameBlending::Blend : FrameBlending::OpticalFlow;
+    r.blending = b == QLatin1String("none")      ? FrameBlending::None
+                 : b == QLatin1String("blend")   ? FrameBlending::Blend
+                 : b == QLatin1String("ai-flow") ? FrameBlending::AiFlow
+                                                 : FrameBlending::OpticalFlow;
     r.keepPitch = o.value("keepPitch").toBool(true);
     r.length = ticksFromJson(o.value("length"), 0);
     r.mediaIn = ticksFromJson(o.value("mediaIn"), 0);
