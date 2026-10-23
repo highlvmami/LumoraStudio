@@ -38,6 +38,8 @@ public:
     // model is missing or fails (`error` set) or `progress` cancels.
     static QImage retouched(const QImage& image, const PhotoRetouch& retouch, const std::function<bool(double)>& progress = {},
                             QString* error = nullptr);
+    // True when retouched() would be quick: the slow part is already done.
+    static bool retouchReady(const QImage& image, const PhotoRetouch& retouch);
 
     // Downscaled copy for interactive preview (never used for export).
     static QImage makeProxy(const QImage& rgba64, int maxSide = 2048);

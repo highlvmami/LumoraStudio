@@ -128,6 +128,20 @@ private slots:
         // At strength 0 the photo stays as it was.
         const QImage none = ai::restoreFaces(img, 0.0, {}, &err);
         QCOMPARE(none.convertToFormat(QImage::Format_RGB32).pixel(fr.center()), img.pixel(fr.center()));
+
+        // In the photo pipeline a new strength only mixes: no second run.
+        const QImage working = img.convertToFormat(QImage::Format_RGBX64);
+        PhotoRetouch r;
+        r.faces = 1.0;
+        QVERIFY(!PhotoProcessor::retouchReady(working, r));
+        const QImage full = PhotoProcessor::retouched(working, r, {}, &err);
+        QVERIFY2(!full.isNull(), qPrintable(err));
+        QVERIFY(!full.hasAlphaChannel());
+        r.faces = 0.5;
+        QVERIFY(PhotoProcessor::retouchReady(working, r));
+        const QImage half = PhotoProcessor::retouched(working, r);
+        const QColor a = QColor(img.pixel(fr.center())), b = full.pixelColor(fr.center()), h = half.pixelColor(fr.center());
+        QVERIFY(std::abs(h.red() - (a.red() + b.red()) / 2) <= 2);
     }
 
     void objectsAreRemoved() {

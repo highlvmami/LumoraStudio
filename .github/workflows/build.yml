@@ -213,7 +213,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/vision-models
-          key: vision-models-v1
+          key: vision-models-v2
 
       - name: Prepare vision tests
         run: |
@@ -223,6 +223,8 @@ jobs:
           get face_detection_yunet_2023mar.onnx https://media.githubusercontent.com/media/opencv/opencv_zoo/main/models/face_detection_yunet/face_detection_yunet_2023mar.onnx
           get yolo-v9-t-640-license-plates-end2end.onnx https://github.com/ankandrew/open-image-models/releases/download/assets/yolo-v9-t-640-license-plates-end2end.onnx
           get u2netp.onnx https://github.com/danielgatis/rembg/releases/download/v0.0.0/u2netp.onnx
+          get real_esrgan_x2.onnx https://github.com/facefusion/facefusion-assets/releases/download/models-3.0.0/real_esrgan_x2.onnx
+          get inpainting_lama_2025jan.onnx https://media.githubusercontent.com/media/opencv/opencv_zoo/main/models/inpainting_lama/inpainting_lama_2025jan.onnx
           get face.jpg https://raw.githubusercontent.com/opencv/opencv/4.x/samples/data/lena.jpg
           echo "LUMORA_VISION_MODELS=$HOME/vision-models" >> "$GITHUB_ENV"
           echo "LUMORA_FACE_IMAGE=$HOME/vision-models/face.jpg" >> "$GITHUB_ENV"

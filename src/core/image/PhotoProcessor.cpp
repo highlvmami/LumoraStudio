@@ -209,8 +209,16 @@ public:
     void insert(const QString& key, const QImage& image) {
         std::lock_guard lock(m_mutex);
         m_items.push_front({key, image});
-        while (m_items.size() > 6)
-            m_items.pop_back();
+        // A few, and not more memory than a handful of big photos take.
+        qint64 bytes = 0;
+        size_t keep = 0;
+        for (const auto& item : m_items) {
+            bytes += item.second.sizeInBytes();
+            if (keep >= 3 && (keep >= 8 || bytes > 1024LL * 1024 * 1024))
+                break;
+            ++keep;
+        }
+        m_items.resize(keep);
     }
 
 private:
@@ -223,6 +231,22 @@ RetouchCache& retouchCache() {
     return cache;
 }
 
+// a + (b - a) * amount, for RGBA64 images of the same size.
+QImage mix(const QImage& a, const QImage& b, double amount) {
+    if (amount >= 1.0)
+        return b;
+    QImage out = a.convertToFormat(QImage::Format_RGBA64);
+    const QImage other = b.convertToFormat(QImage::Format_RGBA64);
+    const int k = static_cast<int>(std::lround(std::clamp(amount, 0.0, 1.0) * 65536));
+    for (int y = 0; y < out.height(); ++y) {
+        auto* d = reinterpret_cast<quint16*>(out.scanLine(y));
+        const auto* s = reinterpret_cast<const quint16*>(other.constScanLine(y));
+        for (int x = 0; x < out.width() * 4; ++x)
+            d[x] = static_cast<quint16>(d[x] + ((static_cast<qint64>(s[x]) - d[x]) * k + 32768) / 65536);
+    }
+    return out;
+}
+
 QString strokesKey(const std::vector<BrushStroke>& strokes) {
     QJsonArray arr;
     for (const auto& s : strokes)
@@ -231,6 +255,18 @@ QString strokesKey(const std::vector<BrushStroke>& strokes) {
 }
 
 } // namespace
+
+bool PhotoProcessor::retouchReady(const QImage& image, const PhotoRetouch& retouch) {
+    QImage out = image;
+    if (!retouch.erase.empty()) {
+        out = retouchCache().find(QStringLiteral("erase %1 %2").arg(image.cacheKey()).arg(strokesKey(retouch.erase)));
+        if (out.isNull())
+            return false;
+    }
+    if (retouch.faces > 0.0 && retouchCache().find(QStringLiteral("faces %1").arg(out.cacheKey())).isNull())
+        return false;
+    return true;
+}
 
 QImage PhotoProcessor::retouched(const QImage& image, const PhotoRetouch& retouch, const std::function<bool(double)>& progress,
                                  QString* error) {
@@ -267,14 +303,20 @@ QImage PhotoProcessor::retouched(const QImage& image, const PhotoRetouch& retouc
         out = done;
     }
     if (faces) {
-        const QString key = QStringLiteral("faces %1 %2").arg(out.cacheKey()).arg(retouch.faces);
+        // Restored fully once; the strength only mixes the restored faces
+        // with the photo, so changing it is instant.
+        const QString full = QStringLiteral("faces %1").arg(out.cacheKey());
+        const QString key = full + QStringLiteral(" %1").arg(retouch.faces);
         QImage done = retouchCache().find(key);
         if (done.isNull()) {
-            done = ai::restoreFaces(out, retouch.faces, [&](double p) { return !progress || progress(erase ? 0.5 + p / 2 : p); }, error);
-            if (done.isNull())
-                return {};
-            // Same format as the photo (a photo without transparency gets
-            // none), and the same image each time for the caches after.
+            QImage restored = retouchCache().find(full);
+            if (restored.isNull()) {
+                restored = ai::restoreFaces(out, 1.0, [&](double p) { return !progress || progress(erase ? 0.5 + p / 2 : p); }, error);
+                if (restored.isNull())
+                    return {};
+                retouchCache().insert(full, restored);
+            }
+            done = mix(out, restored, retouch.faces);
             if (!image.hasAlphaChannel())
                 done = done.convertToFormat(QImage::Format_RGBX64);
             done.setColorSpace(image.colorSpace());

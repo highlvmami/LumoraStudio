@@ -625,6 +625,40 @@ QIcon portrait() {
     });
 }
 
+QIcon eraser() {
+    return draw([](QPainter& p, QColor c) {
+        p.setPen(pen(c, 1.4));
+        p.setBrush(Qt::NoBrush);
+        // A tilted eraser block, its tip in the accent colour.
+        p.save();
+        p.translate(13, 10);
+        p.rotate(-40);
+        p.drawRoundedRect(QRectF(-8, -4, 16, 8), 1.5, 1.5);
+        p.setBrush(themeColors().accent);
+        p.drawRoundedRect(QRectF(-8, -4, 6, 8), 1.5, 1.5);
+        p.restore();
+        p.setPen(pen(c, 1.2));
+        p.drawLine(QPointF(3, 21), QPointF(21, 21));
+    });
+}
+
+QIcon face() {
+    return draw([](QPainter& p, QColor c) {
+        p.setPen(pen(c, 1.4));
+        p.setBrush(Qt::NoBrush);
+        p.drawEllipse(QPointF(11, 13), 7.5, 8.5);
+        p.setBrush(c);
+        p.drawEllipse(QPointF(8.5, 11.5), 0.9, 0.9);
+        p.drawEllipse(QPointF(13.5, 11.5), 0.9, 0.9);
+        p.setBrush(Qt::NoBrush);
+        p.drawArc(QRectF(8, 13, 6, 4.5), 200 * 16, 140 * 16);
+        // Sparkle.
+        p.setPen(pen(themeColors().accent, 1.6));
+        p.drawLine(QPointF(20, 1.5), QPointF(20, 7.5));
+        p.drawLine(QPointF(17, 4.5), QPointF(23, 4.5));
+    });
+}
+
 QIcon chevron(bool open) {
     return draw([open](QPainter& p, QColor c) {
         p.setPen(pen(c, 2.0));

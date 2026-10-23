@@ -46,6 +46,7 @@ namespace lumora {
 
 namespace {
 constexpr int kIdRole = Qt::UserRole + 1;
+constexpr int kSmartTab = 2;
 }
 
 // ----------------------------------------------------------- PhotoWorkspace
@@ -199,6 +200,33 @@ PhotoWorkspace::PhotoWorkspace(PhotoLibrary* library, QUndoStack* undo, QWidget*
             });
     connect(m_layers, &LayersPanel::currentLayerChanged, this, &PhotoWorkspace::updateMaskOverlay);
     connect(m_smart, &SmartToolsPanel::findRequested, this, &PhotoWorkspace::findRedactions);
+    connect(m_smart, &SmartToolsPanel::eraseModeChanged, this, [this](bool on) {
+        if (on && m_cropBtn->isChecked())
+            m_cropBtn->setChecked(false);
+        if (on && m_compareBtn->isChecked())
+            m_compareBtn->setChecked(false);
+        updateMaskOverlay();
+    });
+    connect(m_smart, &SmartToolsPanel::eraseBrushChanged, this, &PhotoWorkspace::updateMaskOverlay);
+    connect(m_smart, &SmartToolsPanel::retouchEdited, this, [this](const PhotoRetouch& r, const QString& text, const QString& field) {
+        if (m_syncing || m_current.isNull())
+            return;
+        if (r.faces > 0.0 && !ensureVisionModels(this, {QStringLiteral("face"), QStringLiteral("face-restore")}, tr("Restore faces"))) {
+            syncControls();
+            return;
+        }
+        PhotoAdjustments a = current();
+        a.retouch = r;
+        pushChange(a, text, PhotoAdjustCommand::Other, field);
+    });
+    auto* eraseKey = new QShortcut(QKeySequence(Qt::Key_E), this);
+    eraseKey->setContext(Qt::WidgetWithChildrenShortcut);
+    connect(eraseKey, &QShortcut::activated, this, [this] {
+        if (m_working.isNull())
+            return;
+        m_tabs->setCurrentIndex(kSmartTab);
+        m_smart->setEraseMode(!m_smart->eraseMode());
+    });
     connect(m_smart, &SmartToolsPanel::redactionEdited, this, [this](const Redaction& r, const QString& text, const QString& field) {
         if (m_syncing || m_current.isNull())
             return;
@@ -222,10 +250,12 @@ PhotoWorkspace::PhotoWorkspace(PhotoLibrary* library, QUndoStack* undo, QWidget*
         QSettings().setValue(QStringLiteral("photo/tab"), i);
         updateMaskOverlay();
     });
-    auto applyBrush = [this] { m_view->setBrush(m_layers->brush(), m_layers->showMaskOverlay()); };
-    connect(m_layers, &LayersPanel::brushChanged, this, applyBrush);
-    applyBrush();
+    connect(m_layers, &LayersPanel::brushChanged, this, &PhotoWorkspace::updateMaskOverlay);
     connect(m_view, &PhotoView::strokePainted, this, [this](const BrushStroke& stroke) {
+        if (erasing()) {
+            removeObject(stroke);
+            return;
+        }
         PhotoAdjustments a = current();
         for (auto& l : a.layers)
             if (l.id == m_layers->currentLayer())
@@ -395,7 +425,7 @@ void PhotoWorkspace::syncControls() {
     m_color->setGrade(a.color);
     m_color->setEditable(has);
     m_layers->setLayers(a.layers, has);
-    m_smart->setState(a.redaction, a.background, has);
+    m_smart->setState(a.retouch, a.redaction, a.background, has);
     m_view->setCrop(a.crop);
     for (QWidget* w : std::initializer_list<QWidget*>{m_cropBtn, m_aspect, m_exportBtn, m_compareBtn, m_fullScreenBtn, m_bgBtn})
         w->setEnabled(has);
@@ -416,7 +446,36 @@ void PhotoWorkspace::syncControls() {
     updateMaskOverlay();
 }
 
+bool PhotoWorkspace::erasing() const {
+    return m_smart->eraseMode() && m_tabs->currentIndex() == kSmartTab && !m_compare &&
+           !m_working.isNull();
+}
+
+void PhotoWorkspace::removeObject(const BrushStroke& stroke) {
+    if (m_current.isNull())
+        return;
+    PhotoAdjustments a = current();
+    if (stroke.erase && a.retouch.erase.empty())
+        return; // nothing removed yet to paint back
+    if (!stroke.erase && !ensureVisionModels(this, {QStringLiteral("inpaint")}, tr("Remove objects")))
+        return;
+    a.retouch.erase.push_back(stroke);
+    pushChange(a, stroke.erase ? tr("Bring part back") : tr("Remove object"), PhotoAdjustCommand::Other);
+}
+
 void PhotoWorkspace::updateMaskOverlay() {
+    if (erasing()) {
+        // A brush canvas over the photo; what was removed is not tinted, so
+        // the filled-in result shows.
+        LayerMask m;
+        m.shape = MaskShape::Brush;
+        m.strokes = current().retouch.erase;
+        m_view->setMaskOverlay(m);
+        m_view->setBrush(m_smart->eraseBrush(), false);
+        m_view->setPictureBox(std::nullopt);
+        return;
+    }
+    m_view->setBrush(m_layers->brush(), m_layers->showMaskOverlay());
     const PhotoLayer* l = m_layers->current();
     const bool show = l && m_tabs->currentIndex() == 1 && l->mask.shape != MaskShape::None && !m_compare;
     m_view->setMaskOverlay(show ? std::optional<LayerMask>(l->mask) : std::nullopt);
@@ -462,6 +521,31 @@ void PhotoWorkspace::render() {
         PhotoAdjustments before;
         before.crop = a.crop;
         a = before;
+    }
+    if (a.retouch.isActive() && a.retouch == m_skippedRetouch) {
+        a.retouch = {};
+    } else if (a.retouch.isActive() && !PhotoProcessor::retouchReady(m_proxy, a.retouch)) {
+        // Removing objects and restoring faces take a few seconds: done
+        // once behind a progress dialog, then kept.
+        if (m_preparing)
+            return;
+        m_preparing = true;
+        const QImage proxy = m_proxy;
+        const PhotoRetouch retouch = a.retouch;
+        QString err;
+        const auto ready = withProgress<bool>(this, tr("Repairing the photo…"), [proxy, retouch, &err](const TaskProgress& progress) {
+            return !PhotoProcessor::retouched(proxy, retouch, progress, &err).isNull();
+        });
+        m_preparing = false;
+        if (!ready || !*ready) {
+            if (ready && !err.isEmpty())
+                QMessageBox::warning(this, tr("Repair"), err);
+            // Shown without the repairs (not asked again for the same ones);
+            // undo takes the last one back.
+            m_skippedRetouch = a.retouch;
+            a.retouch = {};
+            emit statusMessage(tr("The photo is shown without its repairs. Undo (Ctrl+Z) takes the last one back."));
+        }
     }
     const QImage processed = PhotoProcessor::apply(m_proxy, a, false); // crop is drawn by the view
     QImage shown;
@@ -534,6 +618,18 @@ void PhotoWorkspace::showViewMenu(const QPoint& pos) {
     QMenu menu(this);
     menu.addAction(Icons::removeBackground(), a.background.enabled ? tr("Bring the background back") : tr("Remove background"),
                    this, &PhotoWorkspace::toggleBackground);
+    menu.addAction(Icons::eraser(), tr("Remove objects"), this, [this] {
+        m_tabs->setCurrentIndex(kSmartTab);
+        m_smart->setEraseMode(true);
+    });
+    menu.addAction(Icons::face(), a.retouch.faces > 0.0 ? tr("Original faces") : tr("Restore faces"), this, [this] {
+        PhotoAdjustments a = current();
+        const bool on = a.retouch.faces <= 0.0;
+        if (on && !ensureVisionModels(this, {QStringLiteral("face"), QStringLiteral("face-restore")}, tr("Restore faces")))
+            return;
+        a.retouch.faces = on ? 0.8 : 0.0;
+        pushChange(a, on ? tr("Restore faces") : tr("Original faces"), PhotoAdjustCommand::Other);
+    });
     menu.addAction(tr("Hide faces and plates"), this, &PhotoWorkspace::findRedactions);
     menu.addSeparator();
     menu.addAction(Icons::exportFile(), tr("Export photo…"), this, &PhotoWorkspace::exportCurrent);

@@ -1984,6 +1984,7 @@ QString MainWindow::shortcutsHtml() const {
     // Keys of the Photo workspace.
     for (const auto& [key, text] : {std::pair{QStringLiteral("C"), tr("Crop the photo")},
                                     std::pair{QStringLiteral("B"), tr("Remove the photo's background")},
+                                    std::pair{QStringLiteral("E"), tr("Paint over objects to remove them from the photo")},
                                     std::pair{QStringLiteral("\\"), tr("Compare the photo with the original")}})
         html += QStringLiteral("<tr><td><b>%1</b></td><td>%2</td></tr>").arg(key, text.toHtmlEscaped());
     html += QStringLiteral("</table>");

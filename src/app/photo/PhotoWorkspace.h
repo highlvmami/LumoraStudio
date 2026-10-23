@@ -59,6 +59,9 @@ private:
     void pushChange(const PhotoAdjustments& after, const QString& text, int control, const QString& key = {});
     void updateMaskOverlay();
     void findRedactions();
+    // The Smart tab's eraser is painting over the photo.
+    bool erasing() const;
+    void removeObject(const BrushStroke& stroke);
     // One click: cut the subject out with the default settings (or bring
     // the background back when it is already removed).
     void toggleBackground();
@@ -91,6 +94,8 @@ private:
     QLabel* m_info;
     QTimer* m_renderTimer;
     bool m_syncing = false;
+    bool m_preparing = false; // repairs being made behind a progress dialog
+    PhotoRetouch m_skippedRetouch; // cancelled: shown without
     int m_pictureDrags = 0; // keeps each drag of a sticker its own undo step
 };
 

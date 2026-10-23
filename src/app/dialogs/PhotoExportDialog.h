@@ -28,6 +28,7 @@ private:
     PhotoAdjustments m_adj;
     QComboBox* m_format;
     QComboBox* m_depth;
+    QComboBox* m_size;
     QSlider* m_quality;
     QLabel* m_qualityLabel;
     QLabel* m_note;
