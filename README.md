@@ -22,6 +22,12 @@ Açık tema ("Gündüz", Görünüm → Tema):
 
 Tam yol haritası: [docs/ozellikler.md](docs/ozellikler.md). Mimari: [docs/mimari.md](docs/mimari.md).
 
+## Sürüm 0.8.3: altyazı çevirisi
+
+- **Düzen → Altyazılar → Altyazıları çevir…**: bir altyazı izini seçtiğin dile çevirir ve aynı zamanlarla yeni bir altyazı izine yazar. Biçimi (yazı boyu, yer, kutu) kopyalanır; asıl iz olduğu gibi kalır.
+- Türkçe, İngilizce, Almanca, Fransızca, İspanyolca, İtalyanca, Felemenkçe, Rusça ve Arapça arasında her yöne. İki dil arasında doğrudan model yoksa İngilizce üzerinden çevrilir.
+- Çeviri bu bilgisayarda yapılır (Helsinki Üniversitesi'nin Opus-MT modelleri; Türkçe için daha büyük ve daha iyi "tc-big" modeller), hiçbir şey dışarı gönderilmez. Her dil çiftinin modeli ilk kullanımda bir kez indirilir (Türkçe→İngilizce yaklaşık 300 MB, İngilizce→Türkçe yaklaşık 535 MB, diğerleri yaklaşık 110 MB).
+
 ## Sürüm 0.7.1
 
 - **Klibin sesini kapat:** zaman çizelgesinde seçtiğin kliplerin sesini tek tuşla (**M**) ya da sağ tık menüsünden kapat; aynı izdeki diğer klipler sesli kalır, görüntü değişmez.

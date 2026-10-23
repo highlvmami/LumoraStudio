@@ -231,6 +231,31 @@ jobs:
           echo "LUMORA_VISION_MODELS=$HOME/vision-models" >> "$GITHUB_ENV"
           echo "LUMORA_FACE_IMAGE=$HOME/vision-models/face.jpg" >> "$GITHUB_ENV"
 
+      # Three translation models (Opus-MT, ONNX) for the end-to-end
+      # subtitle translation test: Turkish to English and back, and English
+      # to German for a translation through English.
+      - name: Translation test data
+        uses: actions/cache@v4
+        with:
+          path: ~/translate-models
+          key: translate-models-v1
+
+      - name: Prepare translation test
+        run: |
+          get() {
+            mkdir -p ~/translate-models/$1
+            for f in config.json vocab.json source.spm onnx/encoder_model_quantized.onnx:encoder.onnx \
+                     onnx/decoder_model_merged_quantized.onnx:decoder.onnx; do
+              remote=${f%%:*}; name=${f##*:}; name=${name##*/}
+              [ -f ~/translate-models/$1/$name ] || curl -sSfL -o ~/translate-models/$1/$name \
+                "https://huggingface.co/$2/resolve/main/$remote"
+            done
+          }
+          get tr-en Xenova/opus-mt-tc-big-tr-en
+          get en-tr onnx-community/opus-mt-tc-big-en-tr
+          get en-de Xenova/opus-mt-en-de
+          echo "LUMORA_TRANSLATE_MODELS=$HOME/translate-models" >> "$GITHUB_ENV"
+
       - name: Set up sccache
         uses: mozilla-actions/sccache-action@v0.0.9
 

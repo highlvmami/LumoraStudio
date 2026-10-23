@@ -108,34 +108,84 @@ std::vector<Tensor> Network::run(const Tensor& input, int outputs, QString* erro
 }
 
 std::vector<Tensor> Network::run(const std::vector<Tensor>& inputs, int outputs, QString* error) const {
-    std::vector<Tensor> out;
 #ifdef LUMORA_HAVE_ONNXRUNTIME
     if (inputs.size() != d->inputNames.size()) {
         if (error)
             *error = QStringLiteral("the model takes %1 inputs, not %2").arg(d->inputNames.size()).arg(inputs.size());
-        return out;
+        return {};
     }
+    std::vector<std::pair<std::string, Tensor>> named;
+    for (size_t i = 0; i < inputs.size(); ++i)
+        named.emplace_back(d->inputNames[i], inputs[i]);
+    const size_t count = outputs < 0 ? d->outputNames.size() : std::min<size_t>(outputs, d->outputNames.size());
+    return run(named, std::vector<std::string>(d->outputNames.begin(), d->outputNames.begin() + count), error);
+#else
+    (void)inputs, (void)outputs;
+    if (error)
+        *error = QStringLiteral("built without ONNX Runtime");
+    return {};
+#endif
+}
+
+std::vector<Tensor> Network::run(const std::vector<std::pair<std::string, Tensor>>& inputs,
+                                 const std::vector<std::string>& outputs, QString* error) const {
+    std::vector<Tensor> out;
+#ifdef LUMORA_HAVE_ONNXRUNTIME
     try {
         const Ort::MemoryInfo mem = Ort::MemoryInfo::CreateCpu(OrtArenaAllocator, OrtMemTypeDefault);
         std::vector<Ort::Value> in;
         std::vector<const char*> inNames;
-        for (size_t i = 0; i < inputs.size(); ++i) {
-            in.push_back(Ort::Value::CreateTensor<float>(mem, const_cast<float*>(inputs[i].data.data()), inputs[i].data.size(),
-                                                         inputs[i].shape.data(), inputs[i].shape.size()));
-            inNames.push_back(d->inputNames[i].c_str());
+        std::vector<std::unique_ptr<bool[]>> flags; // bool tensors need real bools
+        // Empty tensors (an empty cache) still need somewhere to point.
+        static float noFloat = 0;
+        static int64_t noInt = 0;
+        for (const auto& [name, t] : inputs) {
+            switch (t.type) {
+            case Tensor::Type::Float:
+                in.push_back(Ort::Value::CreateTensor<float>(mem, t.data.empty() ? &noFloat : const_cast<float*>(t.data.data()),
+                                                             t.data.size(), t.shape.data(), t.shape.size()));
+                break;
+            case Tensor::Type::Int64:
+                in.push_back(Ort::Value::CreateTensor<int64_t>(mem, t.ints.empty() ? &noInt : const_cast<int64_t*>(t.ints.data()),
+                                                               t.ints.size(), t.shape.data(), t.shape.size()));
+                break;
+            case Tensor::Type::Bool: {
+                auto& b = flags.emplace_back(std::make_unique<bool[]>(std::max<size_t>(1, t.ints.size())));
+                for (size_t i = 0; i < t.ints.size(); ++i)
+                    b[i] = t.ints[i] != 0;
+                in.push_back(Ort::Value::CreateTensor<bool>(mem, b.get(), t.ints.size(), t.shape.data(), t.shape.size()));
+                break;
+            }
+            }
+            inNames.push_back(name.c_str());
         }
-        const size_t count = outputs < 0 ? d->outputNames.size() : std::min<size_t>(outputs, d->outputNames.size());
         std::vector<const char*> names;
-        for (size_t i = 0; i < count; ++i)
-            names.push_back(d->outputNames[i].c_str());
+        for (const auto& name : outputs)
+            names.push_back(name.c_str());
         auto values = d->session->Run(Ort::RunOptions{nullptr}, inNames.data(), in.data(), in.size(), names.data(), names.size());
         for (auto& v : values) {
             Tensor t;
             const auto info = v.GetTensorTypeAndShapeInfo();
             t.shape = info.GetShape();
             const size_t n = info.GetElementCount();
-            const float* p = v.GetTensorData<float>();
-            t.data.assign(p, p + n);
+            switch (info.GetElementType()) {
+            case ONNX_TENSOR_ELEMENT_DATA_TYPE_INT64: {
+                t.type = Tensor::Type::Int64;
+                const int64_t* p = v.GetTensorData<int64_t>();
+                t.ints.assign(p, p + n);
+                break;
+            }
+            case ONNX_TENSOR_ELEMENT_DATA_TYPE_BOOL: {
+                t.type = Tensor::Type::Bool;
+                const bool* p = v.GetTensorData<bool>();
+                t.ints.assign(p, p + n);
+                break;
+            }
+            default: {
+                const float* p = v.GetTensorData<float>();
+                t.data.assign(p, p + n);
+            }
+            }
             out.push_back(std::move(t));
         }
     } catch (const Ort::Exception& e) {
@@ -149,6 +199,22 @@ std::vector<Tensor> Network::run(const std::vector<Tensor>& inputs, int outputs,
         *error = QStringLiteral("built without ONNX Runtime");
 #endif
     return out;
+}
+
+std::vector<std::string> Network::inputNames() const {
+#ifdef LUMORA_HAVE_ONNXRUNTIME
+    return d->inputNames;
+#else
+    return {};
+#endif
+}
+
+std::vector<std::string> Network::outputNames() const {
+#ifdef LUMORA_HAVE_ONNXRUNTIME
+    return d->outputNames;
+#else
+    return {};
+#endif
 }
 
 } // namespace lumora::ai

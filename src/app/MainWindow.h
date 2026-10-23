@@ -50,6 +50,7 @@ public:
     void openExportDialog(bool modal);
     void seekSeconds(double s);
     void autoSubtitles();
+    void translateSubtitles();
     // Opens a tool of the Tools menu by name (gif, collage, batch, screen,
     // voiceover); used for the screenshots of the booklet.
     void runTool(const QString& name);
@@ -204,6 +205,7 @@ private:
     QAction* m_actAddSubtitleTrack;
     QAction* m_actImportSubtitles;
     QAction* m_actAutoSubtitles;
+    QAction* m_actTranslateSubtitles;
     QAction* m_actExportSubtitles;
     QAction* m_actExportFrame;
     QAction* m_actFullScreenPreview;
