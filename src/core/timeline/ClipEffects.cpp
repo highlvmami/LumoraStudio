@@ -463,6 +463,13 @@ QJsonObject BackgroundRemoval::toJson() const {
     o["enabled"] = enabled;
     o["model"] = model;
     o["softness"] = softness;
+    if (!object.boxes.empty()) {
+        QJsonArray ba;
+        for (const auto& b : object.boxes)
+            ba.append(QJsonArray{ticksToJson(b.time), round4(b.rect.x()), round4(b.rect.y()), round4(b.rect.width()),
+                                 round4(b.rect.height())});
+        o["object"] = ba;
+    }
     return o;
 }
 
@@ -471,6 +478,12 @@ BackgroundRemoval BackgroundRemoval::fromJson(const QJsonObject& o) {
     b.enabled = o.value("enabled").toBool();
     b.model = o.value("model").toString(QStringLiteral("fast"));
     b.softness = std::clamp(o.value("softness").toDouble(0.5), 0.0, 1.0);
+    b.object.kind = RedactionKind::Manual;
+    for (const auto& v : o.value("object").toArray()) {
+        const QJsonArray a = v.toArray();
+        if (a.size() >= 5)
+            b.object.boxes.push_back({ticksFromJson(a[0], 0), QRectF(a[1].toDouble(), a[2].toDouble(), a[3].toDouble(), a[4].toDouble())});
+    }
     return b;
 }
 

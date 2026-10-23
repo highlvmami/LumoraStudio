@@ -11,6 +11,7 @@
 #include <thread>
 
 #include "ai/Redaction.h"
+#include "ai/ObjectCut.h"
 #include "ai/Vision.h"
 #include "color/ColorProcessor.h"
 #include "ffmpeg/FFmpeg.h"
@@ -579,10 +580,24 @@ QImage FrameRenderer::clipImage(const Clip& clip, Ticks sourceTime, QSize* fitSi
         // The detailed model takes seconds per frame; the preview uses the
         // fast one when it is there.
         QString model = clip.background.model;
-        if (!final && model != QLatin1String("fast") && ai::visionModelReady(ai::backgroundModelId(QStringLiteral("fast"))))
+        if (!final && model != QLatin1String("fast") && !clip.background.isObject() &&
+            ai::visionModelReady(ai::backgroundModelId(QStringLiteral("fast"))))
             model = QStringLiteral("fast");
+        if (clip.background.isObject())
+            model += final ? QStringLiteral(" precise") : QStringLiteral(" quick");
         if (slot->mattePts != pts || slot->matteModel != model || slot->matte.isNull()) {
-            slot->matte = ai::subjectMatte(img, model);
+            if (clip.background.isObject()) {
+                // The chosen object: outlined inside its box; nothing when
+                // the box is not known at this moment.
+                const QRectF box = clip.background.object.rectAt(pts, kTicksPerSecond / 2);
+                slot->matte = box.isEmpty() ? QImage() : ai::objectMatte(img, box, final);
+                if (slot->matte.isNull()) {
+                    slot->matte = QImage(img.size(), QImage::Format_Grayscale8);
+                    slot->matte.fill(box.isEmpty() ? 0 : 255);
+                }
+            } else {
+                slot->matte = ai::subjectMatte(img, model);
+            }
             slot->mattePts = pts;
             slot->matteModel = model;
         }

@@ -1,10 +1,12 @@
 #include <QPainter>
+#include <QPainterPath>
 #include <QTemporaryDir>
 #include <QtTest>
 #include <cmath>
 
 #include "TestMedia.h"
 #include "ai/Redaction.h"
+#include "ai/ObjectCut.h"
 #include "ai/Reframe.h"
 #include "ai/Vision.h"
 #include "image/PhotoAdjustments.h"
@@ -323,6 +325,63 @@ private slots:
                 QVERIFY2(std::abs(moved - (6.0 * 49) / 640) < 0.05, qPrintable(QString::number(moved)));
             }
         QCOMPARE(faces, 1);
+    }
+
+    void chosenObjectIsFollowedAndCutOut() {
+        // A patterned ball rolling to the right, 5 px a frame.
+        auto frame = [](int i) {
+            QImage img(640, 360, QImage::Format_RGB32);
+            img.fill(QColor(120, 130, 140));
+            QPainter p(&img);
+            p.setRenderHint(QPainter::Antialiasing);
+            QPainterPath ball;
+            ball.addEllipse(QPointF(150 + 5 * i, 180), 60, 60);
+            p.setClipPath(ball);
+            for (int y = 0; y < 8; ++y)
+                for (int x = 0; x < 8; ++x)
+                    p.fillRect(90 + 5 * i + x * 15, 120 + y * 15, 15, 15, (x + y) % 2 ? QColor(220, 50, 40) : QColor(250, 230, 60));
+            return img;
+        };
+        TestVideoSpec spec;
+        spec.seconds = 2;
+        spec.width = 640;
+        spec.height = 360;
+        spec.audio = false;
+        spec.paint = frame;
+        QString err;
+        QVERIFY2(writeTestVideo(m_dir.filePath("ball.mp4"), spec, &err), qPrintable(err));
+        Clip clip;
+        clip.sourceIn = 0;
+        clip.sourceOut = ticksFromSeconds(2);
+        const QRectF box(80.0 / 640, 110.0 / 360, 140.0 / 640, 140.0 / 360);
+        const auto r = ai::trackObject(m_dir.filePath("ball.mp4"), clip, box);
+        QVERIFY2(r.ok(), qPrintable(r.error));
+        QVERIFY(r.track.boxes.size() >= 12);
+        const double moved = (r.track.rectAt(r.track.end(), 0).center().x() - box.center().x()) * 640;
+        const double expected = 5.0 * (r.track.end() / static_cast<double>(frames(1)));
+        QVERIFY2(std::abs(moved - expected) < 12, qPrintable(QStringLiteral("%1 vs %2").arg(moved).arg(expected)));
+
+        BackgroundRemoval b;
+        b.enabled = true;
+        b.model = QStringLiteral("object");
+        b.object = r.track;
+        const BackgroundRemoval back = BackgroundRemoval::fromJson(b.toJson());
+        QVERIFY(back.isObject());
+        QCOMPARE(back.object.boxes.size(), b.object.boxes.size());
+        QCOMPARE(back.object.boxes.back().time, b.object.boxes.back().time);
+        QVERIFY(std::abs(back.object.boxes.back().rect.x() - b.object.boxes.back().rect.x()) < 1e-4);
+
+        if (!modelsPresent() || !ai::visionModelReady(QStringLiteral("segment")))
+            QSKIP("set LUMORA_VISION_MODELS (with the EfficientSAM model) to cut out");
+        const QImage img = frame(20);
+        const QRectF at = r.track.rectAt(frames(20), 0);
+        for (bool precise : {true, false}) {
+            const QImage matte = ai::objectMatte(img, at, precise, &err);
+            QVERIFY2(!matte.isNull(), qPrintable(err));
+            QVERIFY2(qGray(matte.pixel(250, 180)) > 200, qPrintable(QString::number(qGray(matte.pixel(250, 180)))));
+            QVERIFY(qGray(matte.pixel(250, 112)) < 60); // inside the box, above the ball
+            QVERIFY(qGray(matte.pixel(600, 300)) == 0); // outside the box
+        }
     }
 
     void platesAreFound() {

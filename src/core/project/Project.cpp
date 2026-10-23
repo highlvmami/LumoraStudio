@@ -86,7 +86,11 @@ QByteArray Project::toJson() const {
     // 0.8.1 photo repair: removed objects, restored faces.
     const bool retouch =
         std::any_of(photoEntries.begin(), photoEntries.end(), [](const auto& p) { return p.adjustments.retouch.isActive(); });
-    root["version"] = retouch ? 10 : cleanup ? 9 : tools ? 8 : stickers ? 7 : ai ? 6 : motion ? 5 : freezes ? 4 : subtitles ? 3 : 2;
+    // 0.8.2: a chosen object cut out, AI in-between frames.
+    const bool motionAi = anyClip([](const Clip& c) {
+        return (c.background.enabled && c.background.isObject()) || c.remap.blending == FrameBlending::AiFlow;
+    });
+    root["version"] = motionAi ? 11 : retouch ? 10 : cleanup ? 9 : tools ? 8 : stickers ? 7 : ai ? 6 : motion ? 5 : freezes ? 4 : subtitles ? 3 : 2;
     root["application"] = QCoreApplication::applicationVersion();
 
     QJsonArray media;
