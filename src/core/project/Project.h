@@ -20,7 +20,7 @@ public:
     // 3 adds subtitle tracks; projects without them are still written as 2 so
     // older versions can open them. 4 adds freeze frames, 5 stabilisation and
     // motion tracking; both are written only when the timeline uses them.
-    static constexpr int kFormatVersion = 9;
+    static constexpr int kFormatVersion = 10;
     static constexpr const char* kExtension = "lumora";
 
     explicit Project(QObject* parent = nullptr);

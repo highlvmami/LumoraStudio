@@ -87,6 +87,19 @@ struct PhotoLayer {
     static PhotoLayer fromJson(const QJsonObject& o);
 };
 
+// Repairs made with picture models on the photo as shot, before any colour
+// change: objects painted over with the eraser are removed and filled in,
+// then faces are restored.
+struct PhotoRetouch {
+    std::vector<BrushStroke> erase; // what to remove (strokes with `erase` set take back)
+    double faces = 0.0;             // 0 = off .. 1 = fully restored faces
+
+    bool isActive() const { return faces > 0.0 || !erase.empty(); }
+    bool operator==(const PhotoRetouch&) const = default;
+    QJsonObject toJson() const;
+    static PhotoRetouch fromJson(const QJsonObject& o);
+};
+
 // Non-destructive photo edit settings. The original file is never written;
 // these values are stored in the project and applied on display / export:
 // first the global colour settings, then the layers from bottom to top,
@@ -101,9 +114,11 @@ struct PhotoAdjustments {
     // time 0), then the background cut away (transparent).
     Redaction redaction;
     BackgroundRemoval background;
+    // Applied first, to the photo as shot.
+    PhotoRetouch retouch;
 
     bool hasLayerChanges() const;
-    bool hasAiChanges() const { return redaction.isActive() || background.enabled; }
+    bool hasAiChanges() const { return redaction.isActive() || background.enabled || retouch.isActive(); }
     // Anything that changes pixel values (as opposed to only cropping).
     bool hasToneChanges() const { return !color.isIdentity() || hasLayerChanges() || hasAiChanges(); }
     bool hasCrop() const { return !crop.isNull() && crop != QRectF(0, 0, 1, 1); }

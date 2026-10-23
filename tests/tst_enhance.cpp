@@ -1,10 +1,13 @@
 #include <QFileInfo>
 #include <QPainter>
+#include <QTemporaryDir>
 #include <QtTest>
 #include <cmath>
 
 #include "ai/Enhance.h"
 #include "ai/Vision.h"
+#include "image/PhotoAdjustments.h"
+#include "image/PhotoProcessor.h"
 
 using namespace lumora;
 
@@ -168,6 +171,60 @@ private slots:
         QCOMPARE(rgb.pixel(10, 10), img.pixel(10, 10));
         QCOMPARE(rgb.pixel(500, 500), img.pixel(500, 500));
         QCOMPARE(rgb.pixel(250, 210), img.pixel(250, 210));
+    }
+
+    void retouchSurvivesJson() {
+        PhotoAdjustments a;
+        QVERIFY(!a.hasAiChanges());
+        a.retouch.faces = 0.7;
+        BrushStroke s;
+        s.points = {QPointF(0.2, 0.3), QPointF(0.4, 0.3)};
+        s.radius = 0.05;
+        a.retouch.erase.push_back(s);
+        QVERIFY(a.hasAiChanges() && a.hasToneChanges());
+        const PhotoAdjustments b = PhotoAdjustments::fromJson(a.toJson());
+        QCOMPARE(b.retouch, a.retouch);
+        QVERIFY(!PhotoAdjustments::fromJson(PhotoAdjustments().toJson()).retouch.isActive());
+    }
+
+    void photoPipelineRemovesAndEnlarges() {
+        if (!modelReady("inpaint") || !modelReady("upscale-x2"))
+            QSKIP("set LUMORA_VISION_MODELS (with the object removal and 2x models) to run");
+        QImage img(320, 240, QImage::Format_RGB32);
+        img.fill(QColor(200, 210, 190));
+        QPainter(&img).fillRect(140, 100, 40, 40, Qt::black);
+        const QImage working = img.convertToFormat(QImage::Format_RGBX64);
+        PhotoAdjustments a;
+        BrushStroke s;
+        s.points = {QPointF(0.5, 0.5)};
+        s.radius = 0.15; // of the height: 36 px, covers the square
+        s.hardness = 1.0;
+        a.retouch.erase.push_back(s);
+        const QImage out = PhotoProcessor::apply(working, a);
+        QVERIFY(!out.hasAlphaChannel());
+        QVERIFY(qGray(out.convertToFormat(QImage::Format_RGB32).pixel(160, 120)) > 150);
+        // The second time comes from the cache, as the same image.
+        QCOMPARE(PhotoProcessor::retouched(working, a.retouch).cacheKey(), PhotoProcessor::retouched(working, a.retouch).cacheKey());
+
+        QTemporaryDir dir;
+        PhotoExportSettings es;
+        es.enlarge = 2;
+        QString err;
+        double last = -1;
+        QVERIFY2(PhotoExporter::save(dir.filePath(QStringLiteral("big.png")), img, working, a, es, &err, [&](double p) {
+            last = p;
+            return true;
+        }), qPrintable(err));
+        QCOMPARE(last, 1.0);
+        const QImage saved(dir.filePath(QStringLiteral("big.png")));
+        QCOMPARE(saved.size(), img.size() * 2);
+        QCOMPARE(PhotoExporter::sourceBitDepth(saved), 16);
+        QVERIFY(!saved.hasAlphaChannel());
+        QVERIFY(qGray(saved.pixel(320, 240)) > 150);
+        // Cancelling saves nothing.
+        QVERIFY(!PhotoExporter::save(dir.filePath(QStringLiteral("no.png")), img, working, PhotoAdjustments(), es, &err,
+                                     [](double) { return false; }));
+        QVERIFY(!QFileInfo::exists(dir.filePath(QStringLiteral("no.png"))));
     }
 };
 

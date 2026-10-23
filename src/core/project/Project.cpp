@@ -83,7 +83,10 @@ QByteArray Project::toJson() const {
     });
     // 0.8 sound clean-up: hum and wind removal.
     const bool cleanup = anyClip([](const Clip& c) { return c.audio.humHz > 0 || c.audio.wind > 0.0; });
-    root["version"] = cleanup ? 9 : tools ? 8 : stickers ? 7 : ai ? 6 : motion ? 5 : freezes ? 4 : subtitles ? 3 : 2;
+    // 0.8.1 photo repair: removed objects, restored faces.
+    const bool retouch =
+        std::any_of(photoEntries.begin(), photoEntries.end(), [](const auto& p) { return p.adjustments.retouch.isActive(); });
+    root["version"] = retouch ? 10 : cleanup ? 9 : tools ? 8 : stickers ? 7 : ai ? 6 : motion ? 5 : freezes ? 4 : subtitles ? 3 : 2;
     root["application"] = QCoreApplication::applicationVersion();
 
     QJsonArray media;
