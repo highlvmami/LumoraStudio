@@ -9,6 +9,7 @@
 #include <QSaveFile>
 
 #include "ai/SpeechToText.h"
+#include "ai/Translate.h"
 #include "ai/Vision.h"
 
 namespace lumora {
@@ -76,6 +77,34 @@ bool ensureVisionModels(QWidget* parent, const QStringList& ids, const QString& 
             if (!error.isEmpty())
                 QMessageBox::warning(parent, title, Tasks::tr("The %1 model could not be downloaded: %2").arg(m.label, error));
             return false;
+        }
+    }
+    return true;
+}
+
+bool ensureTranslationModels(QWidget* parent, const QStringList& ids, const QString& title) {
+    if (!translate::available()) {
+        QMessageBox::information(parent, title, Tasks::tr("This build of LumoraStudio has no AI tools."));
+        return false;
+    }
+    for (const QString& id : ids) {
+        if (translate::modelReady(id))
+            continue;
+        const translate::Model m = translate::model(id);
+        const QStringList pair = id.split(QLatin1Char('-'));
+        const QString name = Tasks::tr("%1 → %2").arg(translate::languageName(pair.value(0)), translate::languageName(pair.value(1)));
+        const QString dir = translate::modelDir(id);
+        for (const auto& file : translate::modelFiles()) {
+            const QString dest = dir + QLatin1Char('/') + file.local;
+            if (QFileInfo::exists(dest))
+                continue;
+            QString error;
+            if (!downloadFile(parent, translate::fileUrl(id, file), dest,
+                              Tasks::tr("Downloading the %1 translation model (about %2 MB, once)…").arg(name).arg(m.sizeMB), &error)) {
+                if (!error.isEmpty())
+                    QMessageBox::warning(parent, title, Tasks::tr("The %1 translation model could not be downloaded: %2").arg(name, error));
+                return false;
+            }
         }
     }
     return true;

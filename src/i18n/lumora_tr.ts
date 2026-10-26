@@ -2506,6 +2506,84 @@
         <source>Translation is done by the same model on this computer; the larger models translate better</source>
         <translation>Çeviriyi bu bilgisayarda aynı model yapar; büyük modeller daha iyi çevirir</translation>
     </message>
+    <message>
+        <source>&amp;Translate subtitles…</source>
+        <translation>Altyazıları &amp;çevir…</translation>
+    </message>
+    <message>
+        <source>Writes a subtitle track in another language, on this computer (Opus-MT)</source>
+        <translation>Altyazıları başka bir dilde yeni bir ize yazar, bu bilgisayarda (Opus-MT)</translation>
+    </message>
+    <message>
+        <source>Translate subtitles</source>
+        <translation>Altyazıları çevir</translation>
+    </message>
+    <message>
+        <source>This build of LumoraStudio has no AI tools.</source>
+        <translation>LumoraStudio&apos;nun bu sürümünde yapay zeka araçları yok.</translation>
+    </message>
+    <message>
+        <source>There are no subtitles to translate yet. Import subtitles or write them from speech first.</source>
+        <translation>Çevrilecek altyazı yok. Önce bir altyazı dosyası içe aktarın ya da altyazıyı konuşmadan yazdırın.</translation>
+    </message>
+    <message>
+        <source>LumoraStudio writes the subtitles in another language as a new subtitle track, with the same times. Translation runs on this computer; nothing is sent anywhere. Each language pair&apos;s model is downloaded once.</source>
+        <translation>LumoraStudio altyazıları başka bir dilde, aynı zamanlarla yeni bir altyazı izine yazar. Çeviri bu bilgisayarda yapılır, hiçbir şey dışarı gönderilmez. Her dil çiftinin modeli bir kez indirilir.</translation>
+    </message>
+    <message>
+        <source>%1 (%2)</source>
+        <translation>%1 (%2)</translation>
+    </message>
+    <message>
+        <source>Subtitle track</source>
+        <translation>Altyazı izi</translation>
+    </message>
+    <message>
+        <source>From</source>
+        <translation>Kaynak dil</translation>
+    </message>
+    <message>
+        <source>Into</source>
+        <translation>Hedef dil</translation>
+    </message>
+    <message>
+        <source>Translate</source>
+        <translation>Çevir</translation>
+    </message>
+    <message>
+        <source>Choose two different languages.</source>
+        <translation>İki farklı dil seçin.</translation>
+    </message>
+    <message>
+        <source>This pair of languages is not offered.</source>
+        <translation>Bu dil çifti için çeviri yok.</translation>
+    </message>
+    <message>
+        <source>Translated through English. Needs a one-time download of about %1 MB.</source>
+        <translation>İngilizce üzerinden çevrilir. Bir kez yaklaşık %1 MB indirilir.</translation>
+    </message>
+    <message>
+        <source>Translated through English.</source>
+        <translation>İngilizce üzerinden çevrilir.</translation>
+    </message>
+    <message>
+        <source>Needs a one-time download of about %1 MB.</source>
+        <translation>Bir kez yaklaşık %1 MB indirilir.</translation>
+    </message>
+    <message>
+        <source>The model is on this computer.</source>
+        <translation>Model bu bilgisayarda hazır.</translation>
+    </message>
+    <message>
+        <source>Translating the subtitles…</source>
+        <translation>Altyazılar çevriliyor…</translation>
+    </message>
+    <message numerus="yes">
+        <source>%n subtitle(s) translated into %1. Check them: select a cue to correct its text in Properties.</source>
+        <translation>
+            <numerusform>%n altyazı çevrildi (%1). Kontrol edin: düzeltmek için bir satırı seçip metnini Özellikler panelinde değiştirin.</numerusform>
+        </translation>
+    </message>
 </context>
 <context>
     <name>lumora::MediaBinPanel</name>
@@ -4519,6 +4597,18 @@ Orijinal dosya asla değişmez: düzenlemeler projede saklanır ve dışa aktar�
         <source>The model could not be downloaded: %1</source>
         <translation>Model indirilemedi: %1</translation>
     </message>
+    <message>
+        <source>%1 → %2</source>
+        <translation>%1 → %2</translation>
+    </message>
+    <message>
+        <source>Downloading the %1 translation model (about %2 MB, once)…</source>
+        <translation>%1 çeviri modeli indiriliyor (yaklaşık %2 MB, bir kez)…</translation>
+    </message>
+    <message>
+        <source>The %1 translation model could not be downloaded: %2</source>
+        <translation>%1 çeviri modeli indirilemedi: %2</translation>
+    </message>
 </context>
 <context>
     <name>lumora::TimelinePanel</name>
@@ -6170,6 +6260,69 @@ Unvan</translation>
     <message>
         <source>Cancelled.</source>
         <translation>İptal edildi.</translation>
+    </message>
+</context>
+<context>
+    <name>lumora::translate</name>
+    <message>
+        <source>Turkish</source>
+        <translation>Türkçe</translation>
+    </message>
+    <message>
+        <source>English</source>
+        <translation>İngilizce</translation>
+    </message>
+    <message>
+        <source>German</source>
+        <translation>Almanca</translation>
+    </message>
+    <message>
+        <source>French</source>
+        <translation>Fransızca</translation>
+    </message>
+    <message>
+        <source>Spanish</source>
+        <translation>İspanyolca</translation>
+    </message>
+    <message>
+        <source>Italian</source>
+        <translation>İtalyanca</translation>
+    </message>
+    <message>
+        <source>Dutch</source>
+        <translation>Felemenkçe</translation>
+    </message>
+    <message>
+        <source>Russian</source>
+        <translation>Rusça</translation>
+    </message>
+    <message>
+        <source>Arabic</source>
+        <translation>Arapça</translation>
+    </message>
+    <message>
+        <source>No translation model for %1.</source>
+        <translation>%1 için çeviri modeli yok.</translation>
+    </message>
+    <message>
+        <source>The translation model has not been downloaded yet.</source>
+        <translation>Çeviri modeli henüz indirilmedi.</translation>
+    </message>
+    <message>
+        <source>This build of LumoraStudio has no AI tools.</source>
+        <translation>LumoraStudio&apos;nun bu sürümünde yapay zeka araçları yok.</translation>
+    </message>
+    <message>
+        <source>The translation model could not be loaded: %1</source>
+        <translation>Çeviri modeli açılamadı: %1</translation>
+    </message>
+    <message>
+        <source>Subtitles cannot be translated from %1 into %2.</source>
+        <translation>%1 → %2 altyazı çevirisi yapılamıyor.</translation>
+    </message>
+    <message>
+        <source>Translation failed: %1</source>
+        <translation>Çeviri yapılamadı: %1</translation>
     </message>
 </context>
 </TS>

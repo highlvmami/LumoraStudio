@@ -69,6 +69,7 @@
 #include "project/Project.h"
 #include "ai/Redaction.h"
 #include "ai/SpeechToText.h"
+#include "ai/Translate.h"
 #include "ai/ObjectCut.h"
 #include "ai/Vision.h"
 #include "motion/Analysis.h"
@@ -459,6 +460,8 @@ void MainWindow::createActions() {
     m_actImportSubtitles = make(tr("Import subtitles (SRT, VTT)…"), {}, &MainWindow::importSubtitles);
     m_actAutoSubtitles = make(tr("&Automatic subtitles from speech…"), {}, &MainWindow::autoSubtitles, Icons::title());
     m_actAutoSubtitles->setToolTip(tr("Writes subtitles from what is said, on this computer (Whisper)"));
+    m_actTranslateSubtitles = make(tr("&Translate subtitles…"), {}, &MainWindow::translateSubtitles);
+    m_actTranslateSubtitles->setToolTip(tr("Writes a subtitle track in another language, on this computer (Opus-MT)"));
     m_actExportSubtitles = make(tr("Export subtitles…"), {}, &MainWindow::exportSubtitles);
     m_actExportFrame = make(tr("Export current &frame…"), QKeySequence(Qt::CTRL | Qt::ALT | Qt::Key_S),
                             &MainWindow::exportFrame);
@@ -537,6 +540,7 @@ void MainWindow::createMenus() {
     subs->addAction(m_actAddSubtitle);
     subs->addAction(m_actAddSubtitleTrack);
     subs->addAction(m_actAutoSubtitles);
+    subs->addAction(m_actTranslateSubtitles);
     subs->addSeparator();
     subs->addAction(m_actImportSubtitles);
     subs->addAction(m_actExportSubtitles);
@@ -729,7 +733,7 @@ void MainWindow::setWorkspace(Workspace w) {
     for (QAction* a : {m_actSplit, m_actDelete, m_actJoin, m_actFreeze, m_actMuteClip, m_actPlay, m_actPrevFrame, m_actNextFrame, m_actHome, m_actEnd,
                        m_actMarkIn, m_actMarkOut, m_actAddSource, m_actZoomIn, m_actZoomOut, m_actExport, m_actAddTitle, m_actAddSticker,
                        m_actAddTransition, m_actAddVideoTrack, m_actAddAudioTrack, m_actExportFrame, m_actAddSubtitle,
-                       m_actAddSubtitleTrack, m_actImportSubtitles, m_actExportSubtitles, m_actAutoSubtitles})
+                       m_actAddSubtitleTrack, m_actImportSubtitles, m_actExportSubtitles, m_actAutoSubtitles, m_actTranslateSubtitles})
         a->setVisible(!fullPage);
     m_actExportPhoto->setVisible(photo);
 }
@@ -1508,6 +1512,143 @@ void MainWindow::autoSubtitles() {
                              8000);
 }
 
+void MainWindow::translateSubtitles() {
+    const QString title = tr("Translate subtitles");
+    if (!translate::available()) {
+        QMessageBox::information(this, title, tr("This build of LumoraStudio has no AI tools."));
+        return;
+    }
+    Timeline* tl = m_project->timeline();
+    // Subtitle tracks with cues; the one of the selected subtitle first.
+    int selectedTrack = -1;
+    const auto sel = m_timelineView->selection();
+    if (!sel.isEmpty())
+        if (auto loc = tl->locate(sel.front()); loc && tl->tracks()[loc->track].isSubtitle())
+            selectedTrack = loc->track;
+    std::vector<int> tracks;
+    for (int ti : tl->state().trackIndices(TrackType::Subtitle))
+        if (!tl->tracks()[ti].clips.empty())
+            tracks.push_back(ti);
+    if (tracks.empty()) {
+        QMessageBox::information(this, title,
+                                 tr("There are no subtitles to translate yet. Import subtitles or write them from speech first."));
+        return;
+    }
+    const auto codeOf = [](const QString& iso) {
+        for (const auto& l : translate::languages())
+            if (subtitles::isoLanguage(l.code) == iso)
+                return l.code;
+        return QString();
+    };
+
+    QDialog dlg(this);
+    dlg.setWindowTitle(title);
+    auto* layout = new QVBoxLayout(&dlg);
+    auto* intro = new QLabel(tr("LumoraStudio writes the subtitles in another language as a new subtitle track, with the same "
+                                "times. Translation runs on this computer; nothing is sent anywhere. Each language pair's model "
+                                "is downloaded once."));
+    intro->setWordWrap(true);
+    layout->addWidget(intro);
+    auto* form = new QFormLayout;
+    auto* trackBox = new QComboBox;
+    for (int ti : tracks) {
+        const Track& t = tl->tracks()[ti];
+        const QString lang = codeOf(t.language);
+        trackBox->addItem(lang.isEmpty() ? t.name : tr("%1 (%2)").arg(t.name, translate::languageName(lang)), ti);
+    }
+    trackBox->setCurrentIndex(std::max(0, trackBox->findData(selectedTrack)));
+    if (tracks.size() > 1)
+        form->addRow(tr("Subtitle track"), trackBox);
+    QSettings settings;
+    auto* fromBox = new QComboBox;
+    auto* toBox = new QComboBox;
+    for (const auto& l : translate::languages()) {
+        fromBox->addItem(l.name, l.code);
+        toBox->addItem(l.name, l.code);
+    }
+    const auto pickSource = [&] {
+        const QString lang = codeOf(tl->tracks()[trackBox->currentData().toInt()].language);
+        const QString fallback = settings.value(QStringLiteral("translate/from"), settings.value(QStringLiteral("speech/language"),
+                                                                                                QStringLiteral("tr"))).toString();
+        fromBox->setCurrentIndex(std::max(0, fromBox->findData(lang.isEmpty() ? fallback : lang)));
+    };
+    pickSource();
+    toBox->setCurrentIndex(std::max(0, toBox->findData(settings.value(QStringLiteral("translate/to"), QStringLiteral("en")))));
+    if (toBox->currentData() == fromBox->currentData())
+        toBox->setCurrentIndex(toBox->findData(fromBox->currentData() == QLatin1String("en") ? QStringLiteral("tr") : QStringLiteral("en")));
+    form->addRow(tr("From"), fromBox);
+    form->addRow(tr("Into"), toBox);
+    layout->addLayout(form);
+    auto* note = new QLabel;
+    note->setWordWrap(true);
+    layout->addWidget(note);
+    auto* buttons = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel);
+    buttons->button(QDialogButtonBox::Ok)->setText(tr("Translate"));
+    markPrimary(buttons->button(QDialogButtonBox::Ok));
+    connect(buttons, &QDialogButtonBox::accepted, &dlg, &QDialog::accept);
+    connect(buttons, &QDialogButtonBox::rejected, &dlg, &QDialog::reject);
+    layout->addWidget(buttons);
+    const auto update = [&] {
+        const QStringList route = translate::route(fromBox->currentData().toString(), toBox->currentData().toString());
+        int download = 0;
+        for (const QString& id : route)
+            if (!translate::modelReady(id))
+                download += translate::model(id).sizeMB;
+        if (route.isEmpty())
+            note->setText(fromBox->currentData() == toBox->currentData() ? tr("Choose two different languages.")
+                                                                         : tr("This pair of languages is not offered."));
+        else if (route.size() > 1 && download > 0)
+            note->setText(tr("Translated through English. Needs a one-time download of about %1 MB.").arg(download));
+        else if (route.size() > 1)
+            note->setText(tr("Translated through English."));
+        else if (download > 0)
+            note->setText(tr("Needs a one-time download of about %1 MB.").arg(download));
+        else
+            note->setText(tr("The model is on this computer."));
+        buttons->button(QDialogButtonBox::Ok)->setEnabled(!route.isEmpty());
+    };
+    connect(trackBox, &QComboBox::currentIndexChanged, &dlg, [&] {
+        pickSource();
+        update();
+    });
+    connect(fromBox, &QComboBox::currentIndexChanged, &dlg, update);
+    connect(toBox, &QComboBox::currentIndexChanged, &dlg, update);
+    update();
+    if (dlg.exec() != QDialog::Accepted)
+        return;
+    const QString from = fromBox->currentData().toString(), to = toBox->currentData().toString();
+    settings.setValue(QStringLiteral("translate/from"), from);
+    settings.setValue(QStringLiteral("translate/to"), to);
+    if (!ensureTranslationModels(this, translate::route(from, to), title))
+        return;
+    const int track = trackBox->currentData().toInt();
+    if (track < 0 || track >= static_cast<int>(tl->tracks().size()))
+        return;
+    const std::vector<SubtitleCue> cues = tl->state().subtitleCues(track);
+    const SubtitleStyle style = tl->tracks()[track].subtitleStyle;
+    const auto result = withProgress<translate::Result>(this, tr("Translating the subtitles…"),
+                                                        [cues, from, to](const TaskProgress& p) {
+                                                            return translate::translateCues(cues, from, to, p);
+                                                        });
+    if (!result || result->cancelled)
+        return;
+    if (!result->error.isEmpty()) {
+        QMessageBox::warning(this, title, result->error);
+        return;
+    }
+    runTimelineEdit(m_videoUndo, tl, title, [&] {
+        const int added = tl->addSubtitleTrack(result->cues, subtitles::isoLanguage(to));
+        if (added < 0)
+            return false;
+        tl->setSubtitleStyle(added, style);
+        return true;
+    });
+    statusBar()->showMessage(tr("%n subtitle(s) translated into %1. Check them: select a cue to correct its text in Properties.",
+                                nullptr, static_cast<int>(result->cues.size()))
+                                 .arg(translate::languageName(to)),
+                             8000);
+}
+
 void MainWindow::stabilizeClip(const QUuid& clipId) {
     Timeline* tl = m_project->timeline();
     const Clip* c = tl->clip(clipId);
@@ -1782,7 +1923,8 @@ void MainWindow::runTool(const QString& name) {
                                                       {"voiceover", m_actVoiceover},
                                                       {"silences", m_actCutSilences},
                                                       {"beat", m_actBeatCut},
-                                                      {"reframe", m_actReframe}};
+                                                      {"reframe", m_actReframe},
+                                                      {"translate", m_actTranslateSubtitles}};
     for (const auto& [id, action] : tools)
         if (name == QLatin1String(id))
             action->trigger();
