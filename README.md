@@ -6,15 +6,23 @@
 - Yeniden kodlamak gerekiyorsa "kaynakla aynı" seçeneği kodek, çözünürlük, kare hızı, bit derinliği, renk ve bit hızını kaynaktan alır.
 - Fotoğraflarda orijinal dosyaya asla yazılmaz; ayarlar projede saklanır, dışa aktarırken 32 bit kayan noktada hesaplanıp kayıpsız kaydedilir.
 
+<p align="center">
+  <img src="docs/tanitim/kapak.png" width="49%" alt="LumoraStudio: video ve fotoğraf düzenleme, ücretsiz, tamamen yerel">
+  <img src="docs/tanitim/kurgu.png" width="49%" alt="Bütün vlog, tek ekranda">
+</p>
+
+Bir vlog kurgusu, kurgu çalışma alanında: görüntü, kamera sesi, seslendirme ve müzik ayrı kanallarda; başlıklar, altyazılar, geçişler ve renk ayarı klip klip.
+
 ![Kurgu çalışma alanı](docs/screenshots/kurgu.png)
 
-| Renk | Fotoğraf katmanları |
-|---|---|
-| ![Renk çalışma alanı](docs/screenshots/renk.png) | ![Fotoğraf katmanları ve maske](docs/screenshots/katmanlar.png) |
-
-| Dışa aktarma | Fotoğraf |
-|---|---|
-| ![Dışa aktarma penceresi](docs/screenshots/disa-aktar.png) | ![Fotoğraf çalışma alanı](docs/screenshots/fotograf.png) |
+<p align="center">
+  <img src="docs/tanitim/kalite.png" width="49%" alt="Kalite, siz istemedikçe düşmez">
+  <img src="docs/tanitim/yapay-zeka.png" width="49%" alt="Yapay zekâ, kendi bilgisayarında">
+</p>
+<p align="center">
+  <img src="docs/tanitim/renk-fotograf.png" width="49%" alt="Renk ve fotoğrafta tam kontrol">
+  <img src="docs/tanitim/altyazi-ceviri.png" width="49%" alt="Altyazını başka dile çevir">
+</p>
 
 Açık tema ("Gündüz", Görünüm → Tema):
 
