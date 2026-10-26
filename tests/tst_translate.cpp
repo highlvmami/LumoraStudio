@@ -182,7 +182,7 @@ private slots:
         QCOMPARE(r.cues[2].start, cues[2].start);
         QCOMPARE(r.cues[2].end, cues[2].end);
         QVERIFY(r.cues[0].text.contains(QStringLiteral("Morgen"), Qt::CaseInsensitive));
-        QVERIFY(r.cues[2].text.contains(QStringLiteral("Wetter"), Qt::CaseInsensitive));
+        QVERIFY(r.cues[2].text.contains(QStringLiteral("schön"), Qt::CaseInsensitive));
         QCOMPARE(last, 1.0);
 
         const auto cancelled = translate::translateCues(cues, QStringLiteral("tr"), QStringLiteral("en"), [](double) { return false; });
